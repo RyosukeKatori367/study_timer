@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>グミ勉</title>
+    <meta name="description" content="勉強用タイマー" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="グミ勉" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="views">
+        <!-- 中央: 横スワイプで3つのモードを切り替える -->
+        <main class="view active" data-view="main">
+          <div id="pager">
+            <section class="page" data-mode="pomodoro" aria-label="ポモドーロ"></section>
+            <section class="page" data-mode="timer" aria-label="タイマー"></section>
+            <section class="page" data-mode="stopwatch" aria-label="ストップウォッチ"></section>
+          </div>
+        </main>
+        <main class="view scroll" data-view="stats"></main>
+        <main class="view scroll" data-view="settings"></main>
+      </div>
+
+      <footer id="chrome">
+        <div id="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <nav aria-label="メニュー">
+          <button type="button" data-view="stats" aria-label="統計">
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 20v-5M12 20V9M18 20V4" /></svg>
+          </button>
+          <button type="button" data-view="main" aria-label="タイマー">
+            <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          </button>
+          <button type="button" data-view="settings" aria-label="設定">
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>
+          </button>
+        </nav>
+      </footer>
+
+      <!-- 計測中の画面（全画面でかぶせるので、計測中は横スワイプできない） -->
+      <div id="run" hidden></div>
+      <div id="sheet" hidden></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
