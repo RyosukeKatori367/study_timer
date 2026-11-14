@@ -7,6 +7,7 @@ import { initStopwatchPage } from './pages/stopwatch';
 import { initTimerPage } from './pages/timer';
 import { initRun } from './run';
 import { requestPersistence } from './store';
+import { armTilt } from './tilt';
 import { $ } from './ui/dom';
 
 type ViewName = 'main' | 'stats' | 'settings';
@@ -37,6 +38,26 @@ function refreshAll(): void {
 
 initSettingsPage($('.view[data-view="settings"]'), refreshAll);
 initRun(refreshAll);
+
+armTilt();
+
+// ---- ダブルタップ対策 ----
+// iPhone のホーム画面アプリでは、何もないところをダブルタップすると画面全体がずれて、
+// ボタンの反応する位置までずれてしまうことがある。ボタン以外でのダブルタップを無効にする。
+let lastTouchEnd = 0;
+document.addEventListener(
+  'touchend',
+  (e) => {
+    const now = Date.now();
+    const target = e.target instanceof Element ? e.target : null;
+    const interactive = target?.closest('button, input, .drum, .presets, .lap-list');
+    if (now - lastTouchEnd < 350 && !interactive) e.preventDefault();
+    lastTouchEnd = now;
+  },
+  { passive: false },
+);
+document.addEventListener('dblclick', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 // ---- 下のメニュー ----
 

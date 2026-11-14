@@ -5,10 +5,12 @@
   --muted: #a8a8a8;
   --light: #e6e6e6;
   --red: #ff6259;
+  /* 大きさは画面ではなく #app の幅・高さ（cqw / cqh）を基準にする。
+     iPhone のホーム画面アプリでは vh や dvh が実際の表示領域とずれることがあるため */
   /* 円の大きさ。小さい画面では縮む */
-  --ring: min(290px, 74vw, 36dvh);
+  --ring: min(290px, 74cqw, 36cqh);
   --drum-item: 44px;
-  --pad-top: clamp(20px, 5dvh, 52px);
+  --pad-top: clamp(20px, 5cqh, 52px);
   color-scheme: dark;
 }
 
@@ -21,8 +23,11 @@ html,
 body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
   background: var(--bg);
   overscroll-behavior: none;
+  /* ダブルタップでの拡大を止める（#app の外の余白も含めるため html にも指定する） */
+  touch-action: manipulation;
 }
 
 body {
@@ -68,6 +73,7 @@ h1 {
   inset: 0;
   max-width: 480px;
   margin: 0 auto;
+  container-type: size;
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
@@ -432,7 +438,7 @@ nav button:focus-visible {
 }
 
 .btn-start {
-  height: clamp(110px, 20dvh, 164px);
+  height: clamp(110px, 20cqh, 164px);
   border-radius: 20px;
   background: #fff;
   color: #000;
@@ -483,7 +489,7 @@ nav button:focus-visible {
 }
 
 .card {
-  height: clamp(88px, 13dvh, 112px);
+  height: clamp(88px, 13cqh, 112px);
   border-radius: 16px;
   background: var(--card);
   display: flex;
@@ -572,7 +578,7 @@ nav button:focus-visible {
   z-index: 10;
   background: var(--bg);
   padding: calc(env(safe-area-inset-top) + var(--pad-top)) 24px
-    calc(env(safe-area-inset-bottom) + clamp(16px, 4dvh, 40px));
+    calc(env(safe-area-inset-bottom) + clamp(16px, 4cqh, 40px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -668,7 +674,7 @@ nav button:focus-visible {
 }
 
 .run-btns button {
-  height: clamp(60px, 9dvh, 76px);
+  height: clamp(60px, 9cqh, 76px);
   border-radius: 10px;
   font-size: 17px;
 }
@@ -782,6 +788,99 @@ nav button:focus-visible {
 #run[data-mode='stopwatch'] .lap-total {
   font-size: 19px;
   color: #fff;
+}
+
+/* ---------- 計測中（横向き） ---------- */
+
+/* 左に大きな円、右に見出し・ラップ・ボタン */
+#run.land {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'ring head'
+    'ring mid'
+    'ring btns';
+  gap: 10px 32px;
+  align-items: center;
+  justify-content: normal;
+  padding: 16px calc(env(safe-area-inset-right) + 24px) calc(env(safe-area-inset-bottom) + 16px)
+    calc(env(safe-area-inset-left) + 24px);
+  --ring: min(340px, calc(var(--short) - 40px), calc(var(--long) * 0.42));
+}
+
+#run.land .ring-wrap {
+  grid-area: ring;
+}
+
+#run.land .run-head {
+  grid-area: head;
+}
+
+#run.land .run-info,
+#run.land .run-laps {
+  grid-area: mid;
+}
+
+#run.land .run-btns {
+  grid-area: btns;
+}
+
+#run.land .run-btns button {
+  height: 64px;
+}
+
+/* 向きロック中に本体を倒したとき: 幅と高さを入れ替えた箱（JS で指定）を90度回す */
+#run.rot-left,
+#run.rot-right {
+  inset: 0 auto auto 0;
+  transform-origin: 0 0;
+}
+
+/* 回した中ではスクロールの向きが指とずれるので、ラップは新しい4件だけ見せる */
+#run.rot-left .lap-list,
+#run.rot-right .lap-list {
+  overflow: hidden;
+}
+
+/* 本体の上端が左: 画面の上端（ステータスバー側）が表示の左にくる */
+#run.rot-left {
+  transform: translateX(var(--short)) rotate(90deg);
+  padding: 18px calc(env(safe-area-inset-bottom) + 20px) 18px calc(env(safe-area-inset-top) + 24px);
+}
+
+/* 本体の上端が右 */
+#run.rot-right {
+  transform: translateY(var(--long)) rotate(-90deg);
+  padding: 18px calc(env(safe-area-inset-top) + 24px) 18px calc(env(safe-area-inset-bottom) + 20px);
+}
+
+/* 本体が実際に横向きになったとき（向きロックがオフ）: 設定画面などは縦にスクロールできるようにする */
+@media (orientation: landscape) and (max-height: 520px) {
+  #app {
+    max-width: none;
+  }
+
+  .views,
+  #chrome {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .page {
+    overflow-y: auto;
+  }
+
+  .page-main,
+  .btn-start.wide {
+    flex: none;
+  }
+
+  #chrome {
+    gap: 6px;
+    padding: 4px 0 8px;
+  }
 }
 
 /* ---------- 統計・設定 ---------- */
@@ -1041,6 +1140,20 @@ button.list-row {
 #toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* 横向きに回して表示しているあいだは、お知らせも同じ向きにする */
+#app[data-rot='left'] #toast {
+  top: 50%;
+  left: auto;
+  right: 30px;
+  transform: translate(50%, -50%) rotate(90deg);
+}
+
+#app[data-rot='right'] #toast {
+  top: 50%;
+  left: 30px;
+  transform: translate(-50%, -50%) rotate(-90deg);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -13,6 +13,7 @@ import {
   timerRemaining,
   totalElapsed,
 } from './engine';
+import { nextTilt } from './orientation';
 import { summarize } from './summary';
 import { MIN, SEC, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
 
@@ -159,5 +160,27 @@ describe('集計と表示', () => {
     expect(fmtLap(722 * SEC)).toBe('12分2秒');
     expect(fmtLap(3 * SEC)).toBe('3秒');
     expect(fmtHM(222 * MIN)).toBe('3時間42分');
+  });
+});
+
+describe('傾きの判定', () => {
+  it('立てて持っているときは縦、横に倒すと横', () => {
+    expect(nextTilt('portrait', 90, 0)).toBe('portrait');
+    expect(nextTilt('portrait', 0, -90)).toBe('left'); // 左側が下
+    expect(nextTilt('portrait', 0, 90)).toBe('right'); // 右側が下
+    expect(nextTilt('left', 80, 5)).toBe('portrait');
+  });
+
+  it('横向きで少し後ろに倒しても横のまま（センサーの値が跳ぶ表し方でも同じ）', () => {
+    expect(nextTilt('portrait', 20, -75)).toBe('left');
+    expect(nextTilt('portrait', 160, 75)).toBe('left');
+    expect(nextTilt('portrait', 160, -75)).toBe('right');
+  });
+
+  it('机に平置きしたときと、境目では今の向きを保つ', () => {
+    expect(nextTilt('left', 3, -4)).toBe('left');
+    expect(nextTilt('portrait', 3, -4)).toBe('portrait');
+    expect(nextTilt('portrait', 45, -45)).toBe('portrait');
+    expect(nextTilt('right', 45, 45)).toBe('right');
   });
 });

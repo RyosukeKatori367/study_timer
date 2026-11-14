@@ -15,6 +15,8 @@ export interface Settings {
   overrun: boolean;
   sound: boolean;
   keepAwake: boolean;
+  /** 計測中、本体を横に倒したら横向きで表示する */
+  tilt: boolean;
 
   timerMs: number;
   presets: number[];
@@ -36,6 +38,7 @@ const DEFAULTS: Settings = {
   overrun: false,
   sound: true,
   keepAwake: true,
+  tilt: false,
   timerMs: 10 * MIN,
   presets: [10 * MIN, 20 * MIN, 30 * MIN],
   nextLap: null,

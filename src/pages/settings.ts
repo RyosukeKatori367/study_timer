@@ -1,8 +1,9 @@
 import { clearSessions, exportBackup, getSessions, importBackup, saveSettings, settings } from '../store';
 import { $, html } from '../ui/dom';
 import { toast } from '../ui/toast';
+import { disableTilt, enableTilt } from '../tilt';
 
-type Toggle = 'overrun' | 'sound' | 'keepAwake';
+type Toggle = 'overrun' | 'sound' | 'keepAwake' | 'tilt';
 
 /** 記録を JSON ファイルとして渡す。iPhone では共有シート、それ以外はダウンロード。 */
 async function exportFile(): Promise<void> {
@@ -46,6 +47,9 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
         <button type="button" class="list-row" role="switch" data-toggle="keepAwake">
           <span>計測中は画面をつけたままにする</span><span class="switch" aria-hidden="true"></span>
         </button>
+        <button type="button" class="list-row" role="switch" data-toggle="tilt">
+          <span>計測中、傾けたら横向きにする</span><span class="switch" aria-hidden="true"></span>
+        </button>
       </div>`),
     html(`
       <div class="list">
@@ -62,9 +66,15 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
     toggles.forEach((b) => b.setAttribute('aria-checked', String(settings[b.dataset.toggle as Toggle])));
   };
   toggles.forEach((b) => {
-    b.onclick = () => {
+    b.onclick = async () => {
       const key = b.dataset.toggle as Toggle;
-      saveSettings({ [key]: !settings[key] });
+      const on = !settings[key];
+      if (key === 'tilt') {
+        // 傾きセンサーは許可が要る。断られたらオフのままにする
+        if (on && !(await enableTilt())) return toast('モーションセンサーを使えませんでした');
+        if (!on) disableTilt();
+      }
+      saveSettings({ [key]: on });
       render();
     };
   });

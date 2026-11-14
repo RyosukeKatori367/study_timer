@@ -16,6 +16,7 @@ import {
   type Run,
 } from './engine';
 import { addSession, clearRun, loadRun, saveRun, saveSettings, settings } from './store';
+import { getTilt, onTiltChange } from './tilt';
 import { HOUR, fmtElapsed, fmtHM, fmtLap, fmtRemain, pad2 } from './time';
 import { $, html, setText } from './ui/dom';
 import { createRing, type Ring } from './ui/ring';
@@ -32,6 +33,7 @@ let lastPhase = '';
 let renderedLaps = -1;
 
 let root: HTMLElement;
+let app: HTMLElement;
 let ring: Ring;
 let el: {
   kicker: HTMLElement;
@@ -56,6 +58,7 @@ export const isActive = (): boolean => run !== null;
 export function initRun(exit: () => void): void {
   onExit = exit;
   root = $('#run');
+  app = $('#app');
   root.append(
     html(`
       <div class="run-head">
@@ -133,6 +136,8 @@ export function initRun(exit: () => void): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') render();
   });
+  onTiltChange(applyLayout);
+  window.addEventListener('resize', applyLayout);
 
   // アプリを閉じる前に計測していたら、続きから再開する
   const saved = loadRun();
@@ -159,6 +164,7 @@ function show(): void {
   lastPhase = '';
   renderedLaps = -1;
   root.classList.remove('break');
+  applyLayout();
   setAwake(settings.keepAwake);
   clearInterval(ticker);
   ticker = window.setInterval(render, TICK_MS);
@@ -179,6 +185,7 @@ function end(): void {
   clearInterval(ticker);
   setAwake(false);
   root.hidden = true;
+  delete app.dataset.rot;
   if (session) {
     const t = session.studyMs >= HOUR ? fmtHM(session.studyMs) : fmtLap(session.studyMs);
     toast(`記録しました（${t}）`);
@@ -186,6 +193,31 @@ function end(): void {
     toast('記録せずに終了しました');
   }
   onExit();
+}
+
+/**
+ * 縦・横のレイアウトを切り替える。横向きになるのは次の2通り。
+ * - 本体が実際に横向きになった（画面の向きロックがオフ）→ そのまま横長のレイアウトにする
+ * - 向きロック中に本体を倒した（設定がオンのとき）→ 画面は縦のままなので、CSS で90度回して見せる
+ */
+function applyLayout(): void {
+  if (!run) return;
+  const w = app.clientWidth;
+  const h = app.clientHeight;
+  const native = w > h;
+  const tilt = settings.tilt ? getTilt() : 'portrait';
+  const rotated = !native && tilt !== 'portrait';
+
+  root.classList.toggle('land', native || rotated);
+  root.classList.toggle('rot-left', rotated && tilt === 'left');
+  root.classList.toggle('rot-right', rotated && tilt === 'right');
+  // 回すときは、幅と高さを入れ替えた大きさにしてから回転させる
+  root.style.width = rotated ? `${h}px` : '';
+  root.style.height = rotated ? `${w}px` : '';
+  root.style.setProperty('--short', `${Math.min(w, h)}px`);
+  root.style.setProperty('--long', `${Math.max(w, h)}px`);
+  if (rotated) app.dataset.rot = tilt;
+  else delete app.dataset.rot;
 }
 
 /** finish は 0.6 秒押し続けたときだけ効く。 */
