@@ -1,19 +1,20 @@
 import { getSessions } from '../store';
-import { summarize } from '../summary';
+import { chartAxis, fmtAxis, summarize } from '../summary';
 import { fmtHM, fmtLap } from '../time';
 
 const DAY_LABELS = ['月', '火', '水', '木', '金', '土', '日'];
-const BAR_MAX = 120; // 棒グラフのいちばん高い棒の高さ(px)
 
 export function renderStats(view: HTMLElement): void {
   const s = summarize(getSessions(), Date.now());
-  const max = Math.max(...s.days);
+  const axis = chartAxis(Math.max(...s.days));
+  const percent = (ms: number) => `${((ms / axis.top) * 100).toFixed(2)}%`;
 
+  // 目盛り線（0 の線＋きりのいい時間ごと）
+  const lines = [0, ...axis.ticks]
+    .map((ms) => `<div class="grid-line" style="bottom:${percent(ms)}"><span>${ms === 0 ? '0' : fmtAxis(ms)}</span></div>`)
+    .join('');
   const bars = s.days
-    .map((ms, i) => {
-      const h = max > 0 ? Math.max(3, Math.round((ms / max) * BAR_MAX)) : 3;
-      return `<div class="bar${i === s.todayIndex ? ' today' : ''}" style="height:${h}px"></div>`;
-    })
+    .map((ms, i) => `<div class="bar${i === s.todayIndex ? ' today' : ''}" style="height:${percent(ms)}"></div>`)
     .join('');
   const labels = DAY_LABELS.map(
     (d, i) => `<span${i === s.todayIndex ? ' class="today"' : ''}>${d}</span>`,
@@ -27,7 +28,10 @@ export function renderStats(view: HTMLElement): void {
       <div class="stat-card"><span class="card-label">今週</span><span class="stat-value">${fmtHM(s.weekMs)}</span></div>
     </div>
     <div class="chart" role="img" aria-label="${chartLabel}">
-      <div class="bars">${bars}</div>
+      <div class="plot">
+        ${lines}
+        <div class="bars">${bars}</div>
+      </div>
       <div class="bar-labels">${labels}</div>
     </div>
     <div class="list">

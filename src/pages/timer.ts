@@ -1,7 +1,7 @@
 import { unlockAudio } from '../audio';
 import { newRun } from '../engine';
 import { startRun } from '../run';
-import { nextLapNumber, saveSettings, settings } from '../store';
+import { nextLapNumber, saveSettings, settings, type TimerKind } from '../store';
 import { HOUR, MIN, SEC, fmtRemain } from '../time';
 import { $, html } from '../ui/dom';
 import { createDrum } from '../ui/drum';
@@ -41,6 +41,23 @@ export function initTimerPage(page: HTMLElement): () => void {
   cols[2].prepend(seconds.el);
 
   const presets = $('.presets', main);
+
+  // タイマーの種類（カウントダウン／カウントアップ）。設定時間とプリセットは共通
+  const kinds = html(`
+    <div class="seg" role="group" aria-label="タイマーの種類">
+      <button type="button" data-kind="down">カウントダウン</button>
+      <button type="button" data-kind="up">カウントアップ</button>
+    </div>`);
+  const kindButtons = kinds.querySelectorAll<HTMLElement>('button');
+  const renderKind = () => {
+    kindButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === settings.timerKind)));
+  };
+  kindButtons.forEach((b) => {
+    b.onclick = () => {
+      saveSettings({ timerKind: b.dataset.kind as TimerKind });
+      renderKind();
+    };
+  });
 
   /** プリセットのボタンを作る。長押しで削除（前回の平均は消せない）。 */
   const presetButton = (ms: number, label?: string) => {
@@ -97,12 +114,17 @@ export function initTimerPage(page: HTMLElement): () => void {
     if (ms <= 0) return toast('時間を設定してください');
     unlockAudio();
     saveSettings({ timerMs: ms });
-    startRun(
-      newRun('timer', Date.now(), { firstLap: nextLapNumber(), durationMs: ms, overrun: settings.overrun }),
-    );
+    const firstLap = nextLapNumber();
+    if (settings.timerKind === 'up') {
+      // 0 から増えていく。lap で 0 に戻り、設定時間を過ぎると赤くなる
+      startRun(newRun('timerUp', Date.now(), { firstLap, durationMs: ms }));
+    } else {
+      startRun(newRun('timer', Date.now(), { firstLap, durationMs: ms, overrun: settings.overrun }));
+    }
   });
 
-  page.append(html(`<h1>タイマー</h1>`), main, row.el);
+  page.append(html(`<h1>タイマー</h1>`), kinds, main, row.el);
+  renderKind();
   renderPresets();
 
   return () => {

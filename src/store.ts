@@ -2,12 +2,13 @@
 // GitHub Pages では同じユーザーの全リポジトリが保存領域を共有するので、
 // キーには必ず接頭辞をつける。
 
-import type { Run, Session } from './engine';
+import { normalizeMode, usesLapNumbers, type Run, type Session } from './engine';
 import { MIN } from './time';
 
 const PREFIX = 'studytimer:';
 
-export type PomoKind = 'lap' | 'cycle';
+/** タイマーの種類。down = カウントダウン、up = カウントアップ */
+export type TimerKind = 'down' | 'up';
 export type EndKind = 'none' | 'clock' | 'total' | 'count';
 
 export interface Settings {
@@ -18,13 +19,13 @@ export interface Settings {
   /** 計測中、本体を横に倒したら横向きで表示する */
   tilt: boolean;
 
+  timerKind: TimerKind;
+  /** タイマーの設定時間（2つの種類で共通） */
   timerMs: number;
   presets: number[];
   /** 手で指定した開始ラップ番号。null なら前回の続き */
   nextLap: number | null;
 
-  pomoKind: PomoKind;
-  pomoLapMaxMs: number;
   workMs: number;
   breakMs: number;
   endKind: EndKind;
@@ -39,11 +40,10 @@ const DEFAULTS: Settings = {
   sound: true,
   keepAwake: true,
   tilt: false,
+  timerKind: 'down',
   timerMs: 10 * MIN,
   presets: [10 * MIN, 20 * MIN, 30 * MIN],
   nextLap: null,
-  pomoKind: 'cycle',
-  pomoLapMaxMs: 25 * MIN,
   workMs: 25 * MIN,
   breakMs: 5 * MIN,
   endKind: 'none',
@@ -88,7 +88,15 @@ export function saveSettings(patch: Partial<Settings> = {}): void {
 
 // ---- 記録 ----
 
-let sessions: Session[] = read<Session[]>('sessions') ?? [];
+/** 古い版で保存した記録のモード名を、今の名前に直す。 */
+function migrate(list: Session[]): Session[] {
+  return list.flatMap((s) => {
+    const mode = normalizeMode(s.mode);
+    return mode ? [{ ...s, mode }] : [];
+  });
+}
+
+let sessions: Session[] = migrate(read<Session[]>('sessions') ?? []);
 
 export const getSessions = (): readonly Session[] => sessions;
 
@@ -102,11 +110,11 @@ export function clearSessions(): void {
   remove('sessions');
 }
 
-/** ラップを使った直近のタイマー／ストップウォッチの記録 */
+/** ラップを使った直近の記録（タイマーの2モードとストップウォッチで共通） */
 export function lastLapSession(): Session | null {
   for (let i = sessions.length - 1; i >= 0; i--) {
     const s = sessions[i];
-    if ((s.mode === 'timer' || s.mode === 'stopwatch') && s.laps.length > 0) return s;
+    if (usesLapNumbers(s.mode) && s.laps.length > 0) return s;
   }
   return null;
 }
@@ -120,7 +128,15 @@ export function nextLapNumber(): number {
 
 // ---- 計測中の状態（アプリを閉じても続きから再開するため） ----
 
-export const loadRun = (): Run | null => read<Run>('run');
+export function loadRun(): Run | null {
+  const r = read<Run & { maxMs?: number }>('run');
+  if (!r) return null;
+  const mode = normalizeMode(r.mode);
+  if (!mode) return null;
+  // 古い版のラップ型ポモドーロは、設定時間を maxMs に入れていた
+  if ((r.mode as string) === 'pomoLap' && r.maxMs) r.durationMs = r.maxMs;
+  return { ...r, mode };
+}
 export const saveRun = (r: Run): void => write('run', r);
 export const clearRun = (): void => remove('run');
 
@@ -151,7 +167,7 @@ function isSession(x: unknown): x is Session {
   return (
     typeof s.id === 'string' &&
     typeof s.mode === 'string' &&
-    ['timer', 'stopwatch', 'pomoLap', 'pomoCycle'].includes(s.mode) &&
+    normalizeMode(s.mode) !== null &&
     typeof s.start === 'number' &&
     typeof s.end === 'number' &&
     typeof s.studyMs === 'number' &&
@@ -168,7 +184,7 @@ export function importBackup(text: string): number {
     throw new Error('グミ勉の記録ファイルではありません');
   }
   const known = new Set(sessions.map((s) => s.id));
-  const incoming = data.sessions.filter(isSession).filter((s) => !known.has(s.id));
+  const incoming = migrate(data.sessions.filter(isSession)).filter((s) => !known.has(s.id));
   sessions = [...sessions, ...incoming].sort((a, b) => a.start - b.start);
   write('sessions', sessions);
   return incoming.length;

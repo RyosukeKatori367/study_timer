@@ -2,7 +2,22 @@
 // 秒を1つずつ数えるのではなく、開始時刻との差で経過時間を出すので、
 // アプリを閉じたりロックしたりしても、戻ったときに時間がずれない。
 
-export type Mode = 'timer' | 'stopwatch' | 'pomoLap' | 'pomoCycle';
+// timer    … カウントダウン
+// timerUp  … カウントアップ（lap で 0 に戻り、設定時間を過ぎると赤くなる）
+export type Mode = 'timer' | 'timerUp' | 'stopwatch' | 'pomoCycle';
+
+/** ラップ番号（問題番号など）を共有するモード。前回の続きの番号から始まる。 */
+export const usesLapNumbers = (mode: Mode): boolean => mode !== 'pomoCycle';
+
+/**
+ * 保存されているモード名を今の名前に直す。知らない名前なら null。
+ * カウントアップは、以前はポモドーロの「ラップ型」（pomoLap）だった。
+ */
+export function normalizeMode(mode: unknown): Mode | null {
+  if (mode === 'pomoLap') return 'timerUp';
+  if (mode === 'timer' || mode === 'timerUp' || mode === 'stopwatch' || mode === 'pomoCycle') return mode;
+  return null;
+}
 
 export type EndCondition =
   | { kind: 'none' }
@@ -23,12 +38,11 @@ export interface Run {
   /** 設定時間を過ぎたことを検知済みか（音を1回だけ鳴らすため） */
   rang: boolean;
 
-  // タイマー
+  // タイマー（カウントダウン／カウントアップ共通の設定時間）
   durationMs: number;
+  /** カウントダウンで、0 を過ぎても数え続けるか */
   overrun: boolean;
-  // ポモドーロ（ラップ型）
-  maxMs: number;
-  // ポモドーロ（サイクル型）
+  // ポモドーロ
   workMs: number;
   breakMs: number;
   end: EndCondition;
@@ -39,7 +53,7 @@ export interface Session {
   mode: Mode;
   start: number;
   end: number;
-  /** 勉強時間。サイクル型は作業時間だけを数える */
+  /** 勉強時間。ポモドーロは作業時間だけを数える */
   studyMs: number;
   laps: number[];
   firstLap: number;
@@ -59,7 +73,6 @@ export function newRun(mode: Mode, now: number, opts: Partial<Run> = {}): Run {
     rang: false,
     durationMs: 0,
     overrun: false,
-    maxMs: 0,
     workMs: 0,
     breakMs: 0,
     end: { kind: 'none' },
@@ -111,10 +124,10 @@ export function timerRemaining(r: Run, now: number): number {
   return r.overrun ? rest : Math.max(0, rest);
 }
 
-/** 今のラップが設定時間を過ぎているか（タイマー／ラップ型ポモドーロ） */
+/** 今のラップが設定時間を過ぎているか（タイマーの2モード） */
 export function isOver(r: Run, now: number): boolean {
   if (r.mode === 'timer') return elapsed(r, now) >= r.durationMs;
-  if (r.mode === 'pomoLap') return elapsed(r, now) > r.maxMs;
+  if (r.mode === 'timerUp') return elapsed(r, now) > r.durationMs;
   return false;
 }
 

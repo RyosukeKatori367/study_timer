@@ -13,6 +13,7 @@ import {
   resume,
   timerRemaining,
   totalElapsed,
+  usesLapNumbers,
   type Run,
 } from './engine';
 import { addSession, clearRun, loadRun, saveRun, saveSettings, settings } from './store';
@@ -178,7 +179,7 @@ function end(): void {
   if (session) {
     addSession(session);
     // ラップ番号は、次回は今回の続きから
-    if (mode === 'timer' || mode === 'stopwatch') saveSettings({ nextLap: null });
+    if (usesLapNumbers(mode)) saveSettings({ nextLap: null });
   }
   clearRun();
   run = null;
@@ -269,8 +270,8 @@ function render(): void {
     case 'timer':
       renderTimer(run, now);
       break;
-    case 'pomoLap':
-      renderPomoLap(run, now);
+    case 'timerUp':
+      renderTimerUp(run, now);
       break;
     case 'pomoCycle':
       renderPomoCycle(run, now);
@@ -313,7 +314,7 @@ function renderTimer(r: Run, now: number): void {
   const rest = timerRemaining(r, now);
   const overSeconds = Math.floor(-rest / 1000);
   const over = r.overrun && r.rang;
-  setText(el.kicker, 'タイマー');
+  setText(el.kicker, 'タイマー・カウントダウン');
   setText(el.titleA, '設定');
   setText(el.titleB, fmtRemain(r.durationMs));
   if (over) {
@@ -330,21 +331,22 @@ function renderTimer(r: Run, now: number): void {
   el.btnStop.disabled = !r.overrun && r.rang;
 }
 
-function renderPomoLap(r: Run, now: number): void {
+/** カウントアップ: 0 から増えていき、設定時間を過ぎたら赤くなる（自動では止まらない） */
+function renderTimerUp(r: Run, now: number): void {
   const e = elapsed(r, now);
-  const over = e > r.maxMs;
+  const over = e > r.durationMs;
   if (!r.rang && over) {
     r.rang = true;
     saveRun(r);
     play('over');
   }
-  setText(el.kicker, 'ポモドーロ・ラップ型');
+  setText(el.kicker, 'タイマー・カウントアップ');
   setText(el.titleA, '設定');
-  setText(el.titleB, fmtRemain(r.maxMs));
+  setText(el.titleB, fmtRemain(r.durationMs));
   setBig(fmtElapsed(e), over);
-  setText(el.sub, over ? `+${fmtElapsed(e - r.maxMs)} 超過` : '');
+  setText(el.sub, over ? `+${fmtElapsed(e - r.durationMs)} 超過` : '');
   if (over) ring.set(0, 360, true);
-  else ring.set(0, (e / r.maxMs) * 360);
+  else ring.set(0, (e / r.durationMs) * 360);
   setText(el.lapTotal, `合計 ${fmtLap(totalElapsed(r, now))}`);
   el.btnStop.disabled = false;
 }
@@ -365,7 +367,7 @@ function renderPomoCycle(r: Run, now: number): void {
 
   const work = v.phase === 'work';
   const lastSet = r.end.kind === 'count' && v.set >= r.end.n;
-  setText(el.kicker, 'ポモドーロ・サイクル型');
+  setText(el.kicker, 'ポモドーロ');
   setText(el.titleA, work ? '作業' : '休憩');
   setText(el.titleB, `${v.set}セット目`);
   setBig(fmtRemain(v.phaseRemain));
@@ -406,7 +408,7 @@ function renderLaps(r: Run): void {
   renderedLaps = r.laps.length;
 
   // 設定時間を超えたラップは赤で出す
-  const limit = r.mode === 'pomoLap' ? r.maxMs : r.mode === 'timer' && r.overrun ? r.durationMs : Infinity;
+  const limit = r.mode === 'timerUp' || (r.mode === 'timer' && r.overrun) ? r.durationMs : Infinity;
   const rows = r.laps
     .map((ms, i) => {
       const cls = ms > limit ? ' class="over"' : '';

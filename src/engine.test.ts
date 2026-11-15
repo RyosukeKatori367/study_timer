@@ -8,14 +8,15 @@ import {
   isOver,
   lap,
   newRun,
+  normalizeMode,
   pause,
   resume,
   timerRemaining,
   totalElapsed,
 } from './engine';
 import { nextTilt } from './orientation';
-import { summarize } from './summary';
-import { MIN, SEC, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
+import { chartAxis, fmtAxis, summarize } from './summary';
+import { HOUR, MIN, SEC, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
 
 const T0 = new Date(2026, 10, 14, 13, 0, 0).getTime(); // 2026-11-14(土) 13:00
 
@@ -182,5 +183,51 @@ describe('傾きの判定', () => {
     expect(nextTilt('portrait', 3, -4)).toBe('portrait');
     expect(nextTilt('portrait', 45, -45)).toBe('portrait');
     expect(nextTilt('right', 45, 45)).toBe('right');
+  });
+});
+
+describe('タイマー（カウントアップ）', () => {
+  it('設定時間を過ぎても止まらず、lap で 0 に戻る', () => {
+    const r = newRun('timerUp', T0, { durationMs: 25 * MIN, firstLap: 231 });
+    expect(isOver(r, T0 + 25 * MIN)).toBe(false);
+    expect(isOver(r, T0 + 27 * MIN)).toBe(true);
+    lap(r, T0 + 27 * MIN);
+    expect(r.laps).toEqual([27 * MIN]); // 超過したぶんも記録する
+    expect(elapsed(r, T0 + 28 * MIN)).toBe(1 * MIN);
+    const s = finish(r, T0 + 40 * MIN);
+    expect([s?.mode, s?.firstLap, s?.laps.length, s?.studyMs]).toEqual(['timerUp', 231, 2, 40 * MIN]);
+  });
+
+  it('古い版の「ラップ型ポモドーロ」の記録は、カウントアップとして読む', () => {
+    expect(normalizeMode('pomoLap')).toBe('timerUp');
+    expect(normalizeMode('timer')).toBe('timer');
+    expect(normalizeMode('pomoCycle')).toBe('pomoCycle');
+    expect(normalizeMode('unknown')).toBeNull();
+  });
+
+  it('統計ではタイマーに入る', () => {
+    const s = summarize(
+      [{ id: 'a', mode: 'timerUp', start: T0, end: T0 + 30 * MIN, studyMs: 30 * MIN, laps: [30 * MIN], firstLap: 1 }],
+      T0,
+    );
+    expect(s.byMode).toEqual({ stopwatch: 0, timer: 30 * MIN, pomodoro: 0 });
+  });
+});
+
+describe('グラフの目盛り', () => {
+  it('きりのいい間隔で2〜4本になる', () => {
+    expect(chartAxis(0)).toEqual({ top: 30 * MIN, ticks: [15 * MIN, 30 * MIN] });
+    expect(chartAxis(50 * MIN)).toEqual({ top: 60 * MIN, ticks: [15 * MIN, 30 * MIN, 45 * MIN, 60 * MIN] });
+    expect(chartAxis(222 * MIN)).toEqual({ top: 4 * HOUR, ticks: [1 * HOUR, 2 * HOUR, 3 * HOUR, 4 * HOUR] });
+    expect(chartAxis(5 * HOUR)).toEqual({ top: 6 * HOUR, ticks: [2 * HOUR, 4 * HOUR, 6 * HOUR] });
+    expect(chartAxis(90 * MIN).ticks.map(fmtAxis)).toEqual(['30分', '1時間', '1.5時間']);
+  });
+
+  it('どんな値でも、いちばん長い日が枠に収まる', () => {
+    for (const max of [1, 14 * MIN, 61 * MIN, 4 * HOUR + 1, 13 * HOUR, 24 * HOUR]) {
+      const a = chartAxis(max);
+      expect(a.top).toBeGreaterThanOrEqual(max);
+      expect(a.ticks.length).toBeGreaterThanOrEqual(2);
+    }
   });
 });

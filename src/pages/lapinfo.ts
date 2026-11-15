@@ -1,7 +1,7 @@
 // タイマーとストップウォッチの下段（前回のラップ情報＋start ボタン）。
 
 import { lastLapSession, nextLapNumber, saveSettings } from '../store';
-import { MIN, fmtLap } from '../time';
+import { MIN, SEC, fmtLap } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickInteger } from '../ui/sheet';
 
@@ -17,7 +17,9 @@ export function lastLapAverage(): number | null {
   return last.laps.reduce((a, b) => a + b, 0) / last.laps.length;
 }
 
-const fmtAverage = (ms: number): string => (ms >= MIN ? `${Math.round(ms / MIN)}分` : fmtLap(ms));
+// 1分未満は秒で出す。プリセットの「前回平均」と同じく、秒は四捨五入する
+const fmtAverage = (ms: number): string =>
+  ms >= MIN ? `${Math.round(ms / MIN)}分` : fmtLap(Math.round(ms / SEC) * SEC);
 
 export function createStartRow(onStart: () => void): StartRow {
   const el = html(`

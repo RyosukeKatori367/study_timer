@@ -2,7 +2,7 @@
 // 合計などは表示するときに毎回ここで計算する。
 
 import type { Mode, Session } from './engine';
-import { DAY, dayStart, weekStart } from './time';
+import { DAY, HOUR, MIN, dayStart, weekStart } from './time';
 
 export interface Summary {
   todayMs: number;
@@ -17,7 +17,7 @@ export interface Summary {
 }
 
 const groupOf = (mode: Mode): keyof Summary['byMode'] =>
-  mode === 'timer' ? 'timer' : mode === 'stopwatch' ? 'stopwatch' : 'pomodoro';
+  mode === 'stopwatch' ? 'stopwatch' : mode === 'pomoCycle' ? 'pomodoro' : 'timer';
 
 /** 記録は開始した日のものとして数える。 */
 export function summarize(sessions: readonly Session[], now: number): Summary {
@@ -50,4 +50,28 @@ export function summarize(sessions: readonly Session[], now: number): Summary {
   }
   if (out.weekLaps > 0) out.weekLapAvgMs = lapSum / out.weekLaps;
   return out;
+}
+
+// ---- グラフの目盛り ----
+
+export interface ChartAxis {
+  /** グラフのいちばん上の値 */
+  top: number;
+  /** 目盛り線を引く値（0 は含まない） */
+  ticks: number[];
+}
+
+const AXIS_STEPS = [15, 30, 60, 120, 180, 240, 360, 480, 720].map((m) => m * MIN);
+
+/** いちばん長い日の勉強時間から、きりのいい目盛り（2〜4本）を決める。 */
+export function chartAxis(maxMs: number): ChartAxis {
+  const step = AXIS_STEPS.find((s) => maxMs <= s * 4) ?? AXIS_STEPS[AXIS_STEPS.length - 1];
+  const count = Math.max(2, Math.ceil(maxMs / step));
+  const ticks = Array.from({ length: count }, (_, i) => (i + 1) * step);
+  return { top: count * step, ticks };
+}
+
+/** 目盛りのラベル。例: 30分 / 1時間 / 1.5時間 */
+export function fmtAxis(ms: number): string {
+  return ms < HOUR ? `${Math.round(ms / MIN)}分` : `${ms / HOUR}時間`;
 }

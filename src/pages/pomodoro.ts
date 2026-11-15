@@ -1,7 +1,7 @@
 import { unlockAudio } from '../audio';
 import { clockToTimestamp, newRun, type EndCondition } from '../engine';
 import { startRun } from '../run';
-import { saveSettings, settings, type EndKind, type PomoKind } from '../store';
+import { saveSettings, settings, type EndKind } from '../store';
 import { HOUR, MIN, SEC, fmtHM, fmtRemain, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums } from '../ui/sheet';
@@ -20,13 +20,7 @@ export function initPomodoroPage(page: HTMLElement): void {
   page.append(
     html(`<h1>ポモドーロ</h1>`),
     html(`
-      <div class="seg kind" role="group" aria-label="ポモドーロの種類">
-        <button type="button" data-kind="lap">ラップ型</button>
-        <button type="button" data-kind="cycle">サイクル型</button>
-      </div>`),
-    html(`
       <div class="cards">
-        <button type="button" class="card" data-field="max"><span class="card-label">設定時間</span><span class="card-value"></span></button>
         <button type="button" class="card" data-field="work"><span class="card-label">作業</span><span class="card-value"></span></button>
         <button type="button" class="card" data-field="break"><span class="card-label">休憩</span><span class="card-value"></span></button>
       </div>`),
@@ -42,24 +36,12 @@ export function initPomodoroPage(page: HTMLElement): void {
         <button type="button" class="end-value"><span class="v"></span><span class="u"></span></button>
         <div class="end-none">止めるまで繰り返します</div>
       </div>`),
-    html(`<div class="lap-hint">lap を押すと 0 に戻ります。設定時間を過ぎると数字が赤くなります。</div>`),
     html(`<button type="button" class="btn-start wide">start</button>`),
   );
 
   const card = (field: string) => $(`.card[data-field="${field}"]`, page);
 
   const render = () => {
-    const cycle = settings.pomoKind === 'cycle';
-    page.querySelectorAll<HTMLElement>('.kind button').forEach((b) => {
-      b.setAttribute('aria-pressed', String(b.dataset.kind === settings.pomoKind));
-    });
-    card('max').hidden = cycle;
-    card('work').hidden = !cycle;
-    card('break').hidden = !cycle;
-    $('.end', page).hidden = !cycle;
-    $('.lap-hint', page).hidden = cycle;
-
-    setText($('.card-value', card('max')), fmtRemain(settings.pomoLapMaxMs));
     setText($('.card-value', card('work')), fmtRemain(settings.workMs));
     setText($('.card-value', card('break')), fmtRemain(settings.breakMs));
 
@@ -79,20 +61,6 @@ export function initPomodoroPage(page: HTMLElement): void {
     setText($('.u', value), u);
   };
 
-  page.querySelectorAll<HTMLElement>('.kind button').forEach((b) => {
-    b.onclick = () => {
-      saveSettings({ pomoKind: b.dataset.kind as PomoKind });
-      render();
-    };
-  });
-
-  card('max').onclick = async () => {
-    const ms = await pickDuration('設定時間', settings.pomoLapMaxMs);
-    if (ms === null) return;
-    if (ms < SEC) return toast('1秒以上にしてください');
-    saveSettings({ pomoLapMaxMs: ms });
-    render();
-  };
   card('work').onclick = async () => {
     const ms = await pickDuration('作業時間', settings.workMs);
     if (ms === null) return;
@@ -141,10 +109,6 @@ export function initPomodoroPage(page: HTMLElement): void {
   $('.btn-start', page).onclick = () => {
     unlockAudio();
     const now = Date.now();
-    if (settings.pomoKind === 'lap') {
-      startRun(newRun('pomoLap', now, { maxMs: settings.pomoLapMaxMs }));
-      return;
-    }
     const end: EndCondition =
       settings.endKind === 'clock'
         ? { kind: 'clock', at: clockToTimestamp(settings.endClockMin, now) }
