@@ -16,7 +16,7 @@ import {
 } from './engine';
 import { nextTilt } from './orientation';
 import { chartAxis, fmtAxis, summarize } from './summary';
-import { HOUR, MIN, SEC, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
+import { HOUR, MIN, SEC, setDurationStyle, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
 
 const T0 = new Date(2026, 10, 14, 13, 0, 0).getTime(); // 2026-11-14(土) 13:00
 
@@ -220,7 +220,7 @@ describe('グラフの目盛り', () => {
     expect(chartAxis(50 * MIN)).toEqual({ top: 60 * MIN, ticks: [15 * MIN, 30 * MIN, 45 * MIN, 60 * MIN] });
     expect(chartAxis(222 * MIN)).toEqual({ top: 4 * HOUR, ticks: [1 * HOUR, 2 * HOUR, 3 * HOUR, 4 * HOUR] });
     expect(chartAxis(5 * HOUR)).toEqual({ top: 6 * HOUR, ticks: [2 * HOUR, 4 * HOUR, 6 * HOUR] });
-    expect(chartAxis(90 * MIN).ticks.map(fmtAxis)).toEqual(['30分', '1時間', '1.5時間']);
+    expect(chartAxis(90 * MIN).ticks.map((ms) => fmtAxis(ms))).toEqual(['30分', '1時間', '1.5時間']);
   });
 
   it('どんな値でも、いちばん長い日が枠に収まる', () => {
@@ -229,5 +229,30 @@ describe('グラフの目盛り', () => {
       expect(a.top).toBeGreaterThanOrEqual(max);
       expect(a.ticks.length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+describe('時間の表示（1時間38分／98分）', () => {
+  it('98分表示では、時間を分にまとめる', () => {
+    setDurationStyle('m');
+    try {
+      expect(fmtHM(98 * MIN)).toBe('98分');
+      expect(fmtHM(25 * MIN)).toBe('25分');
+      expect(fmtLap(98 * MIN + 7 * SEC)).toBe('98分7秒');
+      expect(fmtElapsed(98 * MIN + 12 * SEC)).toBe('98:12');
+      expect(fmtElapsed(0, true)).toBe('0:00');
+      expect(fmtRemain(90 * MIN)).toBe('90:00');
+      expect(fmtAxis(90 * MIN, 'm')).toBe('90分');
+    } finally {
+      setDurationStyle('hm');
+    }
+  });
+
+  it('1時間38分表示（初期設定）', () => {
+    expect(fmtHM(98 * MIN)).toBe('1時間38分');
+    expect(fmtLap(98 * MIN + 7 * SEC)).toBe('1時間38分7秒');
+    expect(fmtElapsed(98 * MIN + 12 * SEC)).toBe('1:38:12');
+    expect(fmtRemain(90 * MIN)).toBe('1:30:00');
+    expect(fmtAxis(90 * MIN)).toBe('1.5時間');
   });
 });

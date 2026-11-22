@@ -3,7 +3,7 @@
 // キーには必ず接頭辞をつける。
 
 import { normalizeMode, usesLapNumbers, type Run, type Session } from './engine';
-import { MIN } from './time';
+import { MIN, setDurationStyle, type DurationStyle } from './time';
 
 const PREFIX = 'studytimer:';
 
@@ -18,6 +18,8 @@ export interface Settings {
   keepAwake: boolean;
   /** 計測中、本体を横に倒したら横向きで表示する */
   tilt: boolean;
+  /** 1時間を超える時間を「1時間38分」と「98分」のどちらで出すか */
+  durationStyle: DurationStyle;
 
   timerKind: TimerKind;
   /** タイマーの設定時間（2つの種類で共通） */
@@ -40,6 +42,7 @@ const DEFAULTS: Settings = {
   sound: true,
   keepAwake: true,
   tilt: false,
+  durationStyle: 'hm',
   timerKind: 'down',
   timerMs: 10 * MIN,
   presets: [10 * MIN, 20 * MIN, 30 * MIN],
@@ -81,8 +84,11 @@ function remove(key: string): void {
 
 export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('settings') ?? {}) };
 
+setDurationStyle(settings.durationStyle);
+
 export function saveSettings(patch: Partial<Settings> = {}): void {
   Object.assign(settings, patch);
+  setDurationStyle(settings.durationStyle);
   write('settings', settings);
 }
 

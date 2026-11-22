@@ -1,4 +1,5 @@
 import { clearSessions, exportBackup, getSessions, importBackup, saveSettings, settings } from '../store';
+import type { DurationStyle } from '../time';
 import { $, html } from '../ui/dom';
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
@@ -36,6 +37,14 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
       </div>`),
     html(`
       <div class="list">
+        <div class="section-label">時間の表示（例: 98分のとき）</div>
+        <div class="seg" role="group" aria-label="時間の表示">
+          <button type="button" data-style="hm">1時間38分</button>
+          <button type="button" data-style="m">98分</button>
+        </div>
+      </div>`),
+    html(`
+      <div class="list">
         <div class="section-label">音</div>
         <button type="button" class="list-row" role="switch" data-toggle="sound">
           <span>終了時に音を鳴らす</span><span class="switch" aria-hidden="true"></span>
@@ -62,9 +71,18 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
   );
 
   const toggles = view.querySelectorAll<HTMLElement>('[data-toggle]');
+  const styles = view.querySelectorAll<HTMLElement>('[data-style]');
   const render = () => {
     toggles.forEach((b) => b.setAttribute('aria-checked', String(settings[b.dataset.toggle as Toggle])));
+    styles.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === settings.durationStyle)));
   };
+  styles.forEach((b) => {
+    b.onclick = () => {
+      saveSettings({ durationStyle: b.dataset.style as DurationStyle });
+      render();
+      onDataChange(); // ほかの画面の表示も切り替える
+    };
+  });
   toggles.forEach((b) => {
     b.onclick = async () => {
       const key = b.dataset.toggle as Toggle;

@@ -1,4 +1,4 @@
-import { getSessions } from '../store';
+import { getSessions, settings } from '../store';
 import { chartAxis, fmtAxis, summarize } from '../summary';
 import { fmtHM, fmtLap } from '../time';
 
@@ -11,7 +11,7 @@ export function renderStats(view: HTMLElement): void {
 
   // 目盛り線（0 の線＋きりのいい時間ごと）
   const lines = [0, ...axis.ticks]
-    .map((ms) => `<div class="grid-line" style="bottom:${percent(ms)}"><span>${ms === 0 ? '0' : fmtAxis(ms)}</span></div>`)
+    .map((ms) => `<div class="grid-line" style="bottom:${percent(ms)}"><span>${ms === 0 ? '0' : fmtAxis(ms, settings.durationStyle)}</span></div>`)
     .join('');
   const bars = s.days
     .map((ms, i) => `<div class="bar${i === s.todayIndex ? ' today' : ''}" style="height:${percent(ms)}"></div>`)

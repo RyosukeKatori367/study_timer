@@ -284,6 +284,7 @@ function render(): void {
   const ended = run.mode === 'timer' && !run.overrun && run.rang;
   root.classList.toggle('paused', !running && !ended);
   if (run.mode !== 'pomoCycle') renderLaps(run);
+  el.lapTotal.classList.toggle('long', (el.lapTotal.textContent ?? '').length >= 8);
 }
 
 function renderStopwatch(r: Run, now: number): void {

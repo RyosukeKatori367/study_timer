@@ -2,7 +2,7 @@
 // 合計などは表示するときに毎回ここで計算する。
 
 import type { Mode, Session } from './engine';
-import { DAY, HOUR, MIN, dayStart, weekStart } from './time';
+import { DAY, HOUR, MIN, dayStart, weekStart, type DurationStyle } from './time';
 
 export interface Summary {
   todayMs: number;
@@ -71,7 +71,7 @@ export function chartAxis(maxMs: number): ChartAxis {
   return { top: count * step, ticks };
 }
 
-/** 目盛りのラベル。例: 30分 / 1時間 / 1.5時間 */
-export function fmtAxis(ms: number): string {
-  return ms < HOUR ? `${Math.round(ms / MIN)}分` : `${ms / HOUR}時間`;
+/** 目盛りのラベル。例: 30分 / 1時間 / 1.5時間（98分表示なら 30分 / 60分 / 90分） */
+export function fmtAxis(ms: number, style: DurationStyle = 'hm'): string {
+  return ms < HOUR || style === 'm' ? `${Math.round(ms / MIN)}分` : `${ms / HOUR}時間`;
 }

@@ -16,7 +16,7 @@ async function pickDuration(title: string, ms: number): Promise<number | null> {
   return r ? r[0] * MIN + r[1] * SEC : null;
 }
 
-export function initPomodoroPage(page: HTMLElement): void {
+export function initPomodoroPage(page: HTMLElement): () => void {
   page.append(
     html(`<h1>ポモドーロ</h1>`),
     html(`
@@ -121,4 +121,5 @@ export function initPomodoroPage(page: HTMLElement): void {
   };
 
   render();
+  return render;
 }

@@ -4,13 +4,14 @@ import { startRun } from '../run';
 import { nextLapNumber } from '../store';
 import { html } from '../ui/dom';
 import { createRing } from '../ui/ring';
+import { fmtElapsed } from '../time';
 import { createStartRow } from './lapinfo';
 
 export function initStopwatchPage(page: HTMLElement): () => void {
   const ring = createRing();
   const wrap = html(`
     <div class="ring-wrap">
-      <div class="ring-center"><div class="big long">0:00:00</div></div>
+      <div class="ring-center"><div class="big"></div></div>
     </div>`);
   wrap.prepend(ring.el);
 
@@ -21,5 +22,14 @@ export function initStopwatchPage(page: HTMLElement): () => void {
 
   page.append(html(`<h1>ストップウォッチ</h1>`), html(`<div class="page-main"></div>`), row.el);
   page.querySelector('.page-main')!.append(wrap);
-  return row.refresh;
+
+  const big = wrap.querySelector('.big') as HTMLElement;
+  const refresh = () => {
+    row.refresh();
+    const zero = fmtElapsed(0, true); // 0:00:00、98分表示なら 0:00
+    big.textContent = zero;
+    big.classList.toggle('long', zero.length >= 7);
+  };
+  refresh();
+  return refresh;
 }

@@ -25,12 +25,13 @@ let current: ViewName = 'main';
 
 // ---- 3つのモードのページ ----
 
-initPomodoroPage($('.page[data-mode="pomodoro"]'));
+const refreshPomodoro = initPomodoroPage($('.page[data-mode="pomodoro"]'));
 const refreshTimer = initTimerPage($('.page[data-mode="timer"]'));
 const refreshStopwatch = initStopwatchPage($('.page[data-mode="stopwatch"]'));
 
 /** 記録が変わったとき（計測の終了・読み込み・全消去）に表示を更新する。 */
 function refreshAll(): void {
+  refreshPomodoro();
   refreshTimer();
   refreshStopwatch();
   if (current === 'stats') renderStats(statsView);
