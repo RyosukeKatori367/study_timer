@@ -23,7 +23,7 @@ export type EndCondition =
   | { kind: 'none' }
   | { kind: 'clock'; at: number } // この時刻になったら止める
   | { kind: 'total'; ms: number } // 合計時間に達したら止める
-  | { kind: 'count'; n: number }; // n セット目の作業が終わったら止める
+  | { kind: 'count'; n: number }; // ポモドーロ: n セット目の作業が終わったら止める／ラップ: n ラップで止める
 
 /** 計測中の状態。localStorage にそのまま保存する。 */
 export interface Run {
@@ -42,6 +42,8 @@ export interface Run {
   durationMs: number;
   /** カウントダウンで、0 を過ぎても数え続けるか */
   overrun: boolean;
+  /** ラップ1回の目安（残り時間の見積もりに使う。わからなければ 0） */
+  lapEstMs?: number;
   // ポモドーロ
   workMs: number;
   breakMs: number;
@@ -227,6 +229,54 @@ export function finish(r: Run, now: number): Session | null {
   const studyMs = laps.reduce((a, b) => a + b, 0);
   if (studyMs < 1000) return null;
   return { ...base, studyMs, laps };
+}
+
+export interface LapEndView {
+  /** 終了条件に達したか */
+  done: boolean;
+  /** 終了条件に達した時刻（記録の終了時刻にする） */
+  doneAt: number;
+  /** 終わるまでの時間。ラップ数のときは見積もり。見積もれなければ null */
+  remainMs: number | null;
+  /** 今のラップも含めた、残りのラップ数（ラップ数のときだけ） */
+  remainLaps: number | null;
+  /** 終わったラップの数 */
+  lapsDone: number;
+}
+
+/**
+ * ラップのあるモード（タイマー・ストップウォッチ）の終了条件の状態。
+ * ラップ数のときの残り時間は「1ラップの平均 × 残りのラップ数 − 今のラップの経過」で見積もる。
+ * 平均は、このときのラップがあればその平均、なければ lapEstMs（設定時間や前回の平均）を使う。
+ */
+export function lapEndView(r: Run, now: number): LapEndView {
+  const lapsDone = r.laps.length;
+  const base = { done: false, doneAt: now, remainMs: null, remainLaps: null, lapsDone };
+  switch (r.end.kind) {
+    case 'clock': {
+      const rest = r.end.at - now;
+      return { ...base, done: rest <= 0, doneAt: Math.min(now, r.end.at), remainMs: Math.max(0, rest) };
+    }
+    case 'total': {
+      const over = totalElapsed(r, now) - r.end.ms;
+      return {
+        ...base,
+        done: over >= 0,
+        doneAt: over >= 0 && isRunning(r) ? now - over : now,
+        remainMs: Math.max(0, -over),
+      };
+    }
+    case 'count': {
+      const left = Math.max(0, r.end.n - lapsDone);
+      const avg = lapsDone > 0 ? r.laps.reduce((a, b) => a + b, 0) / lapsDone : (r.lapEstMs ?? 0);
+      let remainMs: number | null = null;
+      if (left === 0) remainMs = 0;
+      else if (avg > 0) remainMs = Math.max(0, avg - lapLength(r, now)) + avg * (left - 1);
+      return { ...base, done: left === 0, remainMs, remainLaps: left };
+    }
+    default:
+      return base;
+  }
 }
 
 /** 「18:00 まで」を実際の時刻にする。もう過ぎていたら翌日の同じ時刻。 */

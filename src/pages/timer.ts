@@ -7,6 +7,7 @@ import { $, html } from '../ui/dom';
 import { createDrum } from '../ui/drum';
 import { toast } from '../ui/toast';
 import { createStartRow, lastLapAverage } from './lapinfo';
+import { createEndRow, lapEndCondition } from './lapend';
 
 const LONG_PRESS_MS = 550;
 
@@ -114,21 +115,25 @@ export function initTimerPage(page: HTMLElement): () => void {
     if (ms <= 0) return toast('時間を設定してください');
     unlockAudio();
     saveSettings({ timerMs: ms });
-    const firstLap = nextLapNumber();
+    const now = Date.now();
+    // ラップ数で終えるときの残り時間は、最初のラップが終わるまでは設定時間で見積もる
+    const common = { firstLap: nextLapNumber(), durationMs: ms, end: lapEndCondition(now), lapEstMs: ms };
     if (settings.timerKind === 'up') {
       // 0 から増えていく。lap で 0 に戻り、設定時間を過ぎると赤くなる
-      startRun(newRun('timerUp', Date.now(), { firstLap, durationMs: ms }));
+      startRun(newRun('timerUp', now, common));
     } else {
-      startRun(newRun('timer', Date.now(), { firstLap, durationMs: ms, overrun: settings.overrun }));
+      startRun(newRun('timer', now, { ...common, overrun: settings.overrun }));
     }
   });
+  const endRow = createEndRow();
 
-  page.append(html(`<h1>タイマー</h1>`), kinds, main, row.el);
+  page.append(html(`<h1>タイマー</h1>`), kinds, main, endRow.el, row.el);
   renderKind();
   renderPresets();
 
   return () => {
     row.refresh();
+    endRow.refresh();
     renderPresets();
   };
 }

@@ -381,6 +381,61 @@ nav button:focus-visible {
   font-size: 20px;
 }
 
+/* ---------- 終了条件（タイマー・ストップウォッチ） ---------- */
+
+.end-row {
+  flex: none;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.end-row-label {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.end-row-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.end-row.on .end-row-value {
+  color: #fff;
+}
+
+.sheet-options {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sheet-option {
+  height: 52px;
+  border-radius: 14px;
+  background: #2e2e2e;
+  font-size: 16px;
+}
+
+.sheet-option[aria-pressed='true'] {
+  background: var(--light);
+  color: #000;
+  font-weight: 500;
+}
+
 /* ---------- 下段（前回のラップ＋start） ---------- */
 
 .start-row {
@@ -791,15 +846,25 @@ nav button:focus-visible {
   font-size: 14px;
 }
 
+/* タイマー・ストップウォッチの終了条件の表示は、ラップ一覧の場所を空けるため少し詰める */
+#run:not([data-mode='pomoCycle']) .run-info > div {
+  padding: 8px 0;
+}
+
+#run:not([data-mode='pomoCycle']) .run-info .value {
+  font-size: 20px;
+}
+
 /* ---------- 計測中（横向き） ---------- */
 
 /* 左に大きな円、右に見出し・ラップ・ボタン */
 #run.land {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     'ring head'
+    'ring info'
     'ring mid'
     'ring btns';
   gap: 10px 32px;
@@ -818,9 +883,22 @@ nav button:focus-visible {
   grid-area: head;
 }
 
-#run.land .run-info,
+#run.land .run-info {
+  grid-area: info;
+}
+
 #run.land .run-laps {
   grid-area: mid;
+  align-self: stretch;
+  min-height: 0;
+}
+
+#run.land .lap-list {
+  height: 100%;
+  max-height: 149px;
+  /* 高さが足りず途中で切れる行は、下に向かって薄くする */
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
 }
 
 #run.land .run-btns {

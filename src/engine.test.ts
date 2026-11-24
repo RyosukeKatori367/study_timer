@@ -6,6 +6,7 @@ import {
   elapsed,
   finish,
   isOver,
+  lapEndView,
   lap,
   newRun,
   normalizeMode,
@@ -254,5 +255,57 @@ describe('時間の表示（1時間38分／98分）', () => {
     expect(fmtElapsed(98 * MIN + 12 * SEC)).toBe('1:38:12');
     expect(fmtRemain(90 * MIN)).toBe('1:30:00');
     expect(fmtAxis(90 * MIN)).toBe('1.5時間');
+  });
+});
+
+describe('ラップのあるモードの終了条件', () => {
+  it('ラップ数: 残りラップと、平均からの残り時間の見積もり', () => {
+    const r = newRun('stopwatch', T0, { firstLap: 231, end: { kind: 'count', n: 10 }, lapEstMs: 12 * MIN });
+    // まだラップがない → 前回の平均 12分 で見積もる
+    let v = lapEndView(r, T0 + 2 * MIN);
+    expect([v.remainLaps, v.remainMs, v.done]).toEqual([10, 10 * MIN + 9 * 12 * MIN, false]);
+    // 2ラップ（10分・14分）終えたら、その平均 12分 で見積もる
+    lap(r, T0 + 10 * MIN);
+    lap(r, T0 + 24 * MIN);
+    v = lapEndView(r, T0 + 30 * MIN);
+    expect([v.remainLaps, v.remainMs, v.lapsDone]).toEqual([8, 6 * MIN + 7 * 12 * MIN, 2]);
+    // 今のラップが平均を超えても、マイナスにはしない
+    expect(lapEndView(r, T0 + 50 * MIN).remainMs).toBe(7 * 12 * MIN);
+  });
+
+  it('ラップ数: 決めた数のラップを押したら終わり、最後に押した直後の数秒は記録しない', () => {
+    const r = newRun('timer', T0, { durationMs: 5 * MIN, end: { kind: 'count', n: 2 }, lapEstMs: 5 * MIN });
+    lap(r, T0 + 4 * MIN);
+    expect(lapEndView(r, T0 + 4 * MIN).done).toBe(false);
+    lap(r, T0 + 9 * MIN);
+    expect(lapEndView(r, T0 + 9 * MIN).done).toBe(true);
+    expect(finish(r, T0 + 9 * MIN)?.laps).toEqual([4 * MIN, 5 * MIN]);
+  });
+
+  it('見積もりの元がなければ残り時間は出さない', () => {
+    const r = newRun('stopwatch', T0, { end: { kind: 'count', n: 3 } });
+    expect(lapEndView(r, T0 + MIN).remainMs).toBeNull();
+  });
+
+  it('合計時間: 達した時刻で止まり、途中のラップも記録する', () => {
+    const r = newRun('stopwatch', T0, { end: { kind: 'total', ms: 30 * MIN } });
+    lap(r, T0 + 20 * MIN);
+    expect(lapEndView(r, T0 + 25 * MIN).remainMs).toBe(5 * MIN);
+    const v = lapEndView(r, T0 + 34 * MIN); // 開き直したのが遅れた
+    expect([v.done, v.doneAt]).toEqual([true, T0 + 30 * MIN]);
+    expect(finish(r, v.doneAt)?.laps).toEqual([20 * MIN, 10 * MIN]);
+  });
+
+  it('時刻: その時刻で止まる', () => {
+    const at = T0 + 45 * MIN;
+    const r = newRun('timerUp', T0, { durationMs: 10 * MIN, end: { kind: 'clock', at } });
+    expect(lapEndView(r, T0 + 40 * MIN).remainMs).toBe(5 * MIN);
+    const v = lapEndView(r, T0 + 60 * MIN);
+    expect([v.done, v.doneAt]).toEqual([true, at]);
+    expect(finish(r, v.doneAt)?.studyMs).toBe(45 * MIN);
+  });
+
+  it('終了条件なし', () => {
+    expect(lapEndView(newRun('stopwatch', T0), T0 + MIN).done).toBe(false);
   });
 });

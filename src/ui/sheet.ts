@@ -66,3 +66,20 @@ export async function pickInteger(title: string, value: number, min: number, max
   });
   return result ? result[0] : null;
 }
+
+/** 選択肢から1つ選ぶ。タップしたらすぐ閉じる。キャンセルなら null。 */
+export async function pickOption(title: string, labels: string[], current: number): Promise<number | null> {
+  const body = html(`<div class="sheet-options" role="group"></div>`);
+  let picked = current;
+  labels.forEach((label, i) => {
+    const b = html<HTMLButtonElement>(`<button type="button" class="sheet-option">${esc(label)}</button>`);
+    b.setAttribute('aria-pressed', String(i === current));
+    b.onclick = () => {
+      picked = i;
+      (body.closest('.sheet-panel')?.querySelector('.sheet-ok') as HTMLButtonElement | null)?.click();
+    };
+    body.append(b);
+  });
+  const result = await open(title, body, () => [picked]);
+  return result ? result[0] : null;
+}

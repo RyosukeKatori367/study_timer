@@ -13,6 +13,7 @@ import {
   resume,
   timerRemaining,
   totalElapsed,
+  lapEndView,
   usesLapNumbers,
   type Run,
 } from './engine';
@@ -127,8 +128,15 @@ export function initRun(exit: () => void): void {
 
   el.btnLap.onclick = () => {
     if (!run) return;
-    lap(run, Date.now());
+    const now = Date.now();
+    lap(run, now);
     saveRun(run);
+    // 決めたラップ数に達したら、そこで終わる
+    if (lapEndView(run, now).done) {
+      play('done');
+      end(now);
+      return;
+    }
     render();
   };
 
@@ -159,7 +167,8 @@ function show(): void {
   const cycle = run.mode === 'pomoCycle';
   root.dataset.mode = run.mode;
   root.hidden = false;
-  el.info.hidden = !cycle;
+  // ポモドーロと、終了条件のあるタイマー・ストップウォッチは、残りなどを出す
+  el.info.hidden = !cycle && run.end.kind === 'none';
   el.laps.hidden = cycle;
   el.btnLap.hidden = cycle;
   lastPhase = '';
@@ -172,10 +181,11 @@ function show(): void {
   render();
 }
 
-function end(): void {
+/** 計測を終えて記録する。at は終了時刻（終了条件に達した時刻など）。 */
+function end(at = Date.now()): void {
   if (!run) return;
   const mode = run.mode;
-  const session = finish(run, Date.now());
+  const session = finish(run, at);
   if (session) {
     addSession(session);
     // ラップ番号は、次回は今回の続きから
@@ -277,7 +287,11 @@ function render(): void {
       renderPomoCycle(run, now);
       break;
   }
-  if (!run) return; // サイクル型が終了条件に達して、自動で終わった
+  if (!run) return; // ポモドーロが終了条件に達して、自動で終わった
+  if (run.mode !== 'pomoCycle' && run.end.kind !== 'none') {
+    renderLapEnd(run, now);
+    if (!run) return; // 時刻・合計時間に達して、自動で終わった
+  }
 
   const running = isRunning(run);
   setText(el.btnStop, running ? 'stop' : 'start');
@@ -401,6 +415,39 @@ function renderPomoCycle(r: Run, now: number): void {
     setText(el.infoValues[i], value);
   });
   el.btnStop.disabled = false;
+}
+
+/** タイマー・ストップウォッチの終了条件（残り時間・残りラップ） */
+function renderLapEnd(r: Run, now: number): void {
+  const v = lapEndView(r, now);
+  if (v.done) {
+    play('done');
+    end(v.doneAt);
+    return;
+  }
+  const rest = v.remainMs === null ? '—' : fmtRemain(v.remainMs);
+  const info: [string, string][] = [];
+  switch (r.end.kind) {
+    case 'clock': {
+      const d = new Date(r.end.at);
+      info.push(['終了', `${d.getHours()}:${pad2(d.getMinutes())}`], ['残り時間', rest], ['完了', `${v.lapsDone}ラップ`]);
+      break;
+    }
+    case 'total':
+      info.push(['合計', fmtHM(r.end.ms)], ['残り時間', rest], ['完了', `${v.lapsDone}ラップ`]);
+      break;
+    case 'count':
+      info.push(
+        ['終了', `${r.firstLap + r.end.n - 1}番`],
+        ['残り時間（目安）', rest],
+        ['残り', `${v.remainLaps ?? 0}ラップ`],
+      );
+      break;
+  }
+  info.forEach(([label, value], i) => {
+    setText(el.infoLabels[i], label);
+    setText(el.infoValues[i], value);
+  });
 }
 
 function renderLaps(r: Run): void {

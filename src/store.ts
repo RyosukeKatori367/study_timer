@@ -35,6 +35,13 @@ export interface Settings {
   endClockMin: number;
   endTotalMs: number;
   endCount: number;
+
+  // ラップのあるモード（タイマー・ストップウォッチ）の終了条件。ポモドーロとは別に持つ
+  lapEndKind: EndKind;
+  lapEndClockMin: number;
+  lapEndTotalMs: number;
+  /** 何ラップで終えるか */
+  lapEndCount: number;
 }
 
 const DEFAULTS: Settings = {
@@ -53,6 +60,10 @@ const DEFAULTS: Settings = {
   endClockMin: 18 * 60,
   endTotalMs: 120 * MIN,
   endCount: 4,
+  lapEndKind: 'none',
+  lapEndClockMin: 18 * 60,
+  lapEndTotalMs: 120 * MIN,
+  lapEndCount: 10,
 };
 
 function read<T>(key: string): T | null {
