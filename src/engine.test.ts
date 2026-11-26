@@ -309,3 +309,16 @@ describe('ラップのあるモードの終了条件', () => {
     expect(lapEndView(newRun('stopwatch', T0), T0 + MIN).done).toBe(false);
   });
 });
+
+describe('ラップ番号で終える', () => {
+  it('231番から始めて 233番まで: 3ラップで終わる', () => {
+    const r = newRun('stopwatch', T0, { firstLap: 231, end: { kind: 'lapNo', to: 233 }, lapEstMs: 10 * MIN });
+    expect(lapEndView(r, T0).remainLaps).toBe(3);
+    lap(r, T0 + 10 * MIN);
+    lap(r, T0 + 20 * MIN);
+    const v = lapEndView(r, T0 + 25 * MIN);
+    expect([v.remainLaps, v.remainMs, v.done]).toEqual([1, 5 * MIN, false]);
+    lap(r, T0 + 30 * MIN);
+    expect(lapEndView(r, T0 + 30 * MIN).done).toBe(true);
+  });
+});

@@ -10,6 +10,8 @@ const PREFIX = 'studytimer:';
 /** タイマーの種類。down = カウントダウン、up = カウントアップ */
 export type TimerKind = 'down' | 'up';
 export type EndKind = 'none' | 'clock' | 'total' | 'count';
+/** タイマー・ストップウォッチの終了条件。ポモドーロの条件に「ラップ番号」が加わる */
+export type LapEndKind = EndKind | 'lapNo';
 
 export interface Settings {
   /** タイマーが 0 になったあとも数え続ける */
@@ -37,11 +39,15 @@ export interface Settings {
   endCount: number;
 
   // ラップのあるモード（タイマー・ストップウォッチ）の終了条件。ポモドーロとは別に持つ
-  lapEndKind: EndKind;
+  lapEndKind: LapEndKind;
   lapEndClockMin: number;
   lapEndTotalMs: number;
   /** 何ラップで終えるか */
   lapEndCount: number;
+  /** 何番のラップで終えるか */
+  lapEndLapNo: number;
+  /** finish したとき途中だったラップを済んだことにして、次は次の番号から始める */
+  lapAdvance: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -64,6 +70,8 @@ const DEFAULTS: Settings = {
   lapEndClockMin: 18 * 60,
   lapEndTotalMs: 120 * MIN,
   lapEndCount: 10,
+  lapEndLapNo: 10,
+  lapAdvance: true,
 };
 
 function read<T>(key: string): T | null {

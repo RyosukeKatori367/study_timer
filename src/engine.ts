@@ -23,7 +23,8 @@ export type EndCondition =
   | { kind: 'none' }
   | { kind: 'clock'; at: number } // この時刻になったら止める
   | { kind: 'total'; ms: number } // 合計時間に達したら止める
-  | { kind: 'count'; n: number }; // ポモドーロ: n セット目の作業が終わったら止める／ラップ: n ラップで止める
+  | { kind: 'count'; n: number } // ポモドーロ: n セット目の作業が終わったら止める／ラップ: n ラップで止める
+  | { kind: 'lapNo'; to: number }; // ラップ: to 番のラップが終わったら止める
 
 /** 計測中の状態。localStorage にそのまま保存する。 */
 export interface Run {
@@ -266,8 +267,11 @@ export function lapEndView(r: Run, now: number): LapEndView {
         remainMs: Math.max(0, -over),
       };
     }
-    case 'count': {
-      const left = Math.max(0, r.end.n - lapsDone);
+    case 'count':
+    case 'lapNo': {
+      // ラップ番号で決めたときは、何ラップ分かに直して同じように数える
+      const target = r.end.kind === 'count' ? r.end.n : r.end.to - r.firstLap + 1;
+      const left = Math.max(0, target - lapsDone);
       const avg = lapsDone > 0 ? r.laps.reduce((a, b) => a + b, 0) / lapsDone : (r.lapEstMs ?? 0);
       let remainMs: number | null = null;
       if (left === 0) remainMs = 0;

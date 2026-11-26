@@ -6,7 +6,8 @@ import { html } from '../ui/dom';
 import { createRing } from '../ui/ring';
 import { fmtElapsed } from '../time';
 import { createStartRow, lastLapAverage } from './lapinfo';
-import { createEndRow, lapEndCondition } from './lapend';
+import { createEndRow, lapEndCondition, lapEndError } from './lapend';
+import { toast } from '../ui/toast';
 
 export function initStopwatchPage(page: HTMLElement): () => void {
   const ring = createRing();
@@ -18,6 +19,8 @@ export function initStopwatchPage(page: HTMLElement): () => void {
 
   const row = createStartRow(() => {
     unlockAudio();
+    const err = lapEndError();
+    if (err) return toast(err);
     const now = Date.now();
     // ラップ数で終えるときの残り時間は、最初のラップが終わるまでは前回の平均で見積もる
     startRun(

@@ -1,14 +1,14 @@
 // タイマーとストップウォッチの「終了条件」の行。設定は2つの画面で共通。
 
 import { clockToTimestamp, type EndCondition } from '../engine';
-import { nextLapNumber, saveSettings, settings, type EndKind } from '../store';
+import { nextLapNumber, saveSettings, settings, type LapEndKind } from '../store';
 import { HOUR, MIN, fmtHM, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums, pickInteger, pickOption } from '../ui/sheet';
 import { toast } from '../ui/toast';
 
-const KINDS: EndKind[] = ['none', 'clock', 'total', 'count'];
-const LABELS = ['なし', '時刻', '合計時間', 'ラップ数'];
+const KINDS: LapEndKind[] = ['none', 'clock', 'total', 'count', 'lapNo'];
+const LABELS = ['なし', '時刻', '合計時間', 'ラップ数', 'ラップ番号'];
 const CHANGE = 'lapend:change';
 
 /** 計測を始めるときの終了条件 */
@@ -20,9 +20,19 @@ export function lapEndCondition(now: number): EndCondition {
       return { kind: 'total', ms: settings.lapEndTotalMs };
     case 'count':
       return { kind: 'count', n: settings.lapEndCount };
+    case 'lapNo':
+      return { kind: 'lapNo', to: settings.lapEndLapNo };
     default:
       return { kind: 'none' };
   }
+}
+
+/** 今の終了条件では始められないとき、その理由。始められるなら null。 */
+export function lapEndError(): string | null {
+  if (settings.lapEndKind === 'lapNo' && settings.lapEndLapNo < nextLapNumber()) {
+    return `終了の${settings.lapEndLapNo}番が、開始の${nextLapNumber()}番より前です`;
+  }
+  return null;
 }
 
 function describe(): string {
@@ -35,13 +45,17 @@ function describe(): string {
       const from = nextLapNumber();
       return `${settings.lapEndCount}ラップ（${from}〜${from + settings.lapEndCount - 1}番）`;
     }
+    case 'lapNo': {
+      const n = settings.lapEndLapNo - nextLapNumber() + 1;
+      return n > 0 ? `${settings.lapEndLapNo}番まで（${n}ラップ）` : `${settings.lapEndLapNo}番まで（開始番号を過ぎています）`;
+    }
     default:
       return 'なし';
   }
 }
 
 /** 終了条件の値を選ぶ。キャンセルしたら false。 */
-async function pickValue(kind: EndKind): Promise<boolean> {
+async function pickValue(kind: LapEndKind): Promise<boolean> {
   if (kind === 'clock') {
     const r = await pickDrums('終了時刻', [
       { min: 0, max: 23, value: Math.floor(settings.lapEndClockMin / 60), unit: '時' },
@@ -65,6 +79,13 @@ async function pickValue(kind: EndKind): Promise<boolean> {
     const n = await pickInteger(`ラップ数（${nextLapNumber()}番から）`, settings.lapEndCount, 1, 999);
     if (n === null) return false;
     saveSettings({ lapEndCount: n });
+  } else if (kind === 'lapNo') {
+    const from = nextLapNumber();
+    // 前に決めた番号が過ぎていたら、今の番号から10ラップ分を初めの値にする
+    const value = settings.lapEndLapNo >= from ? settings.lapEndLapNo : from + 9;
+    const n = await pickInteger(`何番まで（${from}番から）`, value, from, 99999, `${from}番以上にしてください`);
+    if (n === null) return false;
+    saveSettings({ lapEndLapNo: n });
   }
   return true;
 }

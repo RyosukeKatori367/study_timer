@@ -4,7 +4,7 @@ import { $, html } from '../ui/dom';
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
 
-type Toggle = 'overrun' | 'sound' | 'keepAwake' | 'tilt';
+type Toggle = 'overrun' | 'sound' | 'keepAwake' | 'tilt' | 'lapAdvance';
 
 /** 記録を JSON ファイルとして渡す。iPhone では共有シート、それ以外はダウンロード。 */
 async function exportFile(): Promise<void> {
@@ -34,6 +34,10 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
         <button type="button" class="list-row" role="switch" data-toggle="overrun">
           <span>0を過ぎても数える（超過）</span><span class="switch" aria-hidden="true"></span>
         </button>
+        <button type="button" class="list-row" role="switch" data-toggle="lapAdvance" aria-describedby="lap-advance-note">
+          <span>finish後は次の番号から始める</span><span class="switch" aria-hidden="true"></span>
+        </button>
+        <div class="list-note" id="lap-advance-note">オフにすると、finishしたときに途中だったラップの番号から始めます（例: 235番の途中で終えたら、次も235番から）</div>
       </div>`),
     html(`
       <div class="list">

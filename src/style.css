@@ -430,6 +430,10 @@ nav button:focus-visible {
   font-size: 16px;
 }
 
+.sheet-option:first-child {
+  grid-column: span 2;
+}
+
 .sheet-option[aria-pressed='true'] {
   background: var(--light);
   color: #000;
@@ -1086,6 +1090,13 @@ button.list-row {
   border-bottom: 1px solid var(--line);
 }
 
+.list-note {
+  padding: 8px 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
 .list-row.danger {
   color: var(--red);
 }
@@ -1214,14 +1225,25 @@ button.list-row {
 
 .sheet-actions button {
   height: 52px;
-  border-radius: 14px;
-  background: #2e2e2e;
+  border-radius: 26px;
   font-size: 16px;
+}
+
+/* キャンセルは枠線だけ、OK は白で、選択肢のボタンと見分けられるようにする */
+.sheet-actions .sheet-cancel {
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .sheet-actions .sheet-ok {
   background: #fff;
   color: #000;
+  font-weight: 600;
+}
+
+/* 選択肢のシートは、選んだら決まるので OK がない */
+.sheet-actions.single {
+  grid-template-columns: 1fr;
 }
 
 /* ---------- お知らせ ---------- */

@@ -7,7 +7,7 @@ import { $, html } from '../ui/dom';
 import { createDrum } from '../ui/drum';
 import { toast } from '../ui/toast';
 import { createStartRow, lastLapAverage } from './lapinfo';
-import { createEndRow, lapEndCondition } from './lapend';
+import { createEndRow, lapEndCondition, lapEndError } from './lapend';
 
 const LONG_PRESS_MS = 550;
 
@@ -113,6 +113,8 @@ export function initTimerPage(page: HTMLElement): () => void {
   const row = createStartRow(() => {
     const ms = read();
     if (ms <= 0) return toast('時間を設定してください');
+    const err = lapEndError();
+    if (err) return toast(err);
     unlockAudio();
     saveSettings({ timerMs: ms });
     const now = Date.now();

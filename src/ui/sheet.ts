@@ -2,6 +2,7 @@
 
 import { $, esc, html } from './dom';
 import { createDrum } from './drum';
+import { toast } from './toast';
 
 export interface DrumColumn {
   min: number;
@@ -11,15 +12,24 @@ export interface DrumColumn {
   pad?: boolean;
 }
 
-function open(title: string, body: HTMLElement, read: () => number[] | null): Promise<number[] | null> {
+/**
+ * シートを開く。read() が null を返したら（入力が範囲外など）、invalid を知らせて開いたままにする。
+ * withOk = false なら OK ボタンを出さない（選択肢をタップしたら決まるシート）。
+ */
+function open(
+  title: string,
+  body: HTMLElement,
+  read: () => number[] | null,
+  { withOk = true, invalid = '' }: { withOk?: boolean; invalid?: string } = {},
+): Promise<number[] | null> {
   const host = $('#sheet');
   const panel = html(`
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
       <div class="sheet-title">${esc(title)}</div>
       <div class="sheet-body"></div>
-      <div class="sheet-actions">
+      <div class="sheet-actions${withOk ? '' : ' single'}">
         <button type="button" class="sheet-cancel">キャンセル</button>
-        <button type="button" class="sheet-ok">OK</button>
+        ${withOk ? '<button type="button" class="sheet-ok">OK</button>' : ''}
       </div>
     </div>`);
   $('.sheet-body', panel).append(body);
@@ -34,7 +44,14 @@ function open(title: string, body: HTMLElement, read: () => number[] | null): Pr
       resolve(result);
     };
     $('.sheet-cancel', panel).onclick = () => close(null);
-    $('.sheet-ok', panel).onclick = () => close(read());
+    const ok = panel.querySelector<HTMLElement>('.sheet-ok');
+    const submit = () => {
+      const result = read();
+      if (result === null && invalid) toast(invalid);
+      else close(result);
+    };
+    if (ok) ok.onclick = submit;
+    (panel as HTMLElement & { submit?: () => void }).submit = submit;
     // 背景（シートの外）をタップしたら閉じる
     host.onclick = (e) => {
       if (e.target === host) close(null);
@@ -56,14 +73,20 @@ export function pickDrums(title: string, cols: DrumColumn[]): Promise<number[] |
 }
 
 /** 数字を1つ入力する。キャンセルや範囲外なら null。 */
-export async function pickInteger(title: string, value: number, min: number, max: number): Promise<number | null> {
+export async function pickInteger(
+  title: string,
+  value: number,
+  min: number,
+  max: number,
+  invalid = '',
+): Promise<number | null> {
   const input = html<HTMLInputElement>(
     `<input class="sheet-input" type="number" inputmode="numeric" pattern="[0-9]*" min="${min}" max="${max}" value="${value}" aria-label="${esc(title)}">`,
   );
   const result = await open(title, input, () => {
     const n = Math.floor(Number(input.value));
     return Number.isFinite(n) && n >= min && n <= max ? [n] : null;
-  });
+  }, { invalid });
   return result ? result[0] : null;
 }
 
@@ -76,10 +99,10 @@ export async function pickOption(title: string, labels: string[], current: numbe
     b.setAttribute('aria-pressed', String(i === current));
     b.onclick = () => {
       picked = i;
-      (body.closest('.sheet-panel')?.querySelector('.sheet-ok') as HTMLButtonElement | null)?.click();
+      (body.closest('.sheet-panel') as (HTMLElement & { submit?: () => void }) | null)?.submit?.();
     };
     body.append(b);
   });
-  const result = await open(title, body, () => [picked]);
+  const result = await open(title, body, () => [picked], { withOk: false });
   return result ? result[0] : null;
 }

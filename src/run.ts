@@ -16,6 +16,7 @@ import {
   lapEndView,
   usesLapNumbers,
   type Run,
+  type Session,
 } from './engine';
 import { addSession, clearRun, loadRun, saveRun, saveSettings, settings } from './store';
 import { getTilt, onTiltChange } from './tilt';
@@ -181,6 +182,18 @@ function show(): void {
   render();
 }
 
+/**
+ * 次に始めるラップ番号。
+ * finish したときに途中だったラップ（記録に入ったもの）を、設定によって
+ * 済んだことにして次の番号から始めるか、同じ番号からやり直すかを決める。
+ * lap の直後に finish したなど、途中のラップが記録に入らなかったときは、その番号から始める。
+ */
+function nextLapAfter(r: Run, s: Session): number {
+  const inProgress = r.firstLap + r.laps.length;
+  const partial = s.laps.length > r.laps.length;
+  return partial && settings.lapAdvance ? inProgress + 1 : inProgress;
+}
+
 /** 計測を終えて記録する。at は終了時刻（終了条件に達した時刻など）。 */
 function end(at = Date.now()): void {
   if (!run) return;
@@ -188,8 +201,7 @@ function end(at = Date.now()): void {
   const session = finish(run, at);
   if (session) {
     addSession(session);
-    // ラップ番号は、次回は今回の続きから
-    if (usesLapNumbers(mode)) saveSettings({ nextLap: null });
+    if (usesLapNumbers(mode)) saveSettings({ nextLap: nextLapAfter(run, session) });
   }
   clearRun();
   run = null;
@@ -437,8 +449,9 @@ function renderLapEnd(r: Run, now: number): void {
       info.push(['合計', fmtHM(r.end.ms)], ['残り時間', rest], ['完了', `${v.lapsDone}ラップ`]);
       break;
     case 'count':
+    case 'lapNo':
       info.push(
-        ['終了', `${r.firstLap + r.end.n - 1}番`],
+        ['終了', `${r.end.kind === 'count' ? r.firstLap + r.end.n - 1 : r.end.to}番`],
         ['残り時間（目安）', rest],
         ['残り', `${v.remainLaps ?? 0}ラップ`],
       );
