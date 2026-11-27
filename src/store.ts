@@ -48,6 +48,20 @@ export interface Settings {
   lapEndLapNo: number;
   /** finish したとき途中だったラップを済んだことにして、次は次の番号から始める */
   lapAdvance: boolean;
+  /** ラップ数で終えるときの残り時間の目安。average = 平均ラップ、timer = タイマーの設定時間 */
+  lapEstimate: 'average' | 'timer';
+  /** finish は長押しで終わる（オフなら1回タップ） */
+  finishHold: boolean;
+  /** lap を押したときに短い音を鳴らす */
+  lapSound: boolean;
+
+  // 統計
+  /** 1日の区切り（0:00 からの分）。4:00 にすると、深夜の勉強を前の日に数える */
+  dayBoundaryMin: number;
+  /** 週の始まり。1 = 月曜、0 = 日曜 */
+  weekStartsOn: 0 | 1;
+  /** 1日の目標時間。0 なら目標なし */
+  dailyGoalMs: number;
 }
 
 const DEFAULTS: Settings = {
@@ -72,6 +86,12 @@ const DEFAULTS: Settings = {
   lapEndCount: 10,
   lapEndLapNo: 10,
   lapAdvance: true,
+  lapEstimate: 'average',
+  finishHold: true,
+  lapSound: false,
+  dayBoundaryMin: 0,
+  weekStartsOn: 1,
+  dailyGoalMs: 0,
 };
 
 function read<T>(key: string): T | null {

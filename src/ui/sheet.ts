@@ -92,7 +92,8 @@ export async function pickInteger(
 
 /** 選択肢から1つ選ぶ。タップしたらすぐ閉じる。キャンセルなら null。 */
 export async function pickOption(title: string, labels: string[], current: number): Promise<number | null> {
-  const body = html(`<div class="sheet-options" role="group"></div>`);
+  // 選択肢が奇数なら、最初の1つを横いっぱいにして並びをそろえる
+  const body = html(`<div class="sheet-options${labels.length % 2 ? ' odd' : ''}" role="group"></div>`);
   let picked = current;
   labels.forEach((label, i) => {
     const b = html<HTMLButtonElement>(`<button type="button" class="sheet-option">${esc(label)}</button>`);

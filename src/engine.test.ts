@@ -16,7 +16,7 @@ import {
   totalElapsed,
 } from './engine';
 import { nextTilt } from './orientation';
-import { chartAxis, fmtAxis, summarize } from './summary';
+import { chartAxis, dayDetail, fmtAxis, fmtShort, studyDayStart, studyWeekStart, summarize } from './summary';
 import { HOUR, MIN, SEC, setDurationStyle, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
 
 const T0 = new Date(2026, 10, 14, 13, 0, 0).getTime(); // 2026-11-14(土) 13:00
@@ -320,5 +320,77 @@ describe('ラップ番号で終える', () => {
     expect([v.remainLaps, v.remainMs, v.done]).toEqual([1, 5 * MIN, false]);
     lap(r, T0 + 30 * MIN);
     expect(lapEndView(r, T0 + 30 * MIN).done).toBe(true);
+  });
+});
+
+describe('集計の区切り', () => {
+  const mk = (start: number, studyMs: number, laps: number[] = [], firstLap = 1) => ({
+    id: String(start),
+    mode: 'stopwatch' as const,
+    start,
+    end: start + studyMs,
+    studyMs,
+    laps,
+    firstLap,
+  });
+
+  it('1日の区切りを 4:00 にすると、深夜の勉強は前の日に数える', () => {
+    const lateNight = new Date(2026, 10, 15, 1, 30).getTime(); // 日曜 1:30
+    const sat = new Date(2026, 10, 14, 4, 0).getTime(); // 土曜 4:00
+    expect(studyDayStart(lateNight, 240)).toBe(sat);
+    expect(studyDayStart(lateNight, 0)).toBe(new Date(2026, 10, 15).getTime());
+    const s = summarize([mk(lateNight, 60 * MIN)], lateNight, { boundaryMin: 240 });
+    expect(s.todayIndex).toBe(5); // 土曜として数える
+    expect(s.days[5]).toBe(60 * MIN);
+    expect(s.todayMs).toBe(60 * MIN);
+  });
+
+  it('週の始まりを日曜にできる', () => {
+    const monStart = studyWeekStart(T0, { weekStartsOn: 1 });
+    const sunStart = studyWeekStart(T0, { weekStartsOn: 0 });
+    expect(new Date(monStart).getDay()).toBe(1);
+    expect(new Date(sunStart).getDay()).toBe(0);
+    const s = summarize([], T0, { weekStartsOn: 0 });
+    expect(s.todayIndex).toBe(6); // 土曜は日曜始まりの週の最後の日
+  });
+
+  it('前の週を表示しても、今日の合計は今日のもの', () => {
+    const lastWeek = T0 - 7 * 24 * 60 * MIN;
+    const s = summarize([mk(lastWeek, 30 * MIN), mk(T0 - MIN * 90, 20 * MIN)], T0, { ref: lastWeek });
+    expect([s.todayIndex, s.weekMs, s.todayMs]).toEqual([-1, 30 * MIN, 20 * MIN]);
+    expect(s.daySessions[5].map((x) => x.studyMs)).toEqual([30 * MIN]);
+  });
+
+  it('1日の詳細: ラップに番号をつけ、棒の区切りはラップごと', () => {
+    const d = dayDetail([
+      mk(T0, 22 * MIN, [10 * MIN, 12 * MIN], 231),
+      { ...mk(T0 + 60 * MIN, 25 * MIN), mode: 'pomoCycle' as const },
+    ]);
+    expect(d.laps.map((l) => [l.no, l.session])).toEqual([
+      [231, 0],
+      [232, 0],
+    ]);
+    expect([d.totalMs, d.lapAvgMs, d.lapMaxMs]).toEqual([47 * MIN, 11 * MIN, 12 * MIN]);
+    expect(d.segments).toEqual([10 * MIN, 12 * MIN, 25 * MIN]);
+  });
+
+  it('棒の上の短い時間', () => {
+    expect(fmtShort(45 * MIN)).toBe('45分');
+    expect(fmtShort(222 * MIN)).toBe('3:42');
+    expect(fmtShort(222 * MIN, 'm')).toBe('222分');
+  });
+});
+
+describe('残り時間の目安をタイマーの設定時間にする', () => {
+  it('ラップの平均ではなく、いつも設定時間で見積もる', () => {
+    const base = { durationMs: 10 * MIN, end: { kind: 'count' as const, n: 5 }, lapEstMs: 10 * MIN };
+    const avg = newRun('timerUp', T0, base);
+    const fixed = newRun('timerUp', T0, { ...base, estimateFixed: true });
+    for (const r of [avg, fixed]) {
+      lap(r, T0 + 20 * MIN); // 1ラップ目に20分かかった
+    }
+    // 残り4ラップ、今のラップは0分経過
+    expect(lapEndView(avg, T0 + 20 * MIN).remainMs).toBe(4 * 20 * MIN);
+    expect(lapEndView(fixed, T0 + 20 * MIN).remainMs).toBe(4 * 10 * MIN);
   });
 });

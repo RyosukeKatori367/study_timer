@@ -118,8 +118,14 @@ export function initTimerPage(page: HTMLElement): () => void {
     unlockAudio();
     saveSettings({ timerMs: ms });
     const now = Date.now();
-    // ラップ数で終えるときの残り時間は、最初のラップが終わるまでは設定時間で見積もる
-    const common = { firstLap: nextLapNumber(), durationMs: ms, end: lapEndCondition(now), lapEstMs: ms };
+    // ラップ数で終えるときの残り時間は、設定により平均ラップか設定時間で見積もる（最初のラップまではどちらも設定時間）
+    const common = {
+      firstLap: nextLapNumber(),
+      durationMs: ms,
+      end: lapEndCondition(now),
+      lapEstMs: ms,
+      estimateFixed: settings.lapEstimate === 'timer',
+    };
     if (settings.timerKind === 'up') {
       // 0 から増えていく。lap で 0 に戻り、設定時間を過ぎると赤くなる
       startRun(newRun('timerUp', now, common));

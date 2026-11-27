@@ -70,7 +70,7 @@ function showView(name: ViewName): void {
     else b.removeAttribute('aria-current');
   });
   dots.classList.toggle('hide', name !== 'main');
-  if (name === 'stats') renderStats(statsView);
+  if (name === 'stats') renderStats(statsView, true); // メニューから開いたら今週に戻す
 }
 navButtons.forEach((b) => {
   b.onclick = () => showView(b.dataset.view as ViewName);

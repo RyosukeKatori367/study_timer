@@ -45,6 +45,8 @@ export interface Run {
   overrun: boolean;
   /** ラップ1回の目安（残り時間の見積もりに使う。わからなければ 0） */
   lapEstMs?: number;
+  /** true なら、ラップの平均ではなく、いつも lapEstMs（タイマーの設定時間）で見積もる */
+  estimateFixed?: boolean;
   // ポモドーロ
   workMs: number;
   breakMs: number;
@@ -272,7 +274,8 @@ export function lapEndView(r: Run, now: number): LapEndView {
       // ラップ番号で決めたときは、何ラップ分かに直して同じように数える
       const target = r.end.kind === 'count' ? r.end.n : r.end.to - r.firstLap + 1;
       const left = Math.max(0, target - lapsDone);
-      const avg = lapsDone > 0 ? r.laps.reduce((a, b) => a + b, 0) / lapsDone : (r.lapEstMs ?? 0);
+      const est = r.lapEstMs ?? 0;
+      const avg = r.estimateFixed && est > 0 ? est : lapsDone > 0 ? r.laps.reduce((a, b) => a + b, 0) / lapsDone : est;
       let remainMs: number | null = null;
       if (left === 0) remainMs = 0;
       else if (avg > 0) remainMs = Math.max(0, avg - lapLength(r, now)) + avg * (left - 1);

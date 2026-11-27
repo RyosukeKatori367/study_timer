@@ -132,6 +132,7 @@ export function initRun(exit: () => void): void {
     const now = Date.now();
     lap(run, now);
     saveRun(run);
+    play('lap');
     // 決めたラップ数に達したら、そこで終わる
     if (lapEndView(run, now).done) {
       play('done');
@@ -257,6 +258,7 @@ function bindHoldToFinish(): void {
   };
 
   btn.addEventListener('pointerdown', () => {
+    if (!settings.finishHold) return; // 1回タップで終わる設定のときは click で終える
     btn.classList.add('holding');
     hold = window.setTimeout(() => {
       hold = undefined;
@@ -268,9 +270,9 @@ function bindHoldToFinish(): void {
   btn.addEventListener('pointerleave', () => cancel(false));
   btn.addEventListener('pointercancel', () => cancel(false));
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
-  // キーボード（Enter / Space）で押したときはそのまま終了
+  // キーボード（Enter / Space）で押したとき、長押しなしの設定のときはそのまま終了
   btn.addEventListener('click', (e) => {
-    if (e.detail === 0) end();
+    if (e.detail === 0 || !settings.finishHold) end();
   });
 }
 
