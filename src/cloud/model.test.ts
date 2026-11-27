@@ -9,7 +9,11 @@ import {
   fromCloud,
   iconColors,
   isChunkKey,
-  memberToday,
+  ranking,
+  recentDays,
+  dateKey,
+  weekKeys,
+  replyError,
   newInviteCode,
   normalizeCode,
   postFromSession,
@@ -87,7 +91,7 @@ describe('投稿', () => {
   lap(r, T0 + 20 * MIN);
   const s = finish(r, T0 + 30 * MIN)!;
   it('選んだものだけ出す', () => {
-    const p = postFromSession(s, { material: false, laps: true, lapTimes: false, comment: ' よし ' }, { name: '数学', color: '#338ced' });
+    const p = postFromSession(s, { material: false, laps: true, lapTimes: false, away: false, comment: ' よし ' }, { name: '数学', color: '#338ced' });
     expect(p.material).toBeUndefined();
     expect(p.laps).toEqual({ from: 12, count: s.laps.length });
     expect(p.lapMs).toBeUndefined();
@@ -95,14 +99,57 @@ describe('投稿', () => {
     expect(p.likes).toEqual([]);
   });
   it('ラップごとの時間も出せる', () => {
-    const p = postFromSession(s, { material: true, laps: false, lapTimes: true, comment: '' }, { name: '数学', color: '#338ced' });
+    const p = postFromSession(s, { material: true, laps: false, lapTimes: true, away: false, comment: '' }, { name: '数学', color: '#338ced' });
     expect(p.material?.name).toBe('数学');
     expect(p.laps).toBeUndefined();
     expect(p.lapMs).toEqual(s.laps);
   });
-  it('今日の時間は日付が変わると 0', () => {
-    expect(memberToday({ todayStart: 1, todayMs: 5 }, 1)).toBe(5);
-    expect(memberToday({ todayStart: 1, todayMs: 5 }, 2)).toBe(0);
+  it('離れた回数と時間は、選んだときだけ出す', () => {
+    const t = { ...s, leaves: [[T0, T0 + MIN], [T0 + 5 * MIN, T0 + 7 * MIN]] as [number, number][] };
+    const base = { material: false, laps: false, lapTimes: false, comment: '' };
+    expect(postFromSession(t, { ...base, away: false }, null).away).toBeUndefined();
+    expect(postFromSession(t, { ...base, away: true }, null).away).toEqual({ n: 2, ms: 3 * MIN });
+    expect(postFromSession(s, { ...base, away: true }, null).away).toBeUndefined();
+  });
+  it('返信の長さ', () => {
+    expect(replyError('  ')).toMatch('入れて');
+    expect(replyError('あ'.repeat(141))).toMatch('140');
+    expect(replyError('ナイス')).toBeNull();
+  });
+});
+
+describe('ランキング', () => {
+  const H = 60 * MIN;
+  it('日付はその人の1日の区切りで決める', () => {
+    const late = new Date(2026, 10, 28, 2, 0).getTime(); // 28日の 2:00
+    expect(dateKey(late)).toBe('2026-11-28');
+    expect(dateKey(late, 4 * 60)).toBe('2026-11-27'); // 4:00 区切りなら前の日
+  });
+  it('直近 14 日の日ごとの合計を出す', () => {
+    const now = new Date(2026, 10, 27, 20, 0).getTime();
+    const ss = [
+      { start: new Date(2026, 10, 27, 9).getTime(), studyMs: H },
+      { start: new Date(2026, 10, 27, 15).getTime(), studyMs: 2 * H },
+      { start: new Date(2026, 10, 20, 9).getTime(), studyMs: H },
+      { start: new Date(2026, 10, 1, 9).getTime(), studyMs: H }, // 古いので入れない
+    ].map((x, i) => ({ id: String(i), mode: 'timer' as const, end: x.start + x.studyMs, laps: [], firstLap: 1, ...x }));
+    expect(recentDays(ss, now)).toEqual({ '2026-11-27': 3 * H, '2026-11-20': H });
+  });
+  it('今週の 7 日（月曜始まり）', () => {
+    const keys = weekKeys(new Date(2026, 10, 27, 20).getTime(), { weekStartsOn: 1 }); // 金曜
+    expect(keys[0]).toBe('2026-11-23');
+    expect(keys[6]).toBe('2026-11-29');
+  });
+  it('多い順、同じ時間は同じ順位', () => {
+    const list: { n: string; days?: Record<string, number> }[] = [
+        { n: 'a', days: { d1: H } },
+        { n: 'b', days: { d1: 2 * H, d2: H } },
+        { n: 'c', days: { d2: H } },
+        { n: 'd' },
+    ];
+    const r = ranking(list, ['d1']);
+    expect(r.map((x) => [x.item.n, x.rank])).toEqual([['b', 1], ['a', 2], ['c', 3], ['d', 3]]);
+    expect(ranking([{ days: { d1: H } }, { days: { d1: H } }], ['d1']).map((x) => x.rank)).toEqual([1, 1]);
   });
 });
 

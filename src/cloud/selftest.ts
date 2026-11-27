@@ -79,8 +79,7 @@ const member = (code: string) => ({
   icon,
   joinedAt: F.serverTimestamp(),
   joinCode: code,
-  todayStart: 0,
-  todayMs: 0,
+  days: { '2026-11-27': 3600000 },
   lastStudyAt: 0,
 });
 const post = (uid: string) => ({
@@ -198,7 +197,12 @@ async function run(): Promise<void> {
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', a.uid), { todayMs: 999 }),
     );
     await allow('自分の今日の時間は書ける', () =>
-      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { todayStart: 1, todayMs: 60000, lastStudyAt: 2 }),
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { days: { '2026-11-27': 60000 }, lastStudyAt: 2 }),
+    );
+    await deny('日ごとの時間は14日分まで', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), {
+        days: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`2026-11-${String(i + 1).padStart(2, '0')}`, 1])),
+      }),
     );
 
     // ---- 投稿 ----
@@ -220,6 +224,62 @@ async function run(): Promise<void> {
     await deny('入っていない人はいいねできない', () =>
       F.updateDoc(F.doc(c.db, 'groups', gid, 'posts', pid), { likes: F.arrayUnion(c.uid) }),
     );
+    await allow('離れた回数つきで投稿できる', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), away: { n: 2, ms: 180000 } }),
+    );
+
+    // ---- 返信 ----
+    const postRef = (w: Who) => F.doc(w.db, 'groups', gid, 'posts', pid);
+    const reply = (w: Who, text = 'ナイス') => ({ uid: w.uid, name: 'テスト', icon, text, createdAt: F.serverTimestamp() });
+    const addReply = async (w: Who, body = reply(w)) => {
+      const r = F.doc(F.collection(postRef(w), 'replies'));
+      const batch = F.writeBatch(w.db);
+      batch.set(r, body);
+      batch.update(postRef(w), { replyCount: F.increment(1), lastReply: r.id });
+      await batch.commit();
+      return r.id;
+    };
+    let ridA = '';
+    let ridB = '';
+    await allow('返信できる', async () => (ridA = await addReply(a)));
+    await allow('自分の投稿にも返信できる', async () => (ridB = await addReply(b)));
+    await allow('返信の数が合っている', async () => {
+      const n = (await F.getDoc(postRef(a))).data()?.replyCount;
+      if (n !== 2) throw new Error(`数が ${n}`);
+    });
+    await deny('数を増やさずには返信できない', () =>
+      F.addDoc(F.collection(postRef(a), 'replies'), reply(a)),
+    );
+    await deny('数だけを増やせない', () => F.updateDoc(postRef(a), { replyCount: F.increment(1), lastReply: 'x' }));
+    await deny('人になりすまして返信できない', () => addReply(a, reply(b)));
+    await deny('空の返信はできない', () => addReply(a, reply(a, '')));
+    await deny('入っていない人は返信できない', () => addReply(c));
+    await deny('入っていない人は返信を読めない', () => F.getDocs(F.collection(postRef(c), 'replies')));
+    await deny('人の返信は消せない', async () => {
+      const batch = F.writeBatch(b.db);
+      batch.delete(F.doc(postRef(b), 'replies', ridA));
+      batch.update(postRef(b), { replyCount: F.increment(-1), lastReply: ridA });
+      await batch.commit();
+    });
+    await allow('自分の返信は消せる', async () => {
+      const batch = F.writeBatch(b.db);
+      batch.delete(F.doc(postRef(b), 'replies', ridB));
+      batch.update(postRef(b), { replyCount: F.increment(-1), lastReply: ridB });
+      await batch.commit();
+    });
+    await allow('投稿した人は、返信ごと投稿を消せる', async () => {
+      const p2 = F.doc(F.collection(b.db, 'groups', gid, 'posts'));
+      await F.setDoc(p2, post(b.uid));
+      const r = F.doc(F.collection(p2, 'replies'));
+      const add = F.writeBatch(a.db);
+      add.set(F.doc(a.db, r.path), reply(a));
+      add.update(F.doc(a.db, p2.path), { replyCount: F.increment(1), lastReply: r.id });
+      await add.commit();
+      const del = F.writeBatch(b.db);
+      del.delete(r);
+      del.delete(p2);
+      await del.commit();
+    });
 
     // ---- 外す・コードを作り直す ----
     await deny('メンバーは人を外せない', async () => {
@@ -261,6 +321,13 @@ async function run(): Promise<void> {
     await allow('外された人は、自分の投稿を消せる', () => F.deleteDoc(F.doc(b.db, 'groups', gid, 'posts', pid)));
 
     // ---- 片付け（グループを消す） ----
+    await allow('作成者は、人の投稿を消せる', async () => {
+      const rest = await F.getDocs(F.collection(a.db, 'groups', gid, 'posts'));
+      for (const d of rest.docs) await F.deleteDoc(d.ref);
+    });
+    await allow('投稿が消えたあと、残った自分の返信を消せる', () =>
+      F.deleteDoc(F.doc(a.db, 'groups', gid, 'posts', pid, 'replies', ridA)),
+    );
     await allow('作成者1人なら、グループを消せる', async () => {
       const batch = F.writeBatch(a.db);
       batch.delete(F.doc(a.db, 'groups', gid, 'members', a.uid));

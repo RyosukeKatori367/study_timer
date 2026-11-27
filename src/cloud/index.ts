@@ -4,7 +4,7 @@
 import { onStoreChange } from '../store';
 import { USER_CHANGE, cloudUser, deleteLogin, reauth, startCloud } from './account';
 import { fb } from './firebase';
-import { leaveGroup, publishToday } from './groups';
+import { leaveGroup, publishStudy } from './groups';
 import { deleteMyPosts } from './posts';
 import { getProfile } from './profile';
 import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sync';
@@ -23,7 +23,7 @@ export function initCloud(refresh: () => void): void {
   onStoreChange((c) => {
     if (!cloudUser()) return;
     onLocalChange(c);
-    if (c.kind !== 'state') void publishToday().catch(() => undefined);
+    if (c.kind !== 'state') void publishStudy().catch(() => undefined);
   });
 
   document.addEventListener('visibilitychange', () => {

@@ -3,15 +3,17 @@
 
 import type { Unsubscribe } from 'firebase/firestore';
 import { getSessions, settings } from '../store';
-import { studyDayStart } from '../summary';
 import { cloudUser } from './account';
 import { fb, type Fb } from './firebase';
 import {
   MAX_GROUPS,
   MAX_MEMBERS,
+  dateKey,
   groupNameError,
   newInviteCode,
   normalizeCode,
+  recentDays,
+  weekKeys,
   type GroupDoc,
   type InviteDoc,
   type MemberDoc,
@@ -37,12 +39,13 @@ async function myProfile() {
   return p;
 }
 
-/** 今日（設定の「1日の区切り」で数える）の勉強時間 */
-export function todayStudy(now = Date.now()): { todayStart: number; todayMs: number } {
-  const todayStart = studyDayStart(now, settings.dayBoundaryMin);
-  let todayMs = 0;
-  for (const s of getSessions()) if (studyDayStart(s.start, settings.dayBoundaryMin) === todayStart) todayMs += s.studyMs;
-  return { todayStart, todayMs };
+/** メンバー文書に入れる、直近の日ごとの勉強時間（設定の「1日の区切り」で数える） */
+const myDays = (now = Date.now()): Record<string, number> => recentDays(getSessions(), now, settings.dayBoundaryMin);
+
+/** ランキングで使う「今日」と「今週」の日付（見ている人の設定で決める） */
+export function rankKeys(now = Date.now()): { today: string[]; week: string[] } {
+  const opt = { boundaryMin: settings.dayBoundaryMin, weekStartsOn: settings.weekStartsOn };
+  return { today: [dateKey(now, opt.boundaryMin)], week: weekKeys(now, opt) };
 }
 
 // ---- 一覧 ----
@@ -100,14 +103,12 @@ export async function watchMembers(gid: string, cb: (list: Member[]) => void): P
 
 /** 入るときのメンバー文書 */
 function memberData(F: Fb['F'], p: { name: string; icon: MemberDoc['icon'] }, code: string) {
-  const t = todayStudy();
   return {
     name: p.name,
     icon: p.icon,
     joinedAt: F.serverTimestamp(),
     joinCode: code,
-    todayStart: t.todayStart,
-    todayMs: t.todayMs,
+    days: myDays(),
     lastStudyAt: getSessions().at(-1)?.end ?? 0,
   };
 }
@@ -310,23 +311,19 @@ export async function editGroup(gid: string, name: string, hue: number): Promise
   await batch.commit();
 }
 
-// ---- 今日の勉強時間 ----
+// ---- 日ごとの勉強時間（ランキング用） ----
 
-/** 計測を終えたときに、入っているグループに今日の勉強時間を知らせる（オフラインならつながったときに送られる） */
-export async function publishToday(): Promise<void> {
+/** 計測を終えたときに、入っているグループに日ごとの勉強時間を知らせる（オフラインならつながったときに送られる） */
+export async function publishStudy(): Promise<void> {
   const p = cachedProfile() ?? (await getProfile().catch(() => null));
   if (!p || p.groupIds.length === 0) return;
   const { db, F } = await fb();
   const uid = me();
-  const t = todayStudy();
+  const days = myDays();
   const last = getSessions().at(-1);
   await Promise.all(
     p.groupIds.map((gid) =>
-      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), {
-        todayStart: t.todayStart,
-        todayMs: t.todayMs,
-        lastStudyAt: last?.end ?? 0,
-      }).catch(() => undefined),
+      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
     ),
   );
 }

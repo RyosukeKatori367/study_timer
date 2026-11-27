@@ -7,7 +7,7 @@ import type { Session } from '../engine';
 import { materialById } from '../store';
 import { cloudUser } from './account';
 import { fb } from './firebase';
-import { postFromSession, type PostDoc, type PostOptions } from './model';
+import { postFromSession, replyError, type PostDoc, type PostOptions, type ReplyDoc } from './model';
 import { cachedProfile, getProfile, savePostPrefs } from './profile';
 
 export type Post = PostDoc & {
@@ -50,7 +50,9 @@ export async function createPost(s: Session, opt: PostOptions, groups: string[])
   }
   // 送信はつながったときに済む。ここでは待たない
   void batch.commit().catch((e) => console.warn('投稿できませんでした', e));
-  void savePostPrefs({ material: opt.material, laps: opt.laps, lapTimes: opt.lapTimes, groups }).catch(() => undefined);
+  void savePostPrefs({ material: opt.material, laps: opt.laps, lapTimes: opt.lapTimes, away: opt.away, groups }).catch(
+    () => undefined,
+  );
 }
 
 /** グループのタイムライン（新しい順に n 件）を見張る */
@@ -85,19 +87,73 @@ export async function setLike(gid: string, pid: string, liked: boolean): Promise
   });
 }
 
-/** 投稿を消す（自分の投稿、または作成者ならグループの投稿） */
+/** 投稿を消す（自分の投稿、または作成者ならグループの投稿）。返信も一緒に消す */
 export async function deletePost(gid: string, pid: string): Promise<void> {
   const { db, F } = await fb();
-  await F.deleteDoc(F.doc(db, 'groups', gid, 'posts', pid));
+  const replies = await F.getDocs(F.collection(db, 'groups', gid, 'posts', pid, 'replies'));
+  // 投稿と返信を1回で消す（1回で消せるのは 500 件まで。返信がそれ以上つくことは考えない）
+  const batch = F.writeBatch(db);
+  for (const d of replies.docs.slice(0, 499)) batch.delete(d.ref);
+  batch.delete(F.doc(db, 'groups', gid, 'posts', pid));
+  await batch.commit();
 }
 
-/** そのグループの自分の投稿を全部消す（アカウントを消すとき） */
+// ---- 返信 ----
+
+export type Reply = ReplyDoc & { id: string; pending: boolean; at: number };
+
+/** 投稿に返信する（オフラインでも返信でき、つながったときに送られる） */
+export async function addReply(gid: string, pid: string, text: string): Promise<void> {
+  const err = replyError(text);
+  if (err) throw new Error(err);
+  const p = cachedProfile() ?? (await getProfile());
+  if (!p) throw new Error('先にプロフィールを作ってください');
+  const { db, F } = await fb();
+  const post = F.doc(db, 'groups', gid, 'posts', pid);
+  const ref = F.doc(F.collection(post, 'replies'));
+  const batch = F.writeBatch(db);
+  batch.set(ref, { uid: me(), name: p.name, icon: p.icon, text: text.trim(), createdAt: F.serverTimestamp() });
+  batch.update(post, { replyCount: F.increment(1), lastReply: ref.id });
+  void batch.commit().catch((e) => console.warn('返信できませんでした', e));
+}
+
+/** 投稿への返信を見張る（古い順） */
+export async function watchReplies(gid: string, pid: string, cb: (list: Reply[]) => void): Promise<Unsubscribe> {
+  const { db, F } = await fb();
+  const q = F.query(F.collection(db, 'groups', gid, 'posts', pid, 'replies'), F.orderBy('createdAt'));
+  return F.onSnapshot(
+    q,
+    { includeMetadataChanges: true },
+    (snap) =>
+      cb(
+        snap.docs.map((d) => {
+          const data = d.data({ serverTimestamps: 'estimate' }) as ReplyDoc & { createdAt?: { toMillis(): number } };
+          return { ...data, id: d.id, pending: d.metadata.hasPendingWrites, at: data.createdAt?.toMillis?.() ?? Date.now() };
+        }),
+      ),
+    () => cb([]),
+  );
+}
+
+/** 返信を消す（自分の返信、または作成者） */
+export async function deleteReply(gid: string, pid: string, rid: string): Promise<void> {
+  const { db, F } = await fb();
+  const batch = F.writeBatch(db);
+  batch.delete(F.doc(db, 'groups', gid, 'posts', pid, 'replies', rid));
+  batch.update(F.doc(db, 'groups', gid, 'posts', pid), { replyCount: F.increment(-1), lastReply: rid });
+  await batch.commit();
+}
+
+/** そのグループの自分の投稿と返信を全部消す（アカウントを消すとき） */
 export async function deleteMyPosts(gid: string): Promise<void> {
   const { db, F } = await fb();
-  const snap = await F.getDocs(F.query(F.collection(db, 'groups', gid, 'posts'), F.where('uid', '==', me())));
-  for (let i = 0; i < snap.docs.length; i += 400) {
-    const batch = F.writeBatch(db);
-    for (const d of snap.docs.slice(i, i + 400)) batch.delete(d.ref);
-    await batch.commit();
+  const uid = me();
+  const mine = await F.getDocs(F.query(F.collection(db, 'groups', gid, 'posts'), F.where('uid', '==', uid)));
+  for (const d of mine.docs) await deletePost(gid, d.id);
+  // 人の投稿への自分の返信（返信のある投稿だけ見る）
+  const withReplies = await F.getDocs(F.query(F.collection(db, 'groups', gid, 'posts'), F.where('replyCount', '>', 0)));
+  for (const post of withReplies.docs) {
+    const replies = await F.getDocs(F.query(F.collection(post.ref, 'replies'), F.where('uid', '==', uid)));
+    for (const r of replies.docs) await deleteReply(gid, post.id, r.id).catch(() => undefined);
   }
 }

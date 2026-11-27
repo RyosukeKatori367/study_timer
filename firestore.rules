@@ -22,6 +22,8 @@ service cloud.firestore {
     function groupPath(gid) { return /databases/$(database)/documents/groups/$(gid); }
     function memberPath(gid, uid) { return /databases/$(database)/documents/groups/$(gid)/members/$(uid); }
     function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+    function postPath(gid, pid) { return /databases/$(database)/documents/groups/$(gid)/posts/$(pid); }
+    function replyPath(gid, pid, rid) { return /databases/$(database)/documents/groups/$(gid)/posts/$(pid)/replies/$(rid); }
 
     function isMember(gid) { return signedIn() && exists(memberPath(gid, me())); }
 
@@ -31,6 +33,8 @@ service cloud.firestore {
     function validName(s) { return s is string && s.size() >= 1 && s.size() <= 40; }
     function validHue(h) { return h is int && h >= 0 && h < 360; }
     function validCode(c) { return c is string && c.matches('^[A-HJKMNP-Z2-9]{8}$'); }
+    /** 日ごとの勉強時間 { '2026-11-27': ms }（直近14日） */
+    function validDays(d) { return d is map && d.size() <= 14; }
     function validIcon(i) {
       return i is map
         && i.keys().hasAll(['c', 'h'])
@@ -116,12 +120,11 @@ service cloud.firestore {
         allow read: if isMember(gid);
 
         allow create: if isMe(uid)
-          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'todayStart', 'todayMs', 'lastStudyAt'])
+          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && request.resource.data.joinedAt == request.time
-          && request.resource.data.todayStart is number
-          && request.resource.data.todayMs is number
+          && validDays(request.resource.data.days)
           && request.resource.data.lastStudyAt is number
           // 今の招待コードを知っている
           && request.resource.data.joinCode == getAfter(groupPath(gid)).data.code
@@ -135,11 +138,10 @@ service cloud.firestore {
           && getAfter(userPath(uid)).data.groupIds.size() <= 10;
 
         allow update: if isMe(uid)
-          && changed().hasOnly(['name', 'icon', 'todayStart', 'todayMs', 'lastStudyAt'])
+          && changed().hasOnly(['name', 'icon', 'days', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
-          && request.resource.data.todayStart is number
-          && request.resource.data.todayMs is number
+          && validDays(request.resource.data.days)
           && request.resource.data.lastStudyAt is number;
 
         // 抜ける（自分）・外す（作成者）。同時に人数を1減らすか、グループごと消す
@@ -155,7 +157,7 @@ service cloud.firestore {
 
         allow create: if isMember(gid)
           && request.resource.data.keys().hasAll(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'comment', 'likes'])
-          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'material', 'laps', 'lapMs', 'comment', 'likes'])
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'material', 'laps', 'lapMs', 'away', 'comment', 'likes'])
           && request.resource.data.uid == me()
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
@@ -181,19 +183,62 @@ service cloud.firestore {
                   && request.resource.data.laps.from is int
                   && request.resource.data.laps.count is int))
           && (!('lapMs' in request.resource.data)
-              || (request.resource.data.lapMs is list && request.resource.data.lapMs.size() <= 200));
+              || (request.resource.data.lapMs is list && request.resource.data.lapMs.size() <= 200))
+          && (!('away' in request.resource.data)
+              || (request.resource.data.away is map
+                  && request.resource.data.away.keys().hasOnly(['n', 'ms'])
+                  && request.resource.data.away.n is int
+                  && request.resource.data.away.ms is number));
 
-        // いいね：自分の uid を足すか消すだけ
-        allow update: if isMember(gid)
-          && changed().hasOnly(['likes'])
-          && request.resource.data.likes is list
-          && request.resource.data.likes.size() <= 60
-          && request.resource.data.likes.size() <= resource.data.likes.size() + 1
-          && request.resource.data.likes.removeAll([me()]) == resource.data.likes.removeAll([me()]);
+        allow update: if signedIn() && (
+          // いいね：自分の uid を足すか消すだけ
+          (isMember(gid)
+            && changed().hasOnly(['likes'])
+            && request.resource.data.likes is list
+            && request.resource.data.likes.size() <= 60
+            && request.resource.data.likes.size() <= resource.data.likes.size() + 1
+            && request.resource.data.likes.removeAll([me()]) == resource.data.likes.removeAll([me()]))
+          // 返信を足す：その返信を同時に作るときだけ、数を1増やせる
+          || (isMember(gid)
+            && changed().hasOnly(['replyCount', 'lastReply'])
+            && request.resource.data.replyCount == resource.data.get('replyCount', 0) + 1
+            && !exists(replyPath(gid, pid, request.resource.data.lastReply))
+            && existsAfter(replyPath(gid, pid, request.resource.data.lastReply)))
+          // 返信を消す：その返信を同時に消すときだけ、数を1減らせる
+          || (changed().hasOnly(['replyCount', 'lastReply'])
+            && request.resource.data.replyCount == resource.data.get('replyCount', 0) - 1
+            && exists(replyPath(gid, pid, request.resource.data.lastReply))
+            && !existsAfter(replyPath(gid, pid, request.resource.data.lastReply)))
+        );
 
-        // 消す：投稿した本人か、グループの作成者
+        // 消す：投稿した本人か、グループの作成者（返信も同時に消す）
         allow delete: if signedIn()
           && (resource.data.uid == me() || get(groupPath(gid)).data.ownerId == me());
+
+        match /replies/{rid} {
+          allow read: if isMember(gid);
+
+          allow create: if isMember(gid)
+            && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'text', 'createdAt'])
+            && request.resource.data.uid == me()
+            && validName(request.resource.data.name)
+            && validIcon(request.resource.data.icon)
+            && request.resource.data.text is string
+            && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 280
+            && request.resource.data.createdAt == request.time
+            // 同時に投稿の返信の数を1増やしている
+            && getAfter(postPath(gid, pid)).data.lastReply == rid
+            && getAfter(postPath(gid, pid)).data.replyCount == get(postPath(gid, pid)).data.get('replyCount', 0) + 1;
+
+          // 消す：返信した本人か作成者（同時に数を1減らす）。投稿ごと消すときは、投稿した本人も消せる
+          allow delete: if signedIn() && (
+            ((resource.data.uid == me() || get(groupPath(gid)).data.ownerId == me())
+              && (!existsAfter(postPath(gid, pid))
+                  || (getAfter(postPath(gid, pid)).data.replyCount == get(postPath(gid, pid)).data.get('replyCount', 0) - 1
+                      && getAfter(postPath(gid, pid)).data.lastReply == rid)))
+            || (!existsAfter(postPath(gid, pid)) && get(postPath(gid, pid)).data.uid == me())
+          );
+        }
       }
     }
 
