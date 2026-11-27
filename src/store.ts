@@ -44,7 +44,7 @@ export interface Settings {
   lapEndTotalMs: number;
   /** 何ラップで終えるか */
   lapEndCount: number;
-  /** 何番のラップで終えるか */
+  /** 何番のラップで終えるか（教材なしのとき。教材を選んでいるときは教材ごとの値を使う） */
   lapEndLapNo: number;
   /** finish したとき途中だったラップを済んだことにして、次は次の番号から始める */
   lapAdvance: boolean;
@@ -171,6 +171,8 @@ export interface Material {
   name: string;
   /** 手で決めた次のラップ番号、または finish したときに決まった番号。null なら記録から出す */
   nextLap: number | null;
+  /** 終了条件「ラップ番号」で、何番まで（教材ごと）。まだ決めていなければ null */
+  endLapNo?: number | null;
   archived?: boolean;
 }
 
@@ -250,6 +252,22 @@ export function nextLapNumber(materialId: string | null = currentMaterialId()): 
   if (fixed !== null) return fixed;
   const last = lastLapSession(materialId);
   return last ? last.firstLap + last.laps.length : 1;
+}
+
+/** 終了条件「ラップ番号」の番号（教材ごと）。教材でまだ決めていなければ null */
+export function endLapNo(materialId: string | null = currentMaterialId()): number | null {
+  const m = materialById(materialId);
+  return m ? (m.endLapNo ?? null) : settings.lapEndLapNo;
+}
+
+export function setEndLapNo(n: number, materialId: string | null = currentMaterialId()): void {
+  const m = materialById(materialId);
+  if (m) {
+    m.endLapNo = n;
+    saveMaterials();
+  } else {
+    saveSettings({ lapEndLapNo: n });
+  }
 }
 
 /** 次に始めるラップ番号を決める（null なら記録から出す） */

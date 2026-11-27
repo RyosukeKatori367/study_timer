@@ -1,7 +1,16 @@
 // タイマーとストップウォッチの「終了条件」の行。設定は2つの画面で共通。
 
 import { clockToTimestamp, type EndCondition } from '../engine';
-import { nextLapNumber, saveSettings, settings, type LapEndKind } from '../store';
+import {
+  currentMaterialId,
+  endLapNo,
+  materialName,
+  nextLapNumber,
+  saveSettings,
+  setEndLapNo,
+  settings,
+  type LapEndKind,
+} from '../store';
 import { HOUR, MIN, fmtHM, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums, pickInteger, pickOption } from '../ui/sheet';
@@ -21,7 +30,8 @@ export function lapEndCondition(now: number): EndCondition {
     case 'count':
       return { kind: 'count', n: settings.lapEndCount };
     case 'lapNo':
-      return { kind: 'lapNo', to: settings.lapEndLapNo };
+      // 番号は教材ごと。決まっていないときは lapEndError で止めるので、ここには来ない
+      return { kind: 'lapNo', to: endLapNo() ?? nextLapNumber() };
     default:
       return { kind: 'none' };
   }
@@ -29,8 +39,10 @@ export function lapEndCondition(now: number): EndCondition {
 
 /** 今の終了条件では始められないとき、その理由。始められるなら null。 */
 export function lapEndError(): string | null {
-  if (settings.lapEndKind === 'lapNo' && settings.lapEndLapNo < nextLapNumber()) {
-    return `終了の${settings.lapEndLapNo}番が、開始の${nextLapNumber()}番より前です`;
+  if (settings.lapEndKind === 'lapNo') {
+    const to = endLapNo();
+    if (to === null) return `${materialName(currentMaterialId())}の終了番号が決まっていません。終了条件から決めてください`;
+    if (to < nextLapNumber()) return `終了の${to}番が、開始の${nextLapNumber()}番より前です`;
   }
   return null;
 }
@@ -46,8 +58,10 @@ function describe(): string {
       return `${settings.lapEndCount}ラップ（〜${from + settings.lapEndCount - 1}番）`;
     }
     case 'lapNo': {
-      const n = settings.lapEndLapNo - nextLapNumber() + 1;
-      return n > 0 ? `${settings.lapEndLapNo}番まで（${n}ラップ）` : `${settings.lapEndLapNo}番まで（過ぎています）`;
+      const to = endLapNo();
+      if (to === null) return 'ラップ番号（未設定）';
+      const n = to - nextLapNumber() + 1;
+      return n > 0 ? `${to}番まで（${n}ラップ）` : `${to}番まで（過ぎています）`;
     }
     default:
       return 'なし';
@@ -82,10 +96,13 @@ async function pickValue(kind: LapEndKind): Promise<boolean> {
   } else if (kind === 'lapNo') {
     const from = nextLapNumber();
     // 前に決めた番号が過ぎていたら、今の番号から10ラップ分を初めの値にする
-    const value = settings.lapEndLapNo >= from ? settings.lapEndLapNo : from + 9;
-    const n = await pickInteger(`何番まで（${from}番から）`, value, from, 99999, `${from}番以上にしてください`);
+    const saved = endLapNo();
+    const value = saved !== null && saved >= from ? saved : from + 9;
+    const id = currentMaterialId();
+    const title = `${id ? `${materialName(id)}：` : ''}何番まで（${from}番から）`;
+    const n = await pickInteger(title, value, from, 99999, `${from}番以上にしてください`);
     if (n === null) return false;
-    saveSettings({ lapEndLapNo: n });
+    setEndLapNo(n); // 教材ごとに覚える
   }
   return true;
 }

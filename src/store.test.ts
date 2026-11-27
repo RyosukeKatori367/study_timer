@@ -6,11 +6,13 @@ import {
   archiveMaterial,
   assignUntagged,
   currentMaterialId,
+  endLapNo,
   exportBackup,
   lastLapSession,
   materialName,
   nextLapNumber,
   saveSettings,
+  setEndLapNo,
   setNextLap,
 } from './store';
 
@@ -71,5 +73,19 @@ describe('教材ごとのラップ番号', () => {
     expect(data.version).toBe(2);
     expect(data.materials.map((m: { name: string }) => m.name)).toContain('名門の森');
     expect(data.sessions.some((s: { material?: string }) => s.material)).toBe(true);
+  });
+});
+
+describe('終了条件のラップ番号は教材ごと', () => {
+  it('教材ごとに別の番号を覚え、教材なしは設定の値を使う', () => {
+    const a = addMaterial('教材A');
+    const b = addMaterial('教材B');
+    expect(endLapNo(a.id)).toBeNull(); // まだ決めていない
+    setEndLapNo(240, a.id);
+    setEndLapNo(50, b.id);
+    setEndLapNo(15, null);
+    expect([endLapNo(a.id), endLapNo(b.id), endLapNo(null)]).toEqual([240, 50, 15]);
+    saveSettings({ materialId: b.id });
+    expect(endLapNo()).toBe(50);
   });
 });
