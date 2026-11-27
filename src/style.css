@@ -719,6 +719,24 @@ nav button:focus-visible {
   gap: 12px;
 }
 
+/* 左上の × （記録せずにやめる） */
+.run-cancel {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 12px;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.run-cancel:active {
+  background: #262626;
+}
+
 .run-head {
   min-height: 62px;
   display: flex;

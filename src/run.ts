@@ -67,6 +67,8 @@ export function initRun(exit: () => void): void {
   root = $('#run');
   app = $('#app');
   root.append(
+    // 記録せずにやめる（押し間違えないように、確かめてから）
+    html(`<button type="button" class="run-cancel" aria-label="記録せずにやめる">×</button>`),
     html(`
       <div class="run-head">
         <div class="run-kicker"></div>
@@ -120,6 +122,14 @@ export function initRun(exit: () => void): void {
     lapList: $('.lap-list', root),
     lapNumber: $('.lap-now .n', root),
     lapTotal: $('.lap-total', root),
+  };
+
+  $('.run-cancel', root).onclick = () => {
+    if (!run) return;
+    if (!confirm('記録せずにやめますか？\nこの計測の時間とラップは残りません')) return;
+    close();
+    toast('記録せずにやめました');
+    onExit();
   };
 
   el.btnStop.onclick = () => {
@@ -251,12 +261,7 @@ function end(at = Date.now()): void {
     queueMicrotask(() => document.dispatchEvent(new CustomEvent('session:saved', { detail: session })));
     if (usesLapNumbers(mode)) setNextLap(nextLapAfter(run, session), run.material ?? null);
   }
-  clearRun();
-  run = null;
-  clearInterval(ticker);
-  setAwake(false);
-  root.hidden = true;
-  delete app.dataset.rot;
+  close();
   if (session) {
     const t = session.studyMs >= HOUR ? fmtHM(session.studyMs) : fmtLap(session.studyMs);
     toast(`記録しました（${t}）`);
@@ -264,6 +269,16 @@ function end(at = Date.now()): void {
     toast('記録せずに終了しました');
   }
   onExit();
+}
+
+/** 計測の画面を閉じる（記録するかどうかは呼ぶ側で決める） */
+function close(): void {
+  clearRun();
+  run = null;
+  clearInterval(ticker);
+  setAwake(false);
+  root.hidden = true;
+  delete app.dataset.rot;
 }
 
 /**
