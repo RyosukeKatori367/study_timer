@@ -1232,7 +1232,7 @@ nav button:focus-visible {
 }
 
 .day.sel .bar {
-  background: #fff;
+  background: #e6e6e6;
 }
 
 .bar-value {
@@ -1459,6 +1459,114 @@ nav button:focus-visible {
 .sess-sub {
   font-size: 12px;
   color: var(--muted);
+}
+
+/* ---------- 1日の詳細: グラフの切り替えと時間帯のグラフ ---------- */
+
+.detail {
+  --axis: 34px;
+}
+
+.detail-tabs button {
+  height: 36px;
+  font-size: 14px;
+}
+
+.detail-tabs button[aria-pressed='true'] {
+  background: var(--light);
+  color: #000;
+  font-weight: 500;
+}
+
+.hour-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hours {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+}
+
+/* 1時間ぶんの列（タップしやすいように列全体がボタン） */
+.hour {
+  position: relative;
+  min-width: 0;
+}
+
+.hour-bar {
+  position: absolute;
+  left: 1.5px;
+  right: 1.5px;
+  bottom: 0;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+}
+
+.hour-seg {
+  flex-basis: 0;
+  min-height: 0;
+}
+
+.hour.sel::after {
+  content: '';
+  position: absolute;
+  inset: -4px 0 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.hour-labels {
+  margin-left: var(--axis);
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hour-caption {
+  min-height: 1.5em;
+  font-size: 13px;
+  text-align: center;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legend-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend-name i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legend-value {
+  font-size: 15px;
 }
 
 /* ---------- 設定（ジャンルごとのカード） ---------- */

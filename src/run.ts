@@ -334,10 +334,9 @@ function renderTimer(r: Run, now: number): void {
   const e = elapsed(r, now);
   if (!r.rang && e >= r.durationMs) {
     r.rang = true;
-    if (!r.overrun) {
-      // 超過なし: 0 で止める
-      r.acc = r.durationMs;
-      r.resumedAt = null;
+    if (!r.overrun && r.resumedAt !== null) {
+      // 超過なし: ちょうど 0 になった時刻で止める
+      pause(r, r.resumedAt + (r.durationMs - r.acc));
     }
     saveRun(r);
     play('done');

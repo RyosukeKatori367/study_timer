@@ -49,6 +49,8 @@ export interface Run {
   estimateFixed?: boolean;
   /** 教材の id（教材なしなら付けない） */
   material?: string;
+  /** 計っていた時間帯（一時停止で区切ったもの。今動いている区間は入らない） */
+  spans?: [number, number][];
   // ポモドーロ
   workMs: number;
   breakMs: number;
@@ -66,6 +68,8 @@ export interface Session {
   firstLap: number;
   /** 教材の id（教材なしなら付けない） */
   material?: string;
+  /** 実際に計っていた時間帯 [始まり, 終わり] の一覧（一時停止のあいだを除く）。古い記録にはない */
+  spans?: [number, number][];
 }
 
 /** finish のとき、最後のラップがこれより短ければ記録しない（lap 直後の finish 対策） */
@@ -77,6 +81,7 @@ export function newRun(mode: Mode, now: number, opts: Partial<Run> = {}): Run {
     startedAt: now,
     acc: 0,
     resumedAt: now,
+    spans: [],
     laps: [],
     firstLap: 1,
     rang: false,
@@ -96,9 +101,16 @@ export function elapsed(r: Run, now: number): number {
   return r.acc + (r.resumedAt !== null ? Math.max(0, now - r.resumedAt) : 0);
 }
 
+/** 今動いている区間を、計っていた時間帯として記録する */
+function closeSpan(r: Run, end: number): void {
+  if (r.resumedAt === null || end <= r.resumedAt) return;
+  (r.spans ??= []).push([r.resumedAt, end]);
+}
+
 export function pause(r: Run, now: number): void {
   if (r.resumedAt === null) return;
   r.acc = elapsed(r, now);
+  closeSpan(r, now);
   r.resumedAt = null;
 }
 
@@ -117,6 +129,7 @@ export function lapLength(r: Run, now: number): number {
 /** ラップを記録して、次のラップを 0 から始める。 */
 export function lap(r: Run, now: number): void {
   r.laps.push(lapLength(r, now));
+  closeSpan(r, now);
   r.acc = 0;
   r.resumedAt = now;
   r.rang = false;
@@ -214,6 +227,22 @@ export function cycleRemaining(r: Run, now: number, v: CycleView = cycleView(r, 
   }
 }
 
+/** 計っていた時間帯の一覧（終わった時刻までの区間を足して、隣り合う区間はつなげる） */
+function finishedSpans(r: Run, now: number): [number, number][] {
+  // 時間帯を記録していなかった古い版の計測は、始めから終わりまでを1つの区間にする
+  const raw: [number, number][] = r.spans ? [...r.spans] : [[r.startedAt, now]];
+  if (r.spans && r.resumedAt !== null && now > r.resumedAt) raw.push([r.resumedAt, now]);
+  const out: [number, number][] = [];
+  for (const [a, b0] of raw) {
+    const b = Math.min(b0, now);
+    if (b <= a) continue;
+    const last = out[out.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
 /** 計測を終えて、保存する記録を作る。ほぼ何も計っていなければ null。 */
 export function finish(r: Run, now: number): Session | null {
   const base = {
@@ -223,6 +252,7 @@ export function finish(r: Run, now: number): Session | null {
     end: now,
     firstLap: r.firstLap,
     ...(r.material ? { material: r.material } : {}),
+    spans: finishedSpans(r, now),
   };
 
   if (r.mode === 'pomoCycle') {

@@ -178,6 +178,9 @@ export interface Material {
 
 let materials: Material[] = read<Material[]>('materials') ?? [];
 
+/** 教材の並び順（色を決めるのに使う。削除したものも含めて、作った順） */
+export const materialOrder = (id: string): number => materials.findIndex((m) => m.id === id);
+
 /** 選べる教材（削除したものを除く） */
 export const activeMaterials = (): Material[] => materials.filter((m) => !m.archived);
 
@@ -332,7 +335,10 @@ function isSession(x: unknown): x is Session {
     typeof s.firstLap === 'number' &&
     Array.isArray(s.laps) &&
     s.laps.every((v) => typeof v === 'number') &&
-    (s.material === undefined || typeof s.material === 'string')
+    (s.material === undefined || typeof s.material === 'string') &&
+    (s.spans === undefined ||
+      (Array.isArray(s.spans) &&
+        s.spans.every((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'number'))))
   );
 }
 

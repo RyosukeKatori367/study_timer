@@ -16,7 +16,7 @@ import {
   totalElapsed,
 } from './engine';
 import { nextTilt } from './orientation';
-import { chartAxis, dayDetail, fmtAxis, fmtShort, studyDayStart, studyWeekStart, summarize } from './summary';
+import { chartAxis, dayDetail, fmtAxis, fmtShort, hourly, studyDayStart, studyWeekStart, summarize } from './summary';
 import { HOUR, MIN, SEC, setDurationStyle, fmtElapsed, fmtHM, fmtLap, fmtRemain, weekStart } from './time';
 
 const T0 = new Date(2026, 10, 14, 13, 0, 0).getTime(); // 2026-11-14(土) 13:00
@@ -371,7 +371,7 @@ describe('集計の区切り', () => {
       [232, 0],
     ]);
     expect([d.totalMs, d.lapAvgMs, d.lapMaxMs]).toEqual([47 * MIN, 11 * MIN, 12 * MIN]);
-    expect(d.segments).toEqual([10 * MIN, 12 * MIN, 25 * MIN]);
+    expect(d.segments.map((x) => x.ms)).toEqual([10 * MIN, 12 * MIN, 25 * MIN]);
   });
 
   it('棒の上の短い時間', () => {
@@ -392,5 +392,65 @@ describe('残り時間の目安をタイマーの設定時間にする', () => {
     // 残り4ラップ、今のラップは0分経過
     expect(lapEndView(avg, T0 + 20 * MIN).remainMs).toBe(4 * 20 * MIN);
     expect(lapEndView(fixed, T0 + 20 * MIN).remainMs).toBe(4 * 10 * MIN);
+  });
+});
+
+describe('途中で終えたラップは1本にまとめる', () => {
+  it('同じ教材の同じ番号は、時間を足して1ラップにする', () => {
+    const base = { mode: 'stopwatch' as const, material: 'ma' };
+    const d = dayDetail([
+      // 231, 232 を終え、233 の途中（7分）で finish
+      { ...base, id: 'a', start: T0, end: T0 + 30 * MIN, studyMs: 30 * MIN, laps: [10 * MIN, 13 * MIN, 7 * MIN], firstLap: 231 },
+      // あとで 233 の続き（5分）から再開
+      { ...base, id: 'b', start: T0 + 60 * MIN, end: T0 + 80 * MIN, studyMs: 20 * MIN, laps: [5 * MIN, 15 * MIN], firstLap: 233 },
+      // 別の教材の 233 番は別のラップ
+      { ...base, material: 'mb', id: 'c', start: T0 + 90 * MIN, end: T0 + 99 * MIN, studyMs: 9 * MIN, laps: [9 * MIN], firstLap: 233 },
+    ]);
+    expect(d.laps.map((l) => [l.no, l.ms / MIN, l.parts, l.material])).toEqual([
+      [231, 10, 1, 'ma'],
+      [232, 13, 1, 'ma'],
+      [233, 12, 2, 'ma'],
+      [234, 15, 1, 'ma'],
+      [233, 9, 1, 'mb'],
+    ]);
+    expect(d.lapMaxMs).toBe(15 * MIN);
+    expect(d.byMaterial).toEqual([
+      { key: 'ma', ms: 50 * MIN },
+      { key: 'mb', ms: 9 * MIN },
+    ]);
+  });
+});
+
+describe('計っていた時間帯', () => {
+  it('一時停止のあいだは入らず、lap では区切れない', () => {
+    const r = newRun('stopwatch', T0);
+    lap(r, T0 + 10 * MIN);
+    pause(r, T0 + 20 * MIN);
+    resume(r, T0 + 50 * MIN);
+    const s = finish(r, T0 + 60 * MIN)!;
+    expect(s.spans).toEqual([
+      [T0, T0 + 20 * MIN],
+      [T0 + 50 * MIN, T0 + 60 * MIN],
+    ]);
+  });
+
+  it('1時間ごとに割り振る（ポモドーロの休憩は薄める）', () => {
+    const dayStart = studyDayStart(T0); // T0 は 13:00
+    const sw = { id: 'a', mode: 'stopwatch' as const, start: T0 + 30 * MIN, end: T0 + 90 * MIN, studyMs: 60 * MIN, laps: [], firstLap: 1 };
+    const pomo = {
+      id: 'b',
+      mode: 'pomoCycle' as const,
+      start: T0 + 3 * 60 * MIN,
+      end: T0 + 4 * 60 * MIN,
+      studyMs: 50 * MIN, // 1時間のうち作業は50分
+      laps: [],
+      firstLap: 1,
+      material: 'ma',
+    };
+    const h = hourly([sw, pomo], dayStart);
+    expect(h[13].get('')).toBe(30 * MIN);
+    expect(h[14].get('')).toBe(30 * MIN);
+    expect(h[16].get('ma')).toBeCloseTo(50 * MIN);
+    expect(h[15].size).toBe(0);
   });
 });

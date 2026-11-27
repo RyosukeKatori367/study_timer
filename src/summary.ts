@@ -103,41 +103,105 @@ export function summarize(sessions: readonly Session[], now: number, opts: Summa
 export interface LapItem {
   /** ラップ番号 */
   no: number;
+  /** そのラップにかかった時間（途中で終えて分かれたものは合計） */
   ms: number;
-  /** その日の記録の何番目のものか */
+  /** 最初に出てきた記録が、その日の何番目か */
   session: number;
+  /** 教材の id（教材なしは ''） */
+  material: string;
+  /** いくつに分かれていたか（途中で finish して、あとで同じ番号から続けたとき 2 以上） */
+  parts: number;
+}
+
+export interface Segment {
+  ms: number;
+  /** 教材の id（教材なしは ''） */
+  key: string;
 }
 
 export interface DayDetail {
   totalMs: number;
+  /** ラップごと（同じ教材の同じ番号は1つにまとめる） */
   laps: LapItem[];
   lapAvgMs: number | null;
   lapMaxMs: number | null;
-  /** 棒グラフの区切り（ラップがある記録はラップごと、ない記録は1つ） */
-  segments: number[];
+  /** 棒グラフの区切り（ラップがある記録は計ったひとかたまりごと、ない記録は1つ） */
+  segments: Segment[];
+  /** 教材ごとの合計（多い順） */
+  byMaterial: Segment[];
 }
 
 export function dayDetail(sessions: readonly Session[]): DayDetail {
-  const laps: LapItem[] = [];
-  const segments: number[] = [];
+  const laps = new Map<string, LapItem>();
+  const segments: Segment[] = [];
+  const byMaterial = new Map<string, number>();
   let totalMs = 0;
   sessions.forEach((s, i) => {
+    const key = s.material ?? '';
     totalMs += s.studyMs;
+    byMaterial.set(key, (byMaterial.get(key) ?? 0) + s.studyMs);
     if (s.laps.length > 0) {
-      s.laps.forEach((ms, j) => laps.push({ no: s.firstLap + j, ms, session: i }));
-      segments.push(...s.laps);
+      s.laps.forEach((ms, j) => {
+        const no = s.firstLap + j;
+        const id = `${key}\u0000${no}`;
+        const found = laps.get(id);
+        if (found) {
+          found.ms += ms;
+          found.parts += 1;
+        } else {
+          laps.set(id, { no, ms, session: i, material: key, parts: 1 });
+        }
+        segments.push({ ms, key });
+      });
     } else {
-      segments.push(s.studyMs);
+      segments.push({ ms: s.studyMs, key });
     }
   });
-  const sum = laps.reduce((a, l) => a + l.ms, 0);
+  const list = [...laps.values()];
+  const sum = list.reduce((a, l) => a + l.ms, 0);
   return {
     totalMs,
-    laps,
-    lapAvgMs: laps.length > 0 ? sum / laps.length : null,
-    lapMaxMs: laps.length > 0 ? Math.max(...laps.map((l) => l.ms)) : null,
+    laps: list,
+    lapAvgMs: list.length > 0 ? sum / list.length : null,
+    lapMaxMs: list.length > 0 ? Math.max(...list.map((l) => l.ms)) : null,
     segments,
+    byMaterial: [...byMaterial.entries()].map(([key, ms]) => ({ key, ms })).sort((a, b) => b.ms - a.ms),
   };
+}
+
+// ---- 時間帯ごと ----
+
+/** 計っていた時間帯。記録していない古い記録は、始めから終わりまで */
+export const spansOf = (s: Session): [number, number][] => (s.spans?.length ? s.spans : [[s.start, s.end]]);
+
+/**
+ * その日の1時間ごとの勉強時間（教材ごと）。24 個の { 教材: ミリ秒 }。
+ * 計っていた時間帯に、勉強時間を時間の長さに合わせて割り振る
+ * （ポモドーロの休憩は勉強時間に入らないので、そのぶん薄く割り振られる）。
+ * 前の日に始めて日をまたいだ記録も、この日に入るぶんは数える。
+ */
+export function hourly(sessions: readonly Session[], dayStartTs: number): Map<string, number>[] {
+  const end = dayStartTs + 24 * HOUR;
+  const hours = Array.from({ length: 24 }, () => new Map<string, number>());
+  for (const s of sessions) {
+    const spans = spansOf(s);
+    const active = spans.reduce((a, [x, y]) => a + Math.max(0, y - x), 0);
+    if (active <= 0) continue;
+    const weight = Math.min(1, s.studyMs / active);
+    const key = s.material ?? '';
+    for (const [x, y] of spans) {
+      let a = Math.max(x, dayStartTs);
+      const b = Math.min(y, end);
+      while (a < b) {
+        const h = Math.floor((a - dayStartTs) / HOUR);
+        const next = Math.min(b, dayStartTs + (h + 1) * HOUR);
+        const m = hours[h];
+        m.set(key, (m.get(key) ?? 0) + (next - a) * weight);
+        a = next;
+      }
+    }
+  }
+  return hours;
 }
 
 // ---- グラフの目盛り ----
