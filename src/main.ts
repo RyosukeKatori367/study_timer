@@ -6,12 +6,14 @@ import { renderStats } from './pages/stats';
 import { initStopwatchPage } from './pages/stopwatch';
 import { initTimerPage } from './pages/timer';
 import { initCloud } from './cloud';
+import { api, setApi } from './cloud/api';
+import { SHOW_VIEW, initGroupPage } from './pages/group';
 import { initRun } from './run';
 import { requestPersistence } from './store';
 import { armTilt } from './tilt';
 import { $ } from './ui/dom';
 
-type ViewName = 'main' | 'stats' | 'settings';
+type ViewName = 'main' | 'stats' | 'group' | 'settings';
 
 // オフラインでも動くようにする。新しい版を公開したら自動で入れ替わる
 registerSW({ immediate: true });
@@ -41,7 +43,15 @@ function refreshAll(): void {
 initSettingsPage($('.view[data-view="settings"]'), refreshAll);
 document.addEventListener('material:change', refreshAll);
 initRun(refreshAll);
-initCloud(refreshAll);
+
+// ---- グループとバックアップ ----
+// 開発中は ?fake（ログイン前）・?fake=in（ログイン後）で、Firebase につながずに偽のデータで画面を確かめる
+const fake = import.meta.env.DEV ? new URLSearchParams(location.search).get('fake') : null;
+const cloudReady =
+  fake !== null
+    ? import('./cloud/fake').then((m) => setApi(m.makeFakeApi(fake === 'in', api)))
+    : Promise.resolve(initCloud(refreshAll));
+void cloudReady.then(() => initGroupPage($('.view[data-view="group"]'), $('.view[data-view="settings"]')));
 
 armTilt();
 
@@ -75,7 +85,9 @@ function showView(name: ViewName): void {
   dots.classList.toggle('hide', name !== 'main');
   if (name === 'stats') renderStats(statsView, true); // メニューから開いたら今週に戻す
   if (name === 'settings') document.dispatchEvent(new CustomEvent('settings:show'));
+  if (name === 'group') document.dispatchEvent(new CustomEvent('group:show'));
 }
+document.addEventListener(SHOW_VIEW, (e) => showView((e as CustomEvent<ViewName>).detail));
 navButtons.forEach((b) => {
   b.onclick = () => showView(b.dataset.view as ViewName);
 });

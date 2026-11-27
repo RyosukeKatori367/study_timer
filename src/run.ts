@@ -181,7 +181,19 @@ function cameBack(): void {
   const before = getSessions()
     .filter((s) => studyDayStart(s.start, settings.dayBoundaryMin) === today)
     .reduce((a, s) => a + (s.leaves?.length ?? 0), 0);
-  toast(`${fmtHM(ms)}離れていました（今日${before + (run.leaves?.length ?? 0)}回目）`);
+  const r = run;
+  const leave = r.leaves!.at(-1)!;
+  toast(`${ms < HOUR ? fmtLap(ms) : fmtHM(ms)}離れていました（今日${before + (r.leaves?.length ?? 0)}回目）`, {
+    label: '画面を消していただけ',
+    // 画面を消して紙で勉強していたときなどは、離脱に数えない
+    run: () => {
+      if (run !== r || !r.leaves) return;
+      r.leaves = r.leaves.filter((x) => x !== leave);
+      saveRun(r);
+      render();
+      toast('離脱に数えないようにしました');
+    },
+  });
 }
 
 export function startRun(r: Run): void {
@@ -235,6 +247,8 @@ function end(at = Date.now()): void {
   const session = finish(run, at);
   if (session) {
     addSession(session);
+    // ログインしていれば、投稿の確認画面が出る
+    queueMicrotask(() => document.dispatchEvent(new CustomEvent('session:saved', { detail: session })));
     if (usesLapNumbers(mode)) setNextLap(nextLapAfter(run, session), run.material ?? null);
   }
   clearRun();

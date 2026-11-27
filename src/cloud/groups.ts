@@ -327,3 +327,21 @@ export async function publishStudy(): Promise<void> {
     ),
   );
 }
+
+/** メンバーを1回だけ読む（グループ一覧の「今日 N人が勉強」用） */
+export async function getMembers(gid: string): Promise<Member[]> {
+  const { db, F } = await fb();
+  const snap = await F.getDocs(F.collection(db, 'groups', gid, 'members'));
+  return snap.docs.map((d) => ({ uid: d.id, ...(d.data({ serverTimestamps: 'estimate' }) as MemberDoc) }));
+}
+
+/** since（ミリ秒）より新しい投稿の数（グループ一覧の新着の数。オフラインなら 0） */
+export async function unreadCount(gid: string, since: number): Promise<number> {
+  try {
+    const { db, F } = await fb();
+    const q = F.query(F.collection(db, 'groups', gid, 'posts'), F.where('createdAt', '>', F.Timestamp.fromMillis(since)));
+    return (await F.getCountFromServer(q)).data().count;
+  } catch {
+    return 0;
+  }
+}

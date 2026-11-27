@@ -28,6 +28,13 @@ export const MAX_GROUPS = 10;
 export const ICON_IMAGE_MAX = 30000;
 export const PASSWORD_MIN = 8;
 
+/**
+ * 開発者のアカウント（名前の横に「開発者」のしるしを出す）。
+ * UID はログインの番号で、公開しても困らない（なりすましもできない）。メールアドレスは書かない
+ */
+export const DEVELOPER_UIDS: string[] = [];
+export const isDeveloper = (uid: string): boolean => DEVELOPER_UIDS.includes(uid);
+
 // ---- アイコン ----
 
 /** 絵文字か1文字＋背景の色相。img があれば画像を優先して出す */

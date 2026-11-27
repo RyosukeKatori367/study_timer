@@ -157,3 +157,18 @@ export async function deleteMyPosts(gid: string): Promise<void> {
     for (const r of replies.docs) await deleteReply(gid, post.id, r.id).catch(() => undefined);
   }
 }
+
+/** 投稿を1件見張る（返信の画面で、いいねの数などを最新にする）。消えたら null */
+export async function watchPost(gid: string, pid: string, cb: (p: Post | null) => void): Promise<Unsubscribe> {
+  const { db, F } = await fb();
+  return F.onSnapshot(
+    F.doc(db, 'groups', gid, 'posts', pid),
+    { includeMetadataChanges: true },
+    (d) => {
+      if (!d.exists()) return cb(null);
+      const data = d.data({ serverTimestamps: 'estimate' }) as PostDoc & { createdAt?: { toMillis(): number } };
+      cb({ ...data, id: d.id, pending: d.metadata.hasPendingWrites, at: data.createdAt?.toMillis?.() ?? Date.now() });
+    },
+    () => cb(null),
+  );
+}

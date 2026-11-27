@@ -1,7 +1,7 @@
 // プロフィール（表示名・ひとこと・アイコン）と、投稿の初期設定。
 // 表示名とアイコンは、入っているグループのメンバー文書にも写す（グループの人はそちらを読む）。
 
-import { cloudUser } from './account';
+import { USER_CHANGE, cloudUser } from './account';
 import { fb } from './firebase';
 import { DEFAULT_POST_PREFS, ICON_IMAGE_MAX, profileError, type Icon, type PostPrefs, type UserDoc } from './model';
 
@@ -12,6 +12,9 @@ function uid(): string {
 }
 
 let cache: UserDoc | null = null;
+
+// ログインし直したら、前の人のプロフィールを捨てる
+if (typeof document !== 'undefined') document.addEventListener(USER_CHANGE, () => (cache = null));
 
 /** 自分のプロフィール。まだ作っていなければ null（登録した直後） */
 export async function getProfile(): Promise<UserDoc | null> {
