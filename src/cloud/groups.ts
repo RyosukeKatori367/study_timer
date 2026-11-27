@@ -2,7 +2,8 @@
 // 人数の増減はルールで確かめているので、入る・抜けるは必ず1回のまとめ書き（batch）で行う。
 
 import type { Unsubscribe } from 'firebase/firestore';
-import { getSessions, settings } from '../store';
+import { materialColor } from '../colors';
+import { getSessions, materialName, settings } from '../store';
 import { cloudUser } from './account';
 import { fb, type Fb } from './firebase';
 import {
@@ -13,7 +14,9 @@ import {
   newInviteCode,
   normalizeCode,
   recentDays,
+  recentMats,
   weekKeys,
+  type DayMats,
   type GroupDoc,
   type InviteDoc,
   type MemberDoc,
@@ -41,6 +44,10 @@ async function myProfile() {
 
 /** メンバー文書に入れる、直近の日ごとの勉強時間（設定の「1日の区切り」で数える） */
 const myDays = (now = Date.now()): Record<string, number> => recentDays(getSessions(), now, settings.dayBoundaryMin);
+
+/** メンバー文書に入れる、日ごと・教材ごとの時間（ランキングのグラフの色分け用） */
+const myMats = (now = Date.now()): DayMats =>
+  recentMats(getSessions(), now, settings.dayBoundaryMin, (id) => ({ n: materialName(id), c: materialColor(id) }));
 
 /** ランキングで使う「今日」と「今週」の日付（見ている人の設定で決める） */
 export function rankKeys(now = Date.now()): { today: string[]; week: string[] } {
@@ -109,6 +116,7 @@ function memberData(F: Fb['F'], p: { name: string; icon: MemberDoc['icon'] }, co
     joinedAt: F.serverTimestamp(),
     joinCode: code,
     days: myDays(),
+    mats: myMats(),
     lastStudyAt: getSessions().at(-1)?.end ?? 0,
   };
 }
@@ -320,10 +328,11 @@ export async function publishStudy(): Promise<void> {
   const { db, F } = await fb();
   const uid = me();
   const days = myDays();
+  const mats = myMats();
   const last = getSessions().at(-1);
   await Promise.all(
     p.groupIds.map((gid) =>
-      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
+      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, mats, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
     ),
   );
 }

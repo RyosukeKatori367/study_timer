@@ -146,6 +146,8 @@ export interface MemberDoc {
   joinCode: string;
   /** 日ごとの勉強時間 { '2026-11-27': ms }（直近 14 日）。今日・今週のランキングに使う */
   days: Record<string, number>;
+  /** 日ごと・教材ごとの内訳（ランキングのグラフの色分けに使う。古い文書にはない） */
+  mats?: DayMats;
   lastStudyAt: number;
 }
 
@@ -209,6 +211,59 @@ export function recentDays(sessions: readonly Session[], now: number, boundaryMi
     out[k] = (out[k] ?? 0) + s.studyMs;
   }
   return out;
+}
+
+/** 教材1つ分の時間。n = 教材名、c = 色（その人の教材の色） */
+export interface MatSlice {
+  n: string;
+  c: string;
+  ms: number;
+}
+
+/** 日ごと・教材ごとの内訳 { '2026-11-27': { 教材の id（教材なしは '_'）: MatSlice } } */
+export type DayMats = Record<string, Record<string, MatSlice>>;
+
+/**
+ * 記録から、直近 DAYS_KEEP 日の日ごと・教材ごとの時間を出す。
+ * info は教材の id から名前と色を返す（教材なしは id が null）。
+ */
+export function recentMats(
+  sessions: readonly Session[],
+  now: number,
+  boundaryMin: number,
+  info: (id: string | null) => { n: string; c: string },
+): DayMats {
+  const from = addDays(studyDayStart(now, boundaryMin), -(DAYS_KEEP - 1), boundaryMin);
+  const out: DayMats = {};
+  for (const s of sessions) {
+    if (s.start < from || s.studyMs <= 0) continue;
+    const day = (out[dateKey(s.start, boundaryMin)] ??= {});
+    const key = s.material ?? '_';
+    day[key] ??= { ...info(s.material ?? null), ms: 0 };
+    day[key].ms += s.studyMs;
+  }
+  return out;
+}
+
+/** keys の日の、教材ごとの合計（多い順）。内訳がない古いデータは、合計を「不明」1つにする */
+export function matBreakdown(
+  m: { days?: Record<string, number>; mats?: DayMats },
+  keys: readonly string[],
+): (MatSlice & { key: string })[] {
+  const total = sumDays(m.days, keys);
+  const byKey = new Map<string, MatSlice & { key: string }>();
+  for (const k of keys) {
+    for (const [key, v] of Object.entries(m.mats?.[k] ?? {})) {
+      const cur = byKey.get(key);
+      if (cur) cur.ms += v.ms;
+      else byKey.set(key, { key, n: v.n, c: v.c, ms: v.ms });
+    }
+  }
+  const list = [...byKey.values()].filter((x) => x.ms > 0).sort((a, b) => b.ms - a.ms);
+  const known = list.reduce((t, x) => t + x.ms, 0);
+  // 内訳がない日の分（古いデータ）は灰色でまとめる
+  if (total - known >= 60000) list.push({ key: '?', n: '内訳なし', c: '#5a5a5a', ms: total - known });
+  return list;
 }
 
 /** 今週の 7 日の日付（週の始まりから） */

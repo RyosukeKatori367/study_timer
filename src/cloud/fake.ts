@@ -39,9 +39,29 @@ const people: Record<string, { name: string; icon: { c: string; h: number } }> =
   kei: { name: 'けい', icon: { c: 'け', h: 210 } },
 };
 
+const BOOKS: Record<string, [string, string][]> = {
+  me: [['リードα', '#338ced'], ['名門の森', '#e76624'], ['英単語', '#00a888']],
+  dev: [['青チャート', '#338ced'], ['速読英単語', '#e76624']],
+  haru: [['リードα', '#338ced'], ['化学の新研究', '#e76624'], ['古文単語', '#00a888'], ['教材なし', '#d9d9d9']],
+  yuu: [['ターゲット1900', '#338ced']],
+  rin: [['数学IA', '#338ced'], ['物理基礎', '#e76624']],
+  kei: [['英文法', '#338ced'], ['現代文', '#e76624']],
+};
+
+/** 日ごとの合計を、その人の教材に 5:3:2 くらいで分ける */
+function split(uid: string, days: Record<string, number>) {
+  const books = BOOKS[uid] ?? [['教材なし', '#d9d9d9']];
+  const w = [5, 3, 2, 1].slice(0, books.length);
+  const sum = w.reduce((a, b) => a + b, 0);
+  return Object.fromEntries(
+    Object.entries(days).map(([k, ms]) => [k, Object.fromEntries(books.map(([n, c], i) => [`m${i}`, { n, c, ms: Math.round((ms * w[i]) / sum) }]))]),
+  );
+}
+
 function member(uid: string, todayMin: number, weekMin: number, joined: number): Member {
   const p = uid === 'me' && profile ? profile : people[uid];
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days: d(todayMin, weekMin), lastStudyAt: now };
+  const days = d(todayMin, weekMin);
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), lastStudyAt: now };
 }
 
 interface FakeGroup {

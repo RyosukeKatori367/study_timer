@@ -2,7 +2,7 @@
 
 import { api } from '../../cloud/api';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
-import { ranking, sumDays, type Icon } from '../../cloud/model';
+import { matBreakdown, ranking, sumDays, type Icon } from '../../cloud/model';
 import type { Post, Reply } from '../../cloud/posts';
 import { fmtHM, fmtLap } from '../../time';
 import { $, esc, html } from '../../ui/dom';
@@ -14,6 +14,8 @@ import { avatar, busy, groupIcon, header, nameHtml, type Nav, type Screen } from
 
 let tab: 'timeline' | 'ranking' = 'timeline';
 let range: 'today' | 'week' = 'today';
+/** ランキングで教材ごとの時間を開いている人 */
+let openRank: string | null = null;
 
 interface Ctx {
   gid: string;
@@ -147,6 +149,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
     const rows = ranking([...ctx.members.values()], keys);
     const active = rows.filter((r) => r.ms > 0);
     const total = active.reduce((a, r) => a + r.ms, 0);
+    const max = Math.max(1, ...rows.map((r) => r.ms));
     body.innerHTML = `
       <div class="sns-seg small" role="group" style="margin-bottom:12px">
         <button type="button" data-range="today" aria-pressed="${range === 'today'}">今日</button>
@@ -154,20 +157,46 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
       </div>
       <div class="sns-summary" style="margin-bottom:8px"><span>${active.length}人が勉強</span><span>みんなで ${esc(fmtHM(total))}</span></div>
       <div class="sns-card">${rows
-        .map(
-          (r) => `
-        <div class="sns-row rank-row${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}">
+        .map((r) => {
+          const parts = r.ms > 0 ? matBreakdown(r.item, keys) : [];
+          const open = openRank === r.item.uid && parts.length > 0;
+          // 棒の長さは、いちばん長い人を 100% にする。教材ごとに色を分けて、間を 2px あける
+          const bar = parts
+            .map((m) => `<span style="flex:${m.ms} 1 0;background:${esc(m.c)}" title="${esc(m.n)} ${esc(fmtHM(m.ms))}"></span>`)
+            .join('');
+          const detail = open
+            ? `<div class="rank-detail">${parts
+                .map(
+                  (m) => `<div class="rank-mat"><i style="background:${esc(m.c)}"></i><span class="sns-name">${esc(m.n)}</span>
+                    <span class="rank-mat-ms">${esc(fmtHM(m.ms))}</span><span class="rank-mat-pct">${Math.round((m.ms / r.ms) * 100)}%</span></div>`,
+                )
+                .join('')}</div>`
+            : '';
+          return `
+        <${parts.length ? 'button type="button"' : 'div'} class="sns-row rank-row${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}${open ? ' open' : ''}" data-rank="${esc(r.item.uid)}" ${parts.length ? `aria-expanded="${open}"` : ''}>
           <span class="rank">${r.ms > 0 ? r.rank : '–'}</span>
           ${avatar(r.item.icon, 36)}
-          <span class="sns-row-main"><span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid })}</span></span>
-          <span class="ms">${r.ms > 0 ? esc(fmtHM(r.ms)) : '—'}</span>
-        </div>`,
-        )
+          <span class="sns-row-main">
+            <span class="rank-line">
+              <span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid })}</span>
+              <span class="ms">${r.ms > 0 ? esc(fmtHM(r.ms)) : '—'}</span>
+            </span>
+            ${r.ms > 0 ? `<span class="rank-bar" style="width:${(r.ms / max) * 100}%" aria-hidden="true">${bar}</span>` : ''}
+            ${detail}
+          </span>
+        </${parts.length ? 'button' : 'div'}>`;
+        })
         .join('')}</div>
-      <p class="sns-note" style="margin-top:8px">${range === 'today' ? '今日' : '今週'}の勉強時間です。日付は、それぞれの人の「1日の区切り」の設定で数えます</p>`;
+      <p class="sns-note" style="margin-top:8px">${range === 'today' ? '今日' : '今週'}の勉強時間です。色はそれぞれの人の教材で、タップすると教材ごとの時間が出ます。日付は、それぞれの人の「1日の区切り」の設定で数えます</p>`;
     body.querySelectorAll<HTMLElement>('[data-range]').forEach((b) => {
       b.onclick = () => {
         range = b.dataset.range as typeof range;
+        render();
+      };
+    });
+    body.querySelectorAll<HTMLElement>('button[data-rank]').forEach((b) => {
+      b.onclick = () => {
+        openRank = openRank === b.dataset.rank ? null : b.dataset.rank!;
         render();
       };
     });

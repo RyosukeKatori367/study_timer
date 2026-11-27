@@ -16,7 +16,7 @@ import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sy
 export function initCloud(refresh: () => void): void {
   document.addEventListener(USER_CHANGE, () => {
     const u = cloudUser();
-    if (u) void startSync(u.uid, refresh);
+    if (u) void startSync(u.uid, refresh).then(() => publishStudy().catch(() => undefined));
     else stopSync();
   });
 
@@ -40,7 +40,7 @@ export function initCloud(refresh: () => void): void {
       void startCloud()
         .then(() => {
           const now = cloudUser();
-          if (now) return startSync(now.uid, refresh);
+          if (now) return startSync(now.uid, refresh).then(() => publishStudy().catch(() => undefined));
         })
         .catch((e) => console.warn('Firebase を読み込めませんでした', e));
     if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 });

@@ -9,8 +9,10 @@ import {
   fromCloud,
   iconColors,
   isChunkKey,
+  matBreakdown,
   ranking,
   recentDays,
+  recentMats,
   dateKey,
   weekKeys,
   replyError,
@@ -164,5 +166,33 @@ describe('ログインの入力とエラー', () => {
     expect(errorMessage({ code: 'auth/email-already-in-use' })).toMatch('登録されています');
     expect(errorMessage(new Error('先にプロフィール'))).toBe('先にプロフィール');
     expect(errorMessage({ code: 'something' })).toMatch('うまくいきません');
+  });
+});
+
+describe('ランキングの教材ごとの内訳', () => {
+  const H = 3600000;
+  it('日をまたいで同じ教材を足し、多い順に並べる', () => {
+    const m = {
+      days: { d1: 3 * H, d2: 2 * H },
+      mats: {
+        d1: { a: { n: 'A', c: '#1', ms: 2 * H }, b: { n: 'B', c: '#2', ms: H } },
+        d2: { b: { n: 'B', c: '#2', ms: 2 * H } },
+      },
+    };
+    expect(matBreakdown(m, ['d1', 'd2']).map((x) => [x.key, x.ms])).toEqual([['b', 3 * H], ['a', 2 * H]]);
+    expect(matBreakdown(m, ['d1']).map((x) => x.key)).toEqual(['a', 'b']);
+  });
+  it('内訳のない古いデータは「内訳なし」にまとめる', () => {
+    expect(matBreakdown({ days: { d1: H } }, ['d1'])).toEqual([{ key: '?', n: '内訳なし', c: '#5a5a5a', ms: H }]);
+  });
+  it('記録から日ごと・教材ごとの時間を出す', () => {
+    const now = new Date(2026, 10, 27, 20).getTime();
+    const ss = [
+      { material: 'm1', start: new Date(2026, 10, 27, 9).getTime(), studyMs: H },
+      { material: 'm1', start: new Date(2026, 10, 27, 12).getTime(), studyMs: H },
+      { start: new Date(2026, 10, 27, 15).getTime(), studyMs: H },
+    ].map((x, i) => ({ id: String(i), mode: 'timer' as const, end: x.start + x.studyMs, laps: [], firstLap: 1, ...x }));
+    const r = recentMats(ss, now, 0, (id) => ({ n: id ?? '教材なし', c: id ? '#338ced' : '#d9d9d9' }));
+    expect(r['2026-11-27']).toEqual({ m1: { n: 'm1', c: '#338ced', ms: 2 * H }, _: { n: '教材なし', c: '#d9d9d9', ms: H } });
   });
 });

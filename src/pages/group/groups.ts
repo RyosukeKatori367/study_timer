@@ -251,7 +251,7 @@ export function joinScreen(nav: Nav, prefill = ''): Screen {
         </div>`;
       submit.textContent = '参加する';
       $('[data-note]', el).innerHTML =
-        '参加すると、あなたの表示名・アイコン・日ごとの勉強時間と、これから投稿する記録がメンバーに見えます';
+        '参加すると、あなたの表示名・アイコン・日ごとの勉強時間（教材ごとの内訳つき）と、これから投稿する記録がメンバーに見えます';
     });
   };
 

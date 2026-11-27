@@ -80,6 +80,7 @@ const member = (code: string) => ({
   joinedAt: F.serverTimestamp(),
   joinCode: code,
   days: { '2026-11-27': 3600000 },
+  mats: { '2026-11-27': { m1: { n: 'リードα', c: '#338ced', ms: 3600000 } } },
   lastStudyAt: 0,
 });
 const post = (uid: string) => ({
@@ -197,7 +198,16 @@ async function run(): Promise<void> {
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', a.uid), { todayMs: 999 }),
     );
     await allow('自分の今日の時間は書ける', () =>
-      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { days: { '2026-11-27': 60000 }, lastStudyAt: 2 }),
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), {
+        days: { '2026-11-27': 60000 },
+        mats: { '2026-11-27': { _: { n: '教材なし', c: '#d9d9d9', ms: 60000 } } },
+        lastStudyAt: 2,
+      }),
+    );
+    await deny('教材ごとの内訳も14日分まで', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), {
+        mats: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`2026-11-${String(i + 1).padStart(2, '0')}`, {}])),
+      }),
     );
     await deny('日ごとの時間は14日分まで', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), {
