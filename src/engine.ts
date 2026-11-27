@@ -47,6 +47,8 @@ export interface Run {
   lapEstMs?: number;
   /** true なら、ラップの平均ではなく、いつも lapEstMs（タイマーの設定時間）で見積もる */
   estimateFixed?: boolean;
+  /** 教材の id（教材なしなら付けない） */
+  material?: string;
   // ポモドーロ
   workMs: number;
   breakMs: number;
@@ -62,6 +64,8 @@ export interface Session {
   studyMs: number;
   laps: number[];
   firstLap: number;
+  /** 教材の id（教材なしなら付けない） */
+  material?: string;
 }
 
 /** finish のとき、最後のラップがこれより短ければ記録しない（lap 直後の finish 対策） */
@@ -218,6 +222,7 @@ export function finish(r: Run, now: number): Session | null {
     start: r.startedAt,
     end: now,
     firstLap: r.firstLap,
+    ...(r.material ? { material: r.material } : {}),
   };
 
   if (r.mode === 'pomoCycle') {

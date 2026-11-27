@@ -62,6 +62,9 @@ export interface Settings {
   weekStartsOn: 0 | 1;
   /** 1日の目標時間。0 なら目標なし */
   dailyGoalMs: number;
+
+  /** 今選んでいる教材の id。null なら教材なし */
+  materialId: string | null;
 }
 
 const DEFAULTS: Settings = {
@@ -92,6 +95,7 @@ const DEFAULTS: Settings = {
   dayBoundaryMin: 0,
   weekStartsOn: 1,
   dailyGoalMs: 0,
+  materialId: null,
 };
 
 function read<T>(key: string): T | null {
@@ -153,22 +157,110 @@ export function addSession(s: Session): void {
 export function clearSessions(): void {
   sessions = [];
   remove('sessions');
+  saveSettings({ nextLap: null });
+  for (const m of materials) m.nextLap = null;
+  write('materials', materials);
 }
 
-/** ラップを使った直近の記録（タイマーの2モードとストップウォッチで共通） */
-export function lastLapSession(): Session | null {
+// ---- 教材 ----
+// 教材ごとに、ラップ番号（次は何番から）・前回の範囲・前回平均を分けて持つ。
+// 記録には教材の id を付ける。教材を消しても記録は残すため、教材は archived にするだけ。
+
+export interface Material {
+  id: string;
+  name: string;
+  /** 手で決めた次のラップ番号、または finish したときに決まった番号。null なら記録から出す */
+  nextLap: number | null;
+  archived?: boolean;
+}
+
+let materials: Material[] = read<Material[]>('materials') ?? [];
+
+/** 選べる教材（削除したものを除く） */
+export const activeMaterials = (): Material[] => materials.filter((m) => !m.archived);
+
+export const materialById = (id: string | null | undefined): Material | null =>
+  (id && materials.find((m) => m.id === id)) || null;
+
+export function materialName(id: string | null | undefined): string {
+  if (!id) return '教材なし';
+  return materialById(id)?.name ?? '削除した教材';
+}
+
+/** 今選んでいる教材の id（削除されていたら null） */
+export function currentMaterialId(): string | null {
+  const m = materialById(settings.materialId);
+  return m && !m.archived ? m.id : null;
+}
+
+function saveMaterials(): void {
+  write('materials', materials);
+}
+
+export function addMaterial(name: string): Material {
+  const m: Material = { id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, nextLap: null };
+  materials.push(m);
+  saveMaterials();
+  return m;
+}
+
+export function renameMaterial(id: string, name: string): void {
+  const m = materialById(id);
+  if (!m) return;
+  m.name = name;
+  saveMaterials();
+}
+
+/** 教材を消す（これまでの記録は残る）。選んでいたら教材なしに戻す */
+export function archiveMaterial(id: string): void {
+  const m = materialById(id);
+  if (!m) return;
+  m.archived = true;
+  saveMaterials();
+  if (settings.materialId === id) saveSettings({ materialId: null });
+}
+
+/** 教材なしで、ラップのある記録の数 */
+export const untaggedLapSessions = (): number =>
+  sessions.filter((s) => !s.material && usesLapNumbers(s.mode) && s.laps.length > 0).length;
+
+/** 教材なしの記録をすべて、この教材のものにする（最初の教材を作ったとき用） */
+export function assignUntagged(id: string): void {
+  const m = materialById(id);
+  if (!m) return;
+  sessions = sessions.map((s) => (s.material ? s : { ...s, material: id }));
+  write('sessions', sessions);
+  m.nextLap = settings.nextLap;
+  saveMaterials();
+  saveSettings({ nextLap: null });
+}
+
+/** ラップを使った直近の記録（タイマーの2モードとストップウォッチで共通、教材ごと） */
+export function lastLapSession(materialId: string | null = currentMaterialId()): Session | null {
   for (let i = sessions.length - 1; i >= 0; i--) {
     const s = sessions[i];
-    if (usesLapNumbers(s.mode) && s.laps.length > 0) return s;
+    if ((s.material ?? null) === materialId && usesLapNumbers(s.mode) && s.laps.length > 0) return s;
   }
   return null;
 }
 
-/** 次に始めるラップ番号（手で指定していればそれ、なければ前回の続き） */
-export function nextLapNumber(): number {
-  if (settings.nextLap !== null) return settings.nextLap;
-  const last = lastLapSession();
+/** 次に始めるラップ番号（決まっていればそれ、なければ前回の続き） */
+export function nextLapNumber(materialId: string | null = currentMaterialId()): number {
+  const fixed = materialId ? (materialById(materialId)?.nextLap ?? null) : settings.nextLap;
+  if (fixed !== null) return fixed;
+  const last = lastLapSession(materialId);
   return last ? last.firstLap + last.laps.length : 1;
+}
+
+/** 次に始めるラップ番号を決める（null なら記録から出す） */
+export function setNextLap(n: number | null, materialId: string | null = currentMaterialId()): void {
+  const m = materialById(materialId);
+  if (m) {
+    m.nextLap = n;
+    saveMaterials();
+  } else {
+    saveSettings({ nextLap: n });
+  }
 }
 
 // ---- 計測中の状態（アプリを閉じても続きから再開するため） ----
@@ -189,19 +281,22 @@ export const clearRun = (): void => remove('run');
 
 interface Backup {
   app: 'gumiben';
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   settings: Settings;
   sessions: Session[];
+  /** version 2 から */
+  materials?: Material[];
 }
 
 export function exportBackup(): string {
   const data: Backup = {
     app: 'gumiben',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     settings,
     sessions,
+    materials,
   };
   return JSON.stringify(data, null, 2);
 }
@@ -218,7 +313,8 @@ function isSession(x: unknown): x is Session {
     typeof s.studyMs === 'number' &&
     typeof s.firstLap === 'number' &&
     Array.isArray(s.laps) &&
-    s.laps.every((v) => typeof v === 'number')
+    s.laps.every((v) => typeof v === 'number') &&
+    (s.material === undefined || typeof s.material === 'string')
   );
 }
 
@@ -228,6 +324,13 @@ export function importBackup(text: string): number {
   if (data.app !== 'gumiben' || !Array.isArray(data.sessions)) {
     throw new Error('グミ勉の記録ファイルではありません');
   }
+  // 知らない教材は足す（名前が分かるように。消した扱いのものもそのまま）
+  for (const m of data.materials ?? []) {
+    if (m && typeof m.id === 'string' && typeof m.name === 'string' && !materialById(m.id)) {
+      materials.push({ id: m.id, name: m.name, nextLap: null, archived: !!m.archived });
+    }
+  }
+  saveMaterials();
   const known = new Set(sessions.map((s) => s.id));
   const incoming = migrate(data.sessions.filter(isSession)).filter((s) => !known.has(s.id));
   sessions = [...sessions, ...incoming].sort((a, b) => a.start - b.start);

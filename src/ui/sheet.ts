@@ -107,3 +107,57 @@ export async function pickOption(title: string, labels: string[], current: numbe
   const result = await open(title, body, () => [picked], { withOk: false });
   return result ? result[0] : null;
 }
+
+export interface ListItem {
+  label: string;
+  /** 右に小さく出す補足 */
+  sub?: string;
+  danger?: boolean;
+}
+
+/** 縦に並んだ一覧から1つ選ぶ。タップしたらすぐ閉じる。キャンセルなら null。 */
+export async function pickList(title: string, items: ListItem[], current = -1): Promise<number | null> {
+  const body = html(`<div class="sheet-list" role="group"></div>`);
+  let picked = current;
+  items.forEach((item, i) => {
+    const b = html<HTMLButtonElement>(`
+      <button type="button" class="sheet-item${item.danger ? ' danger' : ''}">
+        <span>${esc(item.label)}</span>${item.sub ? `<small>${esc(item.sub)}</small>` : ''}
+      </button>`);
+    b.setAttribute('aria-pressed', String(i === current));
+    b.onclick = () => {
+      picked = i;
+      (body.closest('.sheet-panel') as (HTMLElement & { submit?: () => void }) | null)?.submit?.();
+    };
+    body.append(b);
+  });
+  const result = await open(title, body, () => [picked], { withOk: false });
+  return result ? result[0] : null;
+}
+
+/** 文字を入力する。キャンセルや空なら null。 */
+export async function pickText(title: string, value = '', placeholder = '', maxLength = 20): Promise<string | null> {
+  const input = html<HTMLInputElement>(
+    `<input class="sheet-text" type="text" maxlength="${maxLength}" placeholder="${esc(placeholder)}" aria-label="${esc(title)}">`,
+  );
+  input.value = value;
+  let text = '';
+  const opened = open(
+    title,
+    input,
+    () => {
+      text = input.value.trim();
+      return text ? [1] : null;
+    },
+    { invalid: '名前を入れてください' },
+  );
+  // キーボードの「改行」でも決定する
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      (input.closest('.sheet-panel') as (HTMLElement & { submit?: () => void }) | null)?.submit?.();
+    }
+  });
+  setTimeout(() => input.focus(), 50);
+  return (await opened) ? text : null;
+}

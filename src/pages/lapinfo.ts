@@ -1,6 +1,6 @@
 // タイマーとストップウォッチの下段（前回のラップ情報＋start ボタン）。
 
-import { lastLapSession, nextLapNumber, saveSettings } from '../store';
+import { lastLapSession, nextLapNumber, setNextLap } from '../store';
 import { MIN, SEC, fmtHM, fmtLap } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickInteger } from '../ui/sheet';
@@ -54,13 +54,14 @@ export function createStartRow(onStart: () => void): StartRow {
   $('.lap-pill', el).onclick = async () => {
     const n = await pickInteger('開始ラップ番号', nextLapNumber(), 1, 99999);
     if (n !== null) {
-      saveSettings({ nextLap: n });
+      setNextLap(n);
       // タイマーとストップウォッチの両方の表示を更新する
       document.dispatchEvent(new CustomEvent('lapinfo:change'));
     }
   };
   $('.btn-start', el).onclick = onStart;
   document.addEventListener('lapinfo:change', refresh);
+  document.addEventListener('material:change', refresh);
 
   refresh();
   return { el, refresh };

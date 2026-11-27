@@ -2,7 +2,7 @@
 // タップした日の詳細（ラップごとの棒グラフ・記録の一覧）。
 
 import type { Mode, Session } from '../engine';
-import { getSessions, settings } from '../store';
+import { getSessions, materialName, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, summarize } from '../summary';
 import { fmtHM, fmtLap, pad2 } from '../time';
 import { esc } from '../ui/dom';
@@ -52,7 +52,7 @@ function goalHtml(ms: number): string {
 }
 
 function sessionHtml(s: Session): string {
-  const parts = [MODE_NAMES[s.mode]];
+  const parts = s.material ? [materialName(s.material), MODE_NAMES[s.mode]] : [MODE_NAMES[s.mode]];
   if (s.laps.length > 0) {
     const last = s.firstLap + s.laps.length - 1;
     parts.push(s.laps.length === 1 ? `${s.firstLap}番` : `${s.firstLap}〜${last}番`);
@@ -106,7 +106,12 @@ function detailHtml(start: number, sessions: Session[]): string {
         <div class="avg-line" style="bottom:${((avg / max) * 100).toFixed(1)}%"><span>平均</span></div>
         <div class="lap-chart">${bars}</div>
       </div>
-      <div class="lap-range"><span>${d.laps[0].no}番</span><span>${d.laps[d.laps.length - 1].no}番</span></div>
+      ${
+        // 番号の範囲は、1つの教材だけの日に出す（教材が混ざると番号が続かない）
+        new Set(sessions.filter((x) => x.laps.length > 0).map((x) => x.material ?? '')).size === 1
+          ? `<div class="lap-range"><span>${d.laps[0].no}番</span><span>${d.laps[d.laps.length - 1].no}番</span></div>`
+          : ''
+      }
       <div class="lap-caption">棒をタップすると、そのラップの時間が出ます</div>
       <div class="lap-legend">点線は平均。平均の1.5倍以上かかったラップは赤</div>`;
   }
@@ -116,6 +121,27 @@ function detailHtml(start: number, sessions: Session[]): string {
       ${head}${stats}${laps}
       <div class="sess-list">${sessions.map(sessionHtml).join('')}</div>
     </section>`;
+}
+
+/** 教材ごとの内訳（教材を付けた記録がある週だけ出す） */
+function materialsHtml(sessions: Session[], weekLabel: string): string {
+  if (!sessions.some((s) => s.material)) return '';
+  const totals = new Map<string, { ms: number; laps: number }>();
+  for (const s of sessions) {
+    const key = s.material ?? '';
+    const t = totals.get(key) ?? { ms: 0, laps: 0 };
+    t.ms += s.studyMs;
+    t.laps += s.laps.length;
+    totals.set(key, t);
+  }
+  const rows = [...totals.entries()]
+    .sort((a, b) => b[1].ms - a[1].ms)
+    .map(
+      ([id, t]) =>
+        `<div class="list-row"><span>${esc(materialName(id || null))}</span><span>${t.laps > 0 ? `<small>${t.laps}ラップ</small>` : ''}${fmtHM(t.ms)}</span></div>`,
+    )
+    .join('');
+  return `<div class="list"><div class="section-label">${weekLabel}の教材ごとの内訳</div>${rows}</div>`;
 }
 
 /** reset = true のときは今週に戻す（下のメニューから開いたとき） */
@@ -203,6 +229,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       <div class="list-row"><span>タイマー</span><span>${fmtHM(s.byMode.timer)}</span></div>
       <div class="list-row"><span>ポモドーロ</span><span>${fmtHM(s.byMode.pomodoro)}</span></div>
     </div>
+    ${materialsHtml(s.daySessions.flat(), weekLabel)}
     <div class="pair">
       <div><span class="label">${weekLabel}のラップ</span><span class="value">${s.weekLaps}</span></div>
       <div><span class="label">平均</span><span class="value">${s.weekLapAvgMs === null ? '—' : fmtLap(s.weekLapAvgMs)}</span></div>

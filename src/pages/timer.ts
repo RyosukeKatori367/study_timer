@@ -1,13 +1,14 @@
 import { unlockAudio } from '../audio';
 import { newRun } from '../engine';
 import { startRun } from '../run';
-import { nextLapNumber, saveSettings, settings, type TimerKind } from '../store';
+import { currentMaterialId, nextLapNumber, saveSettings, settings, type TimerKind } from '../store';
 import { HOUR, MIN, SEC, fmtRemain } from '../time';
 import { $, html } from '../ui/dom';
 import { createDrum } from '../ui/drum';
 import { toast } from '../ui/toast';
 import { createStartRow, lastLapAverage } from './lapinfo';
 import { createEndRow, lapEndCondition, lapEndError } from './lapend';
+import { createMaterialChip } from './material';
 
 const LONG_PRESS_MS = 550;
 
@@ -125,6 +126,7 @@ export function initTimerPage(page: HTMLElement): () => void {
       end: lapEndCondition(now),
       lapEstMs: ms,
       estimateFixed: settings.lapEstimate === 'timer',
+      material: currentMaterialId() ?? undefined,
     };
     if (settings.timerKind === 'up') {
       // 0 から増えていく。lap で 0 に戻り、設定時間を過ぎると赤くなる
@@ -135,13 +137,18 @@ export function initTimerPage(page: HTMLElement): () => void {
   });
   const endRow = createEndRow();
 
-  page.append(html(`<h1>タイマー</h1>`), kinds, main, endRow.el, row.el);
+  const materialChip = createMaterialChip();
+  const picks = html(`<div class="pick-row"></div>`);
+  picks.append(materialChip.el, endRow.el);
+
+  page.append(html(`<h1>タイマー</h1>`), kinds, main, picks, row.el);
   renderKind();
   renderPresets();
 
   return () => {
     row.refresh();
     endRow.refresh();
+    materialChip.refresh();
     renderPresets();
   };
 }

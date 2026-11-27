@@ -38,6 +38,7 @@ function refreshAll(): void {
 }
 
 initSettingsPage($('.view[data-view="settings"]'), refreshAll);
+document.addEventListener('material:change', refreshAll);
 initRun(refreshAll);
 
 armTilt();
@@ -71,6 +72,7 @@ function showView(name: ViewName): void {
   });
   dots.classList.toggle('hide', name !== 'main');
   if (name === 'stats') renderStats(statsView, true); // メニューから開いたら今週に戻す
+  if (name === 'settings') document.dispatchEvent(new CustomEvent('settings:show'));
 }
 navButtons.forEach((b) => {
   b.onclick = () => showView(b.dataset.view as ViewName);

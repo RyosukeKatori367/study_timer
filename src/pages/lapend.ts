@@ -38,16 +38,16 @@ export function lapEndError(): string | null {
 function describe(): string {
   switch (settings.lapEndKind) {
     case 'clock':
-      return `${fmtTimeOfDay(settings.lapEndClockMin)} まで`;
+      return `${fmtTimeOfDay(settings.lapEndClockMin)}まで`;
     case 'total':
-      return `合計 ${fmtHM(settings.lapEndTotalMs)}`;
+      return `合計${fmtHM(settings.lapEndTotalMs)}`;
     case 'count': {
       const from = nextLapNumber();
-      return `${settings.lapEndCount}ラップ（${from}〜${from + settings.lapEndCount - 1}番）`;
+      return `${settings.lapEndCount}ラップ（〜${from + settings.lapEndCount - 1}番）`;
     }
     case 'lapNo': {
       const n = settings.lapEndLapNo - nextLapNumber() + 1;
-      return n > 0 ? `${settings.lapEndLapNo}番まで（${n}ラップ）` : `${settings.lapEndLapNo}番まで（開始番号を過ぎています）`;
+      return n > 0 ? `${settings.lapEndLapNo}番まで（${n}ラップ）` : `${settings.lapEndLapNo}番まで（過ぎています）`;
     }
     default:
       return 'なし';
@@ -92,13 +92,12 @@ async function pickValue(kind: LapEndKind): Promise<boolean> {
 
 export function createEndRow(): { el: HTMLElement; refresh: () => void } {
   const el = html(`
-    <button type="button" class="end-row">
-      <span class="end-row-label">終了条件</span>
-      <span class="end-row-value"></span>
+    <button type="button" class="pick-chip">
+      <span class="pick-text"><span class="pick-label">終了条件</span><span class="pick-value"></span></span>
       <span class="chevron" aria-hidden="true">›</span>
     </button>`);
   const refresh = () => {
-    setText($('.end-row-value', el), describe());
+    setText($('.pick-value', el), describe());
     el.classList.toggle('on', settings.lapEndKind !== 'none');
   };
 
@@ -113,6 +112,7 @@ export function createEndRow(): { el: HTMLElement; refresh: () => void } {
   // もう一方の画面で変えたときや、開始ラップ番号を変えたときも表示を合わせる
   document.addEventListener(CHANGE, refresh);
   document.addEventListener('lapinfo:change', refresh);
+  document.addEventListener('material:change', refresh);
 
   refresh();
   return { el, refresh };

@@ -1,7 +1,8 @@
 import { unlockAudio } from '../audio';
 import { clockToTimestamp, newRun, type EndCondition } from '../engine';
 import { startRun } from '../run';
-import { saveSettings, settings, type EndKind } from '../store';
+import { currentMaterialId, saveSettings, settings, type EndKind } from '../store';
+import { createMaterialChip } from './material';
 import { HOUR, MIN, SEC, fmtHM, fmtRemain, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums } from '../ui/sheet';
@@ -38,6 +39,8 @@ export function initPomodoroPage(page: HTMLElement): () => void {
       </div>`),
     html(`<button type="button" class="btn-start wide">start</button>`),
   );
+  const materialChip = createMaterialChip();
+  $('.btn-start', page).before(materialChip.el);
 
   const card = (field: string) => $(`.card[data-field="${field}"]`, page);
 
@@ -117,7 +120,14 @@ export function initPomodoroPage(page: HTMLElement): () => void {
           : settings.endKind === 'count'
             ? { kind: 'count', n: settings.endCount }
             : { kind: 'none' };
-    startRun(newRun('pomoCycle', now, { workMs: settings.workMs, breakMs: settings.breakMs, end }));
+    startRun(
+      newRun('pomoCycle', now, {
+        workMs: settings.workMs,
+        breakMs: settings.breakMs,
+        end,
+        material: currentMaterialId() ?? undefined,
+      }),
+    );
   };
 
   render();

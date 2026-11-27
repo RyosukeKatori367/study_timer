@@ -1,10 +1,24 @@
 // 設定画面。ジャンルごとのカードに分けて並べる。
 // 行の種類は3つ: オン／オフのスイッチ、選ぶもの（右に今の値、タップでシート）、操作（書き出しなど）。
 
-import { clearSessions, exportBackup, getSessions, importBackup, saveSettings, settings, type Settings } from '../store';
+import {
+  activeMaterials,
+  archiveMaterial,
+  clearSessions,
+  exportBackup,
+  getSessions,
+  importBackup,
+  nextLapNumber,
+  renameMaterial,
+  saveSettings,
+  setNextLap,
+  settings,
+  type Settings,
+} from '../store';
+import { MATERIAL_CHANGE, createMaterial } from './material';
 import { HOUR, MIN, fmtHM, fmtTimeOfDay, type DurationStyle } from '../time';
 import { $, esc, html, setText } from '../ui/dom';
-import { pickDrums, pickOption } from '../ui/sheet';
+import { pickDrums, pickInteger, pickList, pickOption, pickText } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
 
@@ -42,6 +56,8 @@ interface Group {
   /** 見出しのアイコン（24x24 の線のパス） */
   icon: string;
   rows: Row[];
+  /** 中身をあとから作るグループ（教材の一覧） */
+  dynamic?: 'materials';
 }
 
 /** 選択肢から選んで設定に入れる。値が変わったら true */
@@ -107,6 +123,12 @@ const GROUPS: Group[] = [
         pick: () => choose('残り時間の目安（タイマー）', 'lapEstimate', ESTIMATE),
       },
     ],
+  },
+  {
+    title: '教材',
+    icon: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/>',
+    rows: [],
+    dynamic: 'materials',
   },
   {
     title: '統計',
@@ -231,7 +253,7 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${g.icon}</svg>
             ${esc(g.title)}
           </h2>
-          <div class="group-card">${g.rows.map(rowHtml).join('')}</div>
+          <div class="group-card"${g.dynamic ? ` data-dynamic="${g.dynamic}"` : ''}>${g.rows.map(rowHtml).join('')}</div>
         </section>`),
     );
   }
@@ -291,10 +313,61 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
   $('[data-action="clear"]', view).onclick = () => {
     if (!confirm('これまでの記録をすべて消します。元に戻せません。よろしいですか？')) return;
     clearSessions();
-    saveSettings({ nextLap: null });
     toast('記録を消しました');
     onDataChange();
   };
+
+  // ---- 教材の一覧 ----
+  const materialCard = $('[data-dynamic="materials"]', view);
+  const renderMaterials = () => {
+    const list = activeMaterials();
+    materialCard.innerHTML = `
+      ${list
+        .map(
+          (m) => `
+        <button type="button" class="row" data-material="${m.id}">
+          <span class="row-label">${esc(m.name)}</span>
+          <span class="row-value"><span>次は${nextLapNumber(m.id)}番</span><span class="chevron" aria-hidden="true">›</span></span>
+        </button>`,
+        )
+        .join('')}
+      <button type="button" class="row add" data-material-add><span class="row-label">＋ 教材を追加</span></button>
+      <div class="row-note">教材ごとに、ラップ番号（次は何番から）・前回の範囲・前回平均を分けて記録します。タイマーやストップウォッチの「教材」から切り替えます</div>`;
+
+    materialCard.querySelectorAll<HTMLElement>('[data-material]').forEach((b) => {
+      const m = list.find((x) => x.id === b.dataset.material)!;
+      b.onclick = async () => {
+        const i = await pickList(m.name, [
+          { label: '名前を変える' },
+          { label: '次のラップ番号を変える', sub: `今は${nextLapNumber(m.id)}番` },
+          { label: '削除する', danger: true },
+        ]);
+        if (i === 0) {
+          const name = await pickText('教材の名前', m.name);
+          if (!name || name === m.name) return;
+          if (activeMaterials().some((x) => x.name === name)) return toast('同じ名前の教材があります');
+          renameMaterial(m.id, name);
+        } else if (i === 1) {
+          const n = await pickInteger(`${m.name}の次のラップ番号`, nextLapNumber(m.id), 1, 99999, '1以上にしてください');
+          if (n === null) return;
+          setNextLap(n, m.id);
+        } else if (i === 2) {
+          if (!confirm(`「${m.name}」を削除しますか？\nこれまでの記録は消えず、統計にも残ります。`)) return;
+          archiveMaterial(m.id);
+        } else {
+          return;
+        }
+        document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
+      };
+    });
+    $('[data-material-add]', materialCard).onclick = async () => {
+      if (await createMaterial()) document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
+    };
+  };
+  document.addEventListener(MATERIAL_CHANGE, renderMaterials);
+  // 計測が終わると「次は何番」が変わるので、設定を開くたびに作り直す
+  document.addEventListener('settings:show', renderMaterials);
+  renderMaterials();
 
   render();
 }

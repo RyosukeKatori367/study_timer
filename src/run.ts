@@ -18,7 +18,7 @@ import {
   type Run,
   type Session,
 } from './engine';
-import { addSession, clearRun, loadRun, saveRun, saveSettings, settings } from './store';
+import { addSession, clearRun, loadRun, materialName, saveRun, setNextLap, settings } from './store';
 import { getTilt, onTiltChange } from './tilt';
 import { HOUR, fmtElapsed, fmtHM, fmtLap, fmtRemain, pad2 } from './time';
 import { $, html, setText } from './ui/dom';
@@ -202,7 +202,7 @@ function end(at = Date.now()): void {
   const session = finish(run, at);
   if (session) {
     addSession(session);
-    if (usesLapNumbers(mode)) saveSettings({ nextLap: nextLapAfter(run, session) });
+    if (usesLapNumbers(mode)) setNextLap(nextLapAfter(run, session), run.material ?? null);
   }
   clearRun();
   run = null;
@@ -276,6 +276,9 @@ function bindHoldToFinish(): void {
   });
 }
 
+/** 計測中の画面の一番上の小さい見出し。教材があれば並べる */
+const kicker = (r: Run, mode: string): string => (r.material ? `${mode} · ${materialName(r.material)}` : mode);
+
 function setBig(text: string, over = false): void {
   setText(el.big, text);
   el.big.classList.toggle('long', text.length >= 7);
@@ -317,7 +320,7 @@ function render(): void {
 
 function renderStopwatch(r: Run, now: number): void {
   const total = totalElapsed(r, now);
-  setText(el.kicker, 'ストップウォッチ');
+  setText(el.kicker, kicker(r, 'ストップウォッチ'));
   setText(el.titleA, '');
   setText(el.titleB, '');
   setBig(fmtElapsed(total, true));
@@ -343,7 +346,7 @@ function renderTimer(r: Run, now: number): void {
   const rest = timerRemaining(r, now);
   const overSeconds = Math.floor(-rest / 1000);
   const over = r.overrun && r.rang;
-  setText(el.kicker, 'タイマー・カウントダウン');
+  setText(el.kicker, kicker(r, 'タイマー・カウントダウン'));
   setText(el.titleA, '設定');
   setText(el.titleB, fmtRemain(r.durationMs));
   if (over) {
@@ -369,7 +372,7 @@ function renderTimerUp(r: Run, now: number): void {
     saveRun(r);
     play('over');
   }
-  setText(el.kicker, 'タイマー・カウントアップ');
+  setText(el.kicker, kicker(r, 'タイマー・カウントアップ'));
   setText(el.titleA, '設定');
   setText(el.titleB, fmtRemain(r.durationMs));
   setBig(fmtElapsed(e), over);
@@ -396,7 +399,7 @@ function renderPomoCycle(r: Run, now: number): void {
 
   const work = v.phase === 'work';
   const lastSet = r.end.kind === 'count' && v.set >= r.end.n;
-  setText(el.kicker, 'ポモドーロ');
+  setText(el.kicker, kicker(r, 'ポモドーロ'));
   setText(el.titleA, work ? '作業' : '休憩');
   setText(el.titleB, `${v.set}セット目`);
   setBig(fmtRemain(v.phaseRemain));
