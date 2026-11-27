@@ -201,8 +201,15 @@ export interface Material {
   endLapNo?: number | null;
   /** 自分で選んだ色（なければ作った順の色） */
   color?: string;
+  /** ジャンル（数学・英語など。この端末の中での分け方） */
+  genre?: string;
+  /** 画像（96px 四方の JPEG の data URL） */
+  img?: string;
   archived?: boolean;
 }
+
+/** 教材を編集するときに変えられるもの（img・genre を undefined にすると消す） */
+export type MaterialPatch = Partial<Pick<Material, 'name' | 'color' | 'genre' | 'img'>>;
 
 let materials: Material[] = read<Material[]>('materials') ?? [];
 
@@ -234,11 +241,12 @@ function saveMaterials(): void {
   emit({ kind: 'state' });
 }
 
-export function addMaterial(name: string): Material {
+export function addMaterial(name: string, extra: MaterialPatch = {}): Material {
   // 色は、ほかの教材（消したものを除く）とかぶらない最初の色にする
   const used = new Set(materials.filter((x) => !x.archived).map((x) => x.color ?? defaultColor(materialOrder(x.id))));
   const color = MATERIAL_COLORS.find((c) => !used.has(c)) ?? defaultColor(materials.length);
   const m: Material = { id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, nextLap: null, color };
+  applyPatch(m, extra);
   materials.push(m);
   saveMaterials();
   return m;
@@ -249,6 +257,30 @@ export function renameMaterial(id: string, name: string): void {
   if (!m) return;
   m.name = name;
   saveMaterials();
+}
+
+function applyPatch(m: Material, patch: MaterialPatch): void {
+  for (const key of ['name', 'color', 'genre', 'img'] as const) {
+    if (!(key in patch)) continue;
+    const v = patch[key];
+    if (v === undefined || v === '') delete m[key];
+    else m[key] = v;
+  }
+}
+
+/** 教材の名前・色・ジャンル・画像をまとめて変える */
+export function updateMaterial(id: string, patch: MaterialPatch): void {
+  const m = materialById(id);
+  if (!m) return;
+  applyPatch(m, patch);
+  saveMaterials();
+}
+
+/** 使っているジャンル（教材の並び順で、最初に出てきた順） */
+export function materialGenres(): string[] {
+  const out: string[] = [];
+  for (const m of activeMaterials()) if (m.genre && !out.includes(m.genre)) out.push(m.genre);
+  return out;
 }
 
 /** 教材の色を変える */
@@ -399,7 +431,15 @@ export function importBackup(text: string): number {
   // 知らない教材は足す（名前が分かるように。消した扱いのものもそのまま）
   for (const m of data.materials ?? []) {
     if (m && typeof m.id === 'string' && typeof m.name === 'string' && !materialById(m.id)) {
-      materials.push({ id: m.id, name: m.name, nextLap: null, archived: !!m.archived, ...(m.color ? { color: m.color } : {}) });
+      materials.push({
+        id: m.id,
+        name: m.name,
+        nextLap: null,
+        archived: !!m.archived,
+        ...(m.color ? { color: m.color } : {}),
+        ...(m.genre ? { genre: m.genre } : {}),
+        ...(typeof m.img === 'string' && m.img.startsWith('data:image/') ? { img: m.img } : {}),
+      });
     }
   }
   saveMaterials();

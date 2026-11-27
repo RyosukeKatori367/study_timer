@@ -3,7 +3,7 @@
 
 import { materialColor } from '../colors';
 import { leaveTotal, type Mode, type Session } from '../engine';
-import { getSessions, materialName, materialOrder, settings } from '../store';
+import { getSessions, materialById, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
 import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
 import { donutHtml } from '../ui/charts';
@@ -235,6 +235,7 @@ function materialsHtml(sessions: Session[], weekLabel: string): string {
       color: colorOf(key),
       label: materialName(key || null),
       sub: t.laps > 0 ? `${t.laps}ラップ` : undefined,
+      img: key ? materialById(key)?.img : undefined,
     }));
   if (segs.length === 0) return '';
   return `

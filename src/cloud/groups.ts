@@ -3,7 +3,7 @@
 
 import type { Unsubscribe } from 'firebase/firestore';
 import { materialColor } from '../colors';
-import { getSessions, materialName, settings } from '../store';
+import { getSessions, materialById, materialName, settings } from '../store';
 import { cloudUser } from './account';
 import { deleteAllMessages } from './chat';
 import { fb, type Fb } from './firebase';
@@ -53,6 +53,18 @@ const myMats = (now = Date.now()): DayMats =>
   recentMats(getSessions(), now, settings.dayBoundaryMin, (id) => ({ n: materialName(id), c: materialColor(id) }));
 
 const mySums = (now = Date.now()): StudySums => studySums(getSessions(), now, settings.dayBoundaryMin);
+
+/** ランキングや統計に出る教材の画像（直近2週間に使った教材のうち、画像があるもの） */
+function myMatImgs(mats: DayMats): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const day of Object.values(mats)) {
+    for (const id of Object.keys(day)) {
+      const img = id !== '_' ? materialById(id)?.img : undefined;
+      if (img) out[id] = img;
+    }
+  }
+  return out;
+}
 
 /** ランキングで使う「今日」と「今週」の日付（見ている人の設定で決める） */
 export function rankKeys(now = Date.now()): { today: string[]; week: string[] } {
@@ -198,6 +210,8 @@ export async function joinGroup(input: string): Promise<string> {
   }
   p.groupIds.push(inv.groupId);
   void syncInvite(inv.groupId);
+  // 教材の画像などは、入ったあとで送る（ルールが古くても入れるように）
+  void publishStudy().catch(() => undefined);
   return inv.groupId;
 }
 
@@ -338,10 +352,24 @@ export async function publishStudy(): Promise<void> {
   const mats = myMats();
   const sums = mySums();
   const last = getSessions().at(-1);
+  const matImgs = myMatImgs(mats);
+  // ルールが古いと新しい項目は断られるので、そのときは項目を減らして送り直す
+  const tries: Record<string, unknown>[] = [
+    { days, mats, matImgs, sums, lastStudyAt: last?.end ?? 0 },
+    { days, mats, sums, lastStudyAt: last?.end ?? 0 },
+    { days, lastStudyAt: last?.end ?? 0 },
+  ];
   await Promise.all(
-    p.groupIds.map((gid) =>
-      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, mats, sums, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
-    ),
+    p.groupIds.map(async (gid) => {
+      for (const data of tries) {
+        try {
+          await F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), data);
+          return;
+        } catch (e) {
+          if ((e as { code?: string }).code !== 'permission-denied') return;
+        }
+      }
+    }),
   );
 }
 

@@ -40,6 +40,21 @@ const people: Record<string, { name: string; icon: { c: string; h: number } }> =
   kei: { name: 'けい', icon: { c: 'け', h: 210 } },
 };
 
+/** 偽の教材の画像（色の地に白い文字） */
+function fakeImg(color: string, text: string): string {
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const g = c.getContext('2d')!;
+  g.fillStyle = color;
+  g.fillRect(0, 0, 96, 96);
+  g.fillStyle = 'rgba(255,255,255,.9)';
+  g.fillRect(10, 58, 76, 8);
+  g.font = 'bold 34px sans-serif';
+  g.textAlign = 'center';
+  g.fillText(text, 48, 46);
+  return c.toDataURL('image/jpeg', 0.8);
+}
+
 const BOOKS: Record<string, [string, string][]> = {
   me: [['リードα', '#338ced'], ['名門の森', '#e76624'], ['英単語', '#00a888']],
   dev: [['青チャート', '#338ced'], ['速読英単語', '#e76624']],
@@ -64,7 +79,8 @@ function member(uid: string, todayMin: number, weekMin: number, joined: number):
   const days = d(todayMin, weekMin);
   const month = Object.values(days).reduce((a, b) => a + b, 0) * 3;
   const sums = { all: month * 7, months: { [today.slice(0, 7)]: month } };
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now };
+  const matImgs = uid === 'haru' ? { m0: fakeImg('#1e5bd8', 'α'), m1: fakeImg('#ef6c1a', '化') } : undefined;
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}) };
 }
 
 interface FakeGroup {
@@ -126,7 +142,7 @@ function seed(): void {
   g1.posts = [
     post('p1', 'haru', 12, {
       studyMs: 123 * MIN,
-      material: { name: 'リードα', color: '#338ced' },
+      material: { name: 'リードα', color: '#338ced', img: fakeImg('#1e5bd8', 'α') },
       laps: { from: 231, count: 10 },
       lapMs: [11, 13, 12, 10, 14, 12, 11, 15, 13, 12].map((m) => m * MIN),
       away: { n: 2, ms: 6 * MIN },

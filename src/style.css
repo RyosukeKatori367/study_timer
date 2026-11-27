@@ -2869,6 +2869,22 @@ nav {
   border-radius: 3px;
 }
 
+.donut-row {
+  grid-template-columns: 22px minmax(0, 1fr) auto auto 38px;
+}
+
+.donut-row i {
+  justify-self: center;
+}
+
+.donut-img {
+  width: 20px;
+  height: 20px;
+  margin: 1px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
 .donut-name {
   min-width: 0;
   overflow: hidden;
@@ -3342,4 +3358,239 @@ nav {
   box-shadow:
     0 0 0 3px var(--card),
     0 0 0 5px #fff;
+}
+
+/* ---------- 教材のページ ---------- */
+
+#materials {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 12px) 22px calc(env(safe-area-inset-bottom) + 24px);
+}
+
+.mthumb {
+  flex: none;
+  width: var(--s);
+  height: var(--s);
+  border-radius: calc(var(--s) * 0.24);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: calc(var(--s) * 0.44);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.mthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mthumb.none {
+  border: 1.5px dashed #5a5a5a;
+}
+
+.mgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mgroup-head {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.mrow {
+  display: flex;
+  align-items: center;
+}
+
+.mrow + .mrow {
+  border-top: 1px solid #2e2e2e;
+}
+
+.mrow-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 6px 10px 14px;
+  text-align: left;
+}
+
+.mrow-main:active {
+  background: #262626;
+}
+
+.mrow-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mrow-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+}
+
+.mrow-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mrow.selected .mrow-name {
+  font-weight: 600;
+}
+
+.mrow-check {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--light);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mrow-edit {
+  flex: none;
+  margin-right: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.medit-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.medit-thumb {
+  flex: none;
+  border-radius: 22px;
+}
+
+.medit-image-btns {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcolors {
+  display: grid;
+  grid-template-columns: repeat(6, 40px);
+  justify-content: space-between;
+  gap: 12px 0;
+}
+
+.mcolors .sheet-color {
+  width: 40px;
+  height: 40px;
+}
+
+.mcolors .sheet-color[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 5px #fff;
+}
+
+/* 教材のチップの絵 */
+.chip-thumb:empty {
+  display: none;
+}
+
+.chip-thumb {
+  display: flex;
+}
+
+/* 設定の教材の一覧のジャンル */
+.row-genre {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: #2e2e2e;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---------- 画像の切り抜き ---------- */
+
+#cropper {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
+}
+
+.crop-title {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.crop-stage {
+  width: min(300px, calc(100vw - 48px));
+  aspect-ratio: 1;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #1c1c1c;
+  touch-action: none;
+  box-shadow: 0 0 0 1px #3a3a3a;
+}
+
+.crop-stage.round {
+  border-radius: 50%;
+}
+
+.crop-stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.crop-zoom {
+  width: min(300px, calc(100vw - 48px));
+  accent-color: #fff;
+}
+
+#cropper .btn-row {
+  width: min(300px, calc(100vw - 48px));
+}
+
+.pill-img {
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  border-radius: 4px;
+  object-fit: cover;
 }

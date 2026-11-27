@@ -29,14 +29,18 @@ function me(): string {
  * 出したもの（教材名など）と投稿先は、次の確認画面の初期値として覚える。
  * 届くのを待たずに返す（オフラインでも投稿の操作は終わる）。
  */
-export async function createPost(s: Session, opt: PostOptions, groups: string[]): Promise<void> {
+export async function createPost(s: Session, opt: PostOptions, groups: string[], materialOverride?: { name: string; color: string }): Promise<void> {
   if (groups.length === 0) throw new Error('投稿先のグループを選んでください');
   const p = cachedProfile() ?? (await getProfile());
   if (!p) throw new Error('先にプロフィールを作ってください');
   const { db, F } = await fb();
   const uid = me();
   const m = materialById(s.material);
-  const body = postFromSession(s, opt, m ? { name: m.name, color: materialColor(m.id) } : null);
+  const body = postFromSession(
+    s,
+    opt,
+    materialOverride ?? (m ? { name: m.name, color: materialColor(m.id), ...(m.img ? { img: m.img } : {}) } : null),
+  );
   const batch = F.writeBatch(db);
   for (const gid of groups) {
     if (!p.groupIds.includes(gid)) continue;
@@ -48,8 +52,16 @@ export async function createPost(s: Session, opt: PostOptions, groups: string[])
       createdAt: F.serverTimestamp(),
     });
   }
-  // 送信はつながったときに済む。ここでは待たない
-  void batch.commit().catch((e) => console.warn('投稿できませんでした', e));
+  // 送信はつながったときに済む。ここでは待たない。ルールが古くて教材の画像を断られたら、画像なしで送り直す
+  void batch.commit().catch((e) => {
+    if ((e as { code?: string }).code === 'permission-denied' && body.material?.img) {
+      const { img: _img, ...rest } = body.material;
+      void _img;
+      void createPost(s, opt, groups, rest);
+      return;
+    }
+    console.warn('投稿できませんでした', e);
+  });
   void savePostPrefs({ material: opt.material, laps: opt.laps, lapTimes: opt.lapTimes, away: opt.away, groups }).catch(
     () => undefined,
   );

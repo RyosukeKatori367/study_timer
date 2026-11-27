@@ -37,6 +37,8 @@ service cloud.firestore {
     function validDays(d) { return d is map && d.size() <= 14; }
     /** 日ごと・教材ごとの内訳（あってもなくてもよい） */
     function validMats(data) { return !('mats' in data) || (data.mats is map && data.mats.size() <= 14); }
+    /** 教材の画像 { 教材の id: data URL }（あってもなくてもよい） */
+    function validMatImgs(data) { return !('matImgs' in data) || (data.matImgs is map && data.matImgs.size() <= 20); }
     /** 累計と月ごとの合計（あってもなくてもよい） */
     function validSums(data) {
       return !('sums' in data)
@@ -128,13 +130,14 @@ service cloud.firestore {
         allow read: if isMember(gid);
 
         allow create: if isMe(uid)
-          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'mats', 'sums', 'lastStudyAt'])
+          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && request.resource.data.joinedAt == request.time
           && validDays(request.resource.data.days)
           && validMats(request.resource.data)
           && validSums(request.resource.data)
+          && validMatImgs(request.resource.data)
           && request.resource.data.lastStudyAt is number
           // 今の招待コードを知っている
           && request.resource.data.joinCode == getAfter(groupPath(gid)).data.code
@@ -148,12 +151,13 @@ service cloud.firestore {
           && getAfter(userPath(uid)).data.groupIds.size() <= 10;
 
         allow update: if isMe(uid)
-          && changed().hasOnly(['name', 'icon', 'days', 'mats', 'sums', 'lastStudyAt'])
+          && changed().hasOnly(['name', 'icon', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && validDays(request.resource.data.days)
           && validMats(request.resource.data)
           && validSums(request.resource.data)
+          && validMatImgs(request.resource.data)
           && request.resource.data.lastStudyAt is number;
 
         // 抜ける（自分）・外す（作成者）。同時に人数を1減らすか、グループごと消す
@@ -199,11 +203,15 @@ service cloud.firestore {
           && request.resource.data.likes == []
           && (!('material' in request.resource.data)
               || (request.resource.data.material is map
-                  && request.resource.data.material.keys().hasOnly(['name', 'color'])
+                  && request.resource.data.material.keys().hasOnly(['name', 'color', 'img'])
                   && request.resource.data.material.name is string
                   && request.resource.data.material.name.size() <= 60
                   && request.resource.data.material.color is string
-                  && request.resource.data.material.color.size() <= 16))
+                  && request.resource.data.material.color.size() <= 16
+                  && (!('img' in request.resource.data.material)
+                      || (request.resource.data.material.img is string
+                          && request.resource.data.material.img.size() <= 16000
+                          && request.resource.data.material.img.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$')))))
           && (!('laps' in request.resource.data)
               || (request.resource.data.laps is map
                   && request.resource.data.laps.keys().hasOnly(['from', 'count'])

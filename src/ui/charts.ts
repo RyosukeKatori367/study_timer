@@ -11,6 +11,8 @@ export interface Seg {
   label: string;
   /** 右に小さく出す補足（「12ラップ」など） */
   sub?: string;
+  /** 教材の画像（あれば色の四角の代わりに出し、色はふちで見せる） */
+  img?: string;
 }
 
 /**
@@ -39,7 +41,11 @@ export function donutHtml(segs: Seg[], title: string, size = 148): string {
     .map(
       (s) => `
       <div class="donut-row">
-        <i style="background:${esc(s.color)}"></i>
+        ${
+          s.img
+            ? `<img class="donut-img" src="${esc(s.img)}" alt="" style="box-shadow:0 0 0 2px ${esc(s.color)}">`
+            : `<i style="background:${esc(s.color)}"></i>`
+        }
         <span class="donut-name">${esc(s.label)}</span>
         ${s.sub ? `<small>${esc(s.sub)}</small>` : ''}
         <span class="donut-ms">${esc(fmtHM(s.ms))}</span>

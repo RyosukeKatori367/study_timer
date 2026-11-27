@@ -88,7 +88,7 @@ export async function memberScreen(_nav: Nav, gid: string, uid: string): Promise
           ${
             parts.length
               ? donutHtml(
-                  parts.map((p) => ({ ms: p.ms, color: p.c, label: p.n })),
+                  parts.map((p) => ({ ms: p.ms, color: p.c, label: p.n, img: m.matImgs?.[p.key] })),
                   weekName,
                 )
               : `<div class="sns-lead">${weekName}の記録はまだありません</div>`

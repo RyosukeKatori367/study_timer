@@ -2,8 +2,8 @@
 
 import { api } from '../../cloud/api';
 import { credentialError } from '../../cloud/account';
-import { BIO_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
-import { iconFromFile } from '../../cloud/profile';
+import { BIO_MAX, ICON_IMAGE_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
+import { cropImage } from '../../ui/cropper';
 import { $, html } from '../../ui/dom';
 import { toast } from '../../ui/toast';
 import { avatar, busy, field, header, hueSlider, type Nav, type Screen } from './ui';
@@ -183,7 +183,9 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
     file.value = '';
     if (!f) return;
     try {
-      icon.img = await iconFromFile(f);
+      const url = await cropImage(f, { size: 128, round: true, maxLength: ICON_IMAGE_MAX });
+      if (!url) return;
+      icon.img = url;
       render();
     } catch (e) {
       toast(e instanceof Error ? e.message : '画像を読み込めませんでした');

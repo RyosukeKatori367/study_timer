@@ -152,6 +152,8 @@ export interface MemberDoc {
   mats?: DayMats;
   /** 累計と月ごとの合計（人の統計の画面に出す。古い文書にはない） */
   sums?: StudySums;
+  /** 教材の画像 { 教材の id: data URL }（mats に出てくる教材のうち、画像があるものだけ） */
+  matImgs?: Record<string, string>;
   lastStudyAt: number;
 }
 
@@ -329,8 +331,8 @@ export interface PostDoc {
   start: number;
   end: number;
   studyMs: number;
-  /** 教材名（出さないときは付けない） */
-  material?: { name: string; color: string };
+  /** 教材名・色・画像（出さないときは付けない） */
+  material?: PostMaterial;
   /** ラップ番号の範囲とラップ数（出さないときは付けない） */
   laps?: { from: number; count: number };
   /** ラップごとの時間（出さないときは付けない） */
@@ -378,6 +380,12 @@ export function replyError(text: string): string | null {
   return null;
 }
 
+export interface PostMaterial {
+  name: string;
+  color: string;
+  img?: string;
+}
+
 export interface PostOptions {
   material: boolean;
   laps: boolean;
@@ -391,7 +399,7 @@ export interface PostOptions {
 export function postFromSession(
   s: Session,
   opt: PostOptions,
-  material: { name: string; color: string } | null,
+  material: PostMaterial | null,
 ): Omit<PostDoc, 'uid' | 'name' | 'icon' | 'createdAt'> {
   const p: Omit<PostDoc, 'uid' | 'name' | 'icon' | 'createdAt'> = {
     sessionId: s.id,

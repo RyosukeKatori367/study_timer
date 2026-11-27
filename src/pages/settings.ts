@@ -3,25 +3,19 @@
 
 import {
   activeMaterials,
-  archiveMaterial,
   clearSessions,
   exportBackup,
   getSessions,
   importBackup,
   nextLapNumber,
-  renameMaterial,
   saveSettings,
-  setMaterialColor,
-  setNextLap,
   settings,
   type Settings,
 } from '../store';
-import { MATERIAL_CHANGE, createMaterial } from './material';
+import { MATERIAL_CHANGE, materialThumb, openMaterialEdit } from './material';
 import { HOUR, MIN, fmtHM, fmtTimeOfDay, type DurationStyle } from '../time';
 import { $, esc, html, setText } from '../ui/dom';
-import { pickColor, pickDrums, pickInteger, pickList, pickOption, pickText } from '../ui/sheet';
-import { materialColor } from '../colors';
-import { MATERIAL_COLORS } from '../palette';
+import { pickDrums, pickOption } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
 
@@ -335,48 +329,20 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
         .map(
           (m) => `
         <button type="button" class="row" data-material="${m.id}">
-          <span class="row-label"><i class="mat-dot" style="background:${materialColor(m.id)}"></i>${esc(m.name)}</span>
+          <span class="row-label" style="display:flex;align-items:center;gap:12px;min-width:0">${materialThumb(m.id, 30)}<span class="sns-name">${esc(m.name)}</span>${
+            m.genre ? `<span class="row-genre">${esc(m.genre)}</span>` : ''
+          }</span>
           <span class="row-value"><span>次は${nextLapNumber(m.id)}番</span><span class="chevron" aria-hidden="true">›</span></span>
         </button>`,
         )
         .join('')}
       <button type="button" class="row add" data-material-add><span class="row-label">＋ 教材を追加</span></button>
-      <div class="row-note">教材ごとに、ラップ番号（次は何番から）・前回の範囲・前回平均を分けて記録します。タイマーやストップウォッチの「教材」から切り替えます</div>`;
+      <div class="row-note">教材ごとに、ラップ番号（次は何番から）・前回の範囲・前回平均を分けて記録します。タップで名前・ジャンル・画像・色・次の番号を変えられます。タイマーやストップウォッチの「教材」から切り替えます</div>`;
 
     materialCard.querySelectorAll<HTMLElement>('[data-material]').forEach((b) => {
-      const m = list.find((x) => x.id === b.dataset.material)!;
-      b.onclick = async () => {
-        const i = await pickList(m.name, [
-          { label: '名前を変える' },
-          { label: '色を変える' },
-          { label: '次のラップ番号を変える', sub: `今は${nextLapNumber(m.id)}番` },
-          { label: '削除する', danger: true },
-        ]);
-        if (i === 0) {
-          const name = await pickText('教材の名前', m.name);
-          if (!name || name === m.name) return;
-          if (activeMaterials().some((x) => x.name === name)) return toast('同じ名前の教材があります');
-          renameMaterial(m.id, name);
-        } else if (i === 1) {
-          const c = await pickColor(`${m.name}の色`, MATERIAL_COLORS, materialColor(m.id));
-          if (!c || c === materialColor(m.id)) return;
-          setMaterialColor(m.id, c);
-        } else if (i === 2) {
-          const n = await pickInteger(`${m.name}の次のラップ番号`, nextLapNumber(m.id), 1, 99999, '1以上にしてください');
-          if (n === null) return;
-          setNextLap(n, m.id);
-        } else if (i === 3) {
-          if (!confirm(`「${m.name}」を削除しますか？\nこれまでの記録は消えず、統計にも残ります。`)) return;
-          archiveMaterial(m.id);
-        } else {
-          return;
-        }
-        document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
-      };
+      b.onclick = () => openMaterialEdit(b.dataset.material!);
     });
-    $('[data-material-add]', materialCard).onclick = async () => {
-      if (await createMaterial()) document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
-    };
+    $('[data-material-add]', materialCard).onclick = () => openMaterialEdit(null);
   };
   document.addEventListener(MATERIAL_CHANGE, renderMaterials);
   // 計測が終わると「次は何番」が変わるので、設定を開くたびに作り直す

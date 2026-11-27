@@ -66,6 +66,9 @@ async function user(name: string): Promise<Who> {
 }
 
 const icon = { c: '🧪', h: 200 };
+/** 1×1 の小さな画像 */
+const TINY_JPEG =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
 const profile = (name: string) => ({
   name,
   bio: '',
@@ -205,6 +208,9 @@ async function run(): Promise<void> {
         lastStudyAt: 2,
       }),
     );
+    await allow('教材の画像を書ける', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { matImgs: { m1: TINY_JPEG } }),
+    );
     await allow('累計と月の合計を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { sums: { all: 7200000, months: { '2026-11': 7200000 } } }),
     );
@@ -240,6 +246,12 @@ async function run(): Promise<void> {
     await deny('入っていない人は投稿を読めない', () => F.getDocs(F.collection(c.db, 'groups', gid, 'posts')));
     await deny('入っていない人はいいねできない', () =>
       F.updateDoc(F.doc(c.db, 'groups', gid, 'posts', pid), { likes: F.arrayUnion(c.uid) }),
+    );
+    await allow('教材の画像つきで投稿できる', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), material: { name: 'リードα', color: '#338ced', img: TINY_JPEG } }),
+    );
+    await deny('教材の画像に画像でないものは入れられない', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), material: { name: 'x', color: '#338ced', img: 'https://example.com/a.png' } }),
     );
     await allow('離れた回数つきで投稿できる', () =>
       F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), away: { n: 2, ms: 180000 } }),

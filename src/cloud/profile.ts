@@ -3,7 +3,7 @@
 
 import { USER_CHANGE, cloudUser } from './account';
 import { fb } from './firebase';
-import { DEFAULT_POST_PREFS, ICON_IMAGE_MAX, profileError, type Icon, type PostPrefs, type UserDoc } from './model';
+import { DEFAULT_POST_PREFS, profileError, type Icon, type PostPrefs, type UserDoc } from './model';
 
 function uid(): string {
   const u = cloudUser();
@@ -76,26 +76,4 @@ export async function savePostPrefs(prefs: Partial<PostPrefs>): Promise<void> {
   if (!current) return;
   current.postPrefs = { ...current.postPrefs, ...prefs };
   await F.updateDoc(F.doc(db, 'users', uid()), { postPrefs: current.postPrefs });
-}
-
-/**
- * 選んだ画像を、真ん中を正方形に切り抜いて 128px の JPEG にする。
- * 画像の置き場所（Storage）は使わず、プロフィールに直接入れるので小さくする（5〜10KB ほど）。
- */
-export async function iconFromFile(file: File, size = 128): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('画像を選んでください');
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('画像を読み込めませんでした');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
-  bitmap.close();
-  for (const q of [0.8, 0.65, 0.5]) {
-    const url = canvas.toDataURL('image/jpeg', q);
-    if (url.length <= ICON_IMAGE_MAX) return url;
-  }
-  throw new Error('画像が大きすぎました。別の画像を選んでください');
 }

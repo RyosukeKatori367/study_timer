@@ -66,7 +66,13 @@ function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; 
   if (chosen.size === 0) chosen.add(groups[0].id);
 
   const parts = [
-    material ? `<span class="pill"><i style="background:${materialColor(material.id)}"></i>${esc(material.name)}</span>` : '',
+    material
+      ? `<span class="pill">${
+          material.img
+            ? `<img class="pill-img" src="${esc(material.img)}" alt="" style="box-shadow:0 0 0 1.5px ${materialColor(material.id)}">`
+            : `<i style="background:${materialColor(material.id)}"></i>`
+        }${esc(material.name)}</span>`
+      : '',
     hasLaps ? `<span class="pill">${s.firstLap}〜${s.firstLap + s.laps.length - 1}番・${s.laps.length}ラップ</span>` : '',
   ].join('');
 

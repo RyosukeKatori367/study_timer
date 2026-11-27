@@ -48,7 +48,12 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
   const liked = p.likes.includes(me());
   const likers = p.likes.map((u) => ctx.members.get(u)?.name ?? '抜けた人');
   const pills: string[] = [];
-  if (p.material) pills.push(`<span class="pill"><i style="background:${esc(p.material.color)}"></i>${esc(p.material.name)}</span>`);
+  if (p.material) {
+    const mark = p.material.img
+      ? `<img class="pill-img" src="${esc(p.material.img)}" alt="" style="box-shadow:0 0 0 1.5px ${esc(p.material.color)}">`
+      : `<i style="background:${esc(p.material.color)}"></i>`;
+    pills.push(`<span class="pill">${mark}${esc(p.material.name)}</span>`);
+  }
   if (p.laps) {
     const to = p.laps.from + p.laps.count - 1;
     pills.push(`<span class="pill">${p.laps.count > 1 ? `${p.laps.from}〜${to}番` : `${p.laps.from}番`}・${p.laps.count}ラップ</span>`);
