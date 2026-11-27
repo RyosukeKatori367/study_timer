@@ -12,10 +12,11 @@ import { $, esc, html } from '../../ui/dom';
 import { pickList } from '../../ui/sheet';
 import { toast } from '../../ui/toast';
 import { MODE_LABEL, likeNames, postTime, timeRange } from './fmt';
-import { codeScreen, editScreen, markSeen } from './groups';
+import { chatSeenKey, createChat } from './chat';
+import { codeScreen, editScreen, markSeen, seenAt } from './groups';
 import { avatar, busy, groupIcon, header, nameHtml, type Nav, type Screen } from './ui';
 
-let tab: 'timeline' | 'ranking' = 'timeline';
+let tab: 'timeline' | 'ranking' | 'chat' = 'timeline';
 let range: 'today' | 'week' = 'today';
 
 interface Ctx {
@@ -123,6 +124,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
       <div class="sns-seg" role="group">
         <button type="button" data-tab="timeline">タイムライン</button>
         <button type="button" data-tab="ranking">ランキング</button>
+        <button type="button" data-tab="chat">チャット<span class="tab-dot" data-chat-dot hidden></span></button>
       </div>
       <div data-body><div class="sns-loading">読み込んでいます…</div></div>
     </div>`);
@@ -130,9 +132,24 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
   const title = $('.switch-title', el);
   const titleText = $('.t', title);
 
+  // チャットは入力中の文字を消さないように、一度作ったものを出し入れする
+  const chat = createChat(gid, () => ({ members: ctx.members, ownerId: ctx.group?.ownerId ?? '' }));
+  const chatDot = $('[data-chat-dot]', el);
+
   const render = () => {
     titleText.textContent = ctx.group?.name ?? '';
     el.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    if (tab === 'chat') {
+      chatDot.hidden = true;
+      if (body.firstElementChild !== chat.el) {
+        body.replaceChildren(chat.el);
+        chat.show();
+      } else {
+        chat.refresh();
+      }
+      return;
+    }
+    chat.hide();
     if (tab === 'timeline') renderTimeline();
     else renderRanking();
   };
@@ -242,7 +259,20 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
       render();
     }),
   ]);
-  return { el, dispose: () => stops.forEach((s) => s()) };
+  // まだ見ていないメッセージがあれば、チャットのタブに印を付ける
+  if (tab !== 'chat') {
+    const since = seenAt(chatSeenKey(gid));
+    void api.chatUnread(gid, since).then((n) => {
+      if (n > 0 && tab !== 'chat') chatDot.hidden = false;
+    });
+  }
+  return {
+    el,
+    dispose: () => {
+      stops.forEach((s) => s());
+      chat.dispose();
+    },
+  };
 }
 
 // ---- 投稿と返信 ----

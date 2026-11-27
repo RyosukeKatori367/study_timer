@@ -7,6 +7,7 @@ import { settings } from '../../store';
 import { $, esc, html } from '../../ui/dom';
 import { toast } from '../../ui/toast';
 import { profileScreen } from './account';
+import { chatSeenKey } from './chat';
 import { rememberGroups } from './compose';
 import { badgeText } from './fmt';
 import { timelineScreen } from './timeline';
@@ -22,6 +23,13 @@ function seenMap(): Record<string, number> {
   } catch {
     return {};
   }
+}
+
+/** 最後に見た時刻（まだ見たことがなければ今を記録して、それより前を新着にしない） */
+export function seenAt(key: string): number {
+  const m = seenMap();
+  if (!(key in m)) markSeen(key);
+  return m[key] ?? Date.now();
 }
 
 export function markSeen(gid: string, at = Date.now()): void {
@@ -97,11 +105,12 @@ export async function listScreen(nav: Nav): Promise<Screen> {
         $('[data-sub]', row).textContent = `${ms.length}人・今日 ${n}人が勉強`;
       })
       .catch(() => undefined);
-    // 初めて見るグループは、入ったときより前の投稿を新着にしない
+    // 新しい投稿とメッセージの数（初めて見るグループは、入ったときより前を新着にしない）
     const since = seen[g.id] ?? Date.now();
     if (!(g.id in seen)) markSeen(g.id, since);
-    void api.unreadCount(g.id, since).then((n) => {
-      if (n > 0) $('[data-badge]', row).outerHTML = `<span class="badge" aria-label="新しい投稿${n}件">${badgeText(n)}</span>`;
+    void Promise.all([api.unreadCount(g.id, since), api.chatUnread(g.id, seenAt(chatSeenKey(g.id)))]).then(([p, c]) => {
+      const n = p + c;
+      if (n > 0) $('[data-badge]', row).outerHTML = `<span class="badge" aria-label="新しい投稿とメッセージ${n}件">${badgeText(n)}</span>`;
     });
   }
   return { el };

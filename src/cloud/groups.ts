@@ -5,6 +5,7 @@ import type { Unsubscribe } from 'firebase/firestore';
 import { materialColor } from '../colors';
 import { getSessions, materialName, settings } from '../store';
 import { cloudUser } from './account';
+import { deleteAllMessages } from './chat';
 import { fb, type Fb } from './firebase';
 import {
   MAX_GROUPS,
@@ -258,6 +259,7 @@ export async function leaveGroup(gid: string): Promise<void> {
 async function deleteGroup(gid: string, g: GroupDoc): Promise<void> {
   const { db, F } = await fb();
   const uid = me();
+  await deleteAllMessages(gid);
   const posts = await F.getDocs(F.collection(db, 'groups', gid, 'posts'));
   for (let i = 0; i < posts.docs.length; i += 400) {
     const b = F.writeBatch(db);

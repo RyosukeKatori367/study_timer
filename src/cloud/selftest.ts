@@ -298,6 +298,26 @@ async function run(): Promise<void> {
       await del.commit();
     });
 
+    // ---- チャット ----
+    const msgs = (w: Who) => F.collection(w.db, 'groups', gid, 'messages');
+    const message = (w: Who, text = 'おつかれ') => ({ uid: w.uid, name: 'テスト', icon, text, createdAt: F.serverTimestamp() });
+    let midA = '';
+    let midB = '';
+    await allow('メンバーはチャットに送れる', async () => (midB = (await F.addDoc(msgs(b), message(b))).id));
+    await allow('作成者もチャットに送れる', async () => (midA = (await F.addDoc(msgs(a), message(a))).id));
+    await allow('メンバーはチャットを読める', () =>
+      F.getDocs(F.query(msgs(b), F.orderBy('createdAt'), F.limitToLast(50))),
+    );
+    await deny('人になりすまして送れない', () => F.addDoc(msgs(b), message(a)));
+    await deny('空のメッセージは送れない', () => F.addDoc(msgs(b), message(b, '')));
+    await deny('入っていない人はチャットを読めない', () => F.getDocs(msgs(c)));
+    await deny('入っていない人はチャットに送れない', () => F.addDoc(msgs(c), message(c)));
+    await deny('送ったメッセージは書き換えられない', () => F.updateDoc(F.doc(msgs(b), midB), { text: '書き換え' }));
+    await deny('人のメッセージは消せない', () => F.deleteDoc(F.doc(msgs(b), midA)));
+    await allow('自分のメッセージは消せる', () => F.deleteDoc(F.doc(msgs(b), midB)));
+    midB = (await F.addDoc(msgs(b), message(b))).id;
+    await allow('作成者は人のメッセージも消せる', () => F.deleteDoc(F.doc(msgs(a), midB)));
+
     // ---- 外す・コードを作り直す ----
     await deny('メンバーは人を外せない', async () => {
       const batch = F.writeBatch(b.db);
@@ -338,6 +358,11 @@ async function run(): Promise<void> {
     await allow('外された人は、自分の投稿を消せる', () => F.deleteDoc(F.doc(b.db, 'groups', gid, 'posts', pid)));
 
     // ---- 片付け（グループを消す） ----
+    await allow('作成者は、残ったメッセージを消せる', async () => {
+      const rest = await F.getDocs(F.collection(a.db, 'groups', gid, 'messages'));
+      for (const d of rest.docs) await F.deleteDoc(d.ref);
+    });
+    void midA;
     await allow('作成者は、人の投稿を消せる', async () => {
       const rest = await F.getDocs(F.collection(a.db, 'groups', gid, 'posts'));
       for (const d of rest.docs) await F.deleteDoc(d.ref);

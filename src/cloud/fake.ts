@@ -9,6 +9,7 @@ import { USER_CHANGE } from './account';
 import type { Group, Member } from './groups';
 import { DEVELOPER_UIDS, dateKey, newInviteCode, normalizeCode, postFromSession, type UserDoc } from './model';
 import type { Post, Reply } from './posts';
+import type { Message } from './chat';
 import { DEFAULT_POST_PREFS } from './model';
 import { materialById, settings } from '../store';
 import { materialColor } from '../colors';
@@ -71,6 +72,7 @@ interface FakeGroup {
   members: Member[];
   posts: Post[];
   replies: Map<string, Reply[]>;
+  messages: Message[];
 }
 
 const groups = new Map<string, FakeGroup>();
@@ -82,7 +84,28 @@ function seed(): void {
     members: [member('me', 173, 610, 1), member('dev', 95, 400, 2), member('haru', 123, 820, 3), member('yuu', 80, 300, 4), member('rin', 0, 120, 5)],
     posts: [],
     replies: new Map(),
+    messages: [],
   };
+  const msg = (uid: string, ago: number, text: string): Message => ({
+    id: `c${ago}${uid}`,
+    uid,
+    name: people[uid].name,
+    icon: people[uid].icon,
+    text,
+    createdAt: now - ago * MIN,
+    at: now - ago * MIN,
+    pending: false,
+  });
+  g1.messages = [
+    msg('haru', 60 * 25, '明日の小テストの範囲どこまでだっけ'),
+    msg('yuu', 60 * 25 - 2, 'p.120まで！'),
+    msg('haru', 60 * 25 - 3, 'ありがと'),
+    msg('dev', 95, '今日21時から一緒にポモドーロやる人いる？'),
+    msg('me', 90, 'やる！'),
+    msg('haru', 88, '自分もやる'),
+    msg('haru', 87, '25分×4セットでいい？'),
+    msg('dev', 30, 'おつかれー。リードα 240番まで終わった'),
+  ];
   const post = (id: string, uid: string, ago: number, extra: Partial<Post>): Post => ({
     id,
     uid,
@@ -124,6 +147,7 @@ function seed(): void {
     members: [member('kei', 60, 500, 1), member('me', 173, 610, 2), member('yuu', 80, 300, 3)],
     posts: [],
     replies: new Map(),
+    messages: [],
   };
   for (const fg of [g1, g2]) {
     groups.set(fg.g.id, fg);
@@ -221,6 +245,7 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
         members: [member('me', 0, 0, Date.now())],
         posts: [],
         replies: new Map(),
+        messages: [],
       });
       invites.set(code, id);
       profile!.groupIds.push(id);
@@ -315,6 +340,18 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       x.posts.find((q) => q.id === pid)!.replyCount = list.length;
       changed();
     },
+
+    sendMessage: async (gid, text) => {
+      fg(gid).messages.push({ id: `c${Math.random()}`, uid: 'me', name: profile!.name, icon: profile!.icon, text: text.trim(), createdAt: Date.now(), at: Date.now(), pending: false });
+      changed();
+    },
+    watchMessages: async (gid, n, cb) => watch(() => cb((groups.get(gid)?.messages ?? []).slice(-n))),
+    deleteMessage: async (gid, mid) => {
+      const x = fg(gid);
+      x.messages = x.messages.filter((m) => m.id !== mid);
+      changed();
+    },
+    chatUnread: async (gid, since) => groups.get(gid)?.messages.filter((m) => m.at > since && m.uid !== 'me').length ?? 0,
 
     syncInfo: () => ({ status: 'idle', syncedAt: synced, pending: 0 }),
     syncNow: async () => {

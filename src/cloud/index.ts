@@ -5,6 +5,7 @@ import { onStoreChange } from '../store';
 import { USER_CHANGE, cloudUser, deleteLogin, reauth, startCloud } from './account';
 import { fb } from './firebase';
 import { leaveGroup, publishStudy } from './groups';
+import { deleteMyMessages } from './chat';
 import { deleteMyPosts } from './posts';
 import { getProfile } from './profile';
 import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sync';
@@ -60,6 +61,7 @@ export async function deleteAccount(password: string): Promise<void> {
   for (const gid of p?.groupIds ?? []) {
     try {
       await deleteMyPosts(gid);
+      await deleteMyMessages(gid);
       await leaveGroup(gid);
     } catch (e) {
       // 外されていたグループなどは読めないので、そのまま進む

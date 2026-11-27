@@ -2,6 +2,7 @@
 // 開発中は ?fake を付けて開くと、Firebase につながずに偽のデータで画面を確かめられる（公開版には入らない）。
 
 import * as account from './account';
+import * as chat from './chat';
 import * as groups from './groups';
 import { deleteAccount } from './index';
 import * as posts from './posts';
@@ -44,6 +45,11 @@ const real = {
   addReply: posts.addReply,
   watchReplies: posts.watchReplies,
   deleteReply: posts.deleteReply,
+
+  sendMessage: chat.sendMessage,
+  watchMessages: chat.watchMessages,
+  deleteMessage: chat.deleteMessage,
+  chatUnread: chat.chatUnread,
 
   syncInfo,
   syncNow,

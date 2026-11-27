@@ -164,6 +164,21 @@ service cloud.firestore {
                   && getAfter(groupPath(gid)).data.lastMember == uid));
       }
 
+      // グループのチャット：メンバーだけ読み書き。書き換えはできず、消せるのは本人か作成者
+      match /messages/{mid} {
+        allow read: if isMember(gid);
+        allow create: if isMember(gid)
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'text', 'createdAt'])
+          && request.resource.data.uid == me()
+          && validName(request.resource.data.name)
+          && validIcon(request.resource.data.icon)
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 1000
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn()
+          && (resource.data.uid == me() || get(groupPath(gid)).data.ownerId == me());
+      }
+
       match /posts/{pid} {
         allow read: if isMember(gid);
 

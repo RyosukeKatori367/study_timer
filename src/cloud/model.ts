@@ -9,6 +9,7 @@
 //   groups/{gid}/members/{uid}     メンバーだけ。表示名とアイコンの写し、今日の勉強時間
 //   groups/{gid}/posts/{pid}       メンバーだけ。投稿
 //   groups/{gid}/posts/{pid}/replies/{rid} メンバーだけ。投稿への返信
+//   groups/{gid}/messages/{mid}    メンバーだけ。グループのチャット
 //   invites/{code}                 ログインしていれば、コードを知っている1件だけ読める（一覧は不可）
 
 import type { Mode, Session } from '../engine';
@@ -20,6 +21,7 @@ export const BIO_MAX = 60;
 export const GROUP_NAME_MAX = 24;
 export const COMMENT_MAX = 140;
 export const REPLY_MAX = 140;
+export const MESSAGE_MAX = 500;
 /** メンバー文書に残す、日ごとの勉強時間の日数（今週のランキングに足りる分） */
 export const DAYS_KEEP = 14;
 export const MAX_MEMBERS = 50;
@@ -351,6 +353,22 @@ export interface ReplyDoc {
   icon: Icon;
   text: string;
   createdAt: unknown;
+}
+
+/** groups/{gid}/messages/{mid} */
+export interface MessageDoc {
+  uid: string;
+  name: string;
+  icon: Icon;
+  text: string;
+  createdAt: unknown;
+}
+
+export function messageError(text: string): string | null {
+  const t = text.trim();
+  if (!t) return 'メッセージを入れてください';
+  if (Array.from(t).length > MESSAGE_MAX) return `メッセージは${MESSAGE_MAX}文字までです`;
+  return null;
 }
 
 export function replyError(text: string): string | null {
