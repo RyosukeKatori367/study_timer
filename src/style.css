@@ -3275,3 +3275,23 @@ nav {
   border-radius: 22px;
   font-size: 15px;
 }
+
+/* チャットは、メッセージが少なくても入力欄を画面のいちばん下に置く */
+.sns.fill {
+  flex: 1 0 auto;
+}
+
+.chat-on {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-on .chat {
+  flex: 1;
+}
+
+.chat-on .chat-list {
+  flex: 1;
+  justify-content: flex-end;
+}

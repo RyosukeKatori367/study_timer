@@ -139,6 +139,9 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
   const render = () => {
     titleText.textContent = ctx.group?.name ?? '';
     el.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    // チャットのときは画面の高さいっぱいに広げて、入力欄をいちばん下に置く
+    el.classList.toggle('fill', tab === 'chat');
+    body.classList.toggle('chat-on', tab === 'chat');
     if (tab === 'chat') {
       chatDot.hidden = true;
       if (body.firstElementChild !== chat.el) {
