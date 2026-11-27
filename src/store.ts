@@ -54,6 +54,8 @@ export interface Settings {
   finishHold: boolean;
   /** lap を押したときに短い音を鳴らす */
   lapSound: boolean;
+  /** 計測中にアプリから離れた回数と時間を記録する */
+  leaveTrack: boolean;
 
   // 統計
   /** 1日の区切り（0:00 からの分）。4:00 にすると、深夜の勉強を前の日に数える */
@@ -92,6 +94,7 @@ const DEFAULTS: Settings = {
   lapEstimate: 'average',
   finishHold: true,
   lapSound: false,
+  leaveTrack: false,
   dayBoundaryMin: 0,
   weekStartsOn: 1,
   dailyGoalMs: 0,
@@ -336,6 +339,9 @@ function isSession(x: unknown): x is Session {
     Array.isArray(s.laps) &&
     s.laps.every((v) => typeof v === 'number') &&
     (s.material === undefined || typeof s.material === 'string') &&
+    (s.leaves === undefined ||
+      (Array.isArray(s.leaves) &&
+        s.leaves.every((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'number')))) &&
     (s.spans === undefined ||
       (Array.isArray(s.spans) &&
         s.spans.every((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'number'))))

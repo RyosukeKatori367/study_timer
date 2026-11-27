@@ -1,7 +1,7 @@
 // 統計画面。週の棒グラフ（日ごとの時間・ラップの区切り・目標線）と、
 // タップした日の詳細（ラップごとの棒グラフ・記録の一覧）。
 
-import type { Mode, Session } from '../engine';
+import { leaveTotal, type Mode, type Session } from '../engine';
 import { getSessions, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
 import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
@@ -77,6 +77,7 @@ function sessionHtml(s: Session): string {
     parts.push(`${s.laps.length}ラップ`);
     if (s.laps.length > 1) parts.push(`平均${fmtLap(s.studyMs / s.laps.length)}`);
   }
+  if (s.leaves?.length) parts.push(`離脱${s.leaves.length}回（${fmtHM(leaveTotal(s.leaves))}）`);
   return `
     <div class="sess">
       <div class="sess-top"><span>${fmtClock(s.start)}〜${fmtClock(s.end)}</span><span>${fmtHM(s.studyMs)}</span></div>
@@ -170,6 +171,19 @@ function lapHtml(d: DayDetail): string {
     <div class="lap-legend">1本が1ラップ（途中で終えて分かれたものも合計）。点線は平均、平均の1.5倍以上は赤</div>`;
 }
 
+/** 離脱の回数と合計（設定がオンのとき、または記録があるとき） */
+function leaveStats(sessions: Session[]): { count: number; ms: number } | null {
+  const leaves = sessions.flatMap((s) => s.leaves ?? []);
+  if (!settings.leaveTrack && leaves.length === 0) return null;
+  return { count: leaves.length, ms: leaveTotal(leaves) };
+}
+
+function leaveLine(sessions: Session[]): string {
+  const l = leaveStats(sessions);
+  if (!l) return '';
+  return `<div class="leave-line"><span>離脱</span><span>${l.count === 0 ? 'なし' : `${l.count}回・合計${fmtHM(l.ms)}`}</span></div>`;
+}
+
 /** 選んだ日の詳細 */
 function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
   const head = `
@@ -188,7 +202,8 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
       <div><span class="label">ラップ</span><span class="value">${d.laps.length}</span></div>
       <div><span class="label">平均</span><span class="value">${d.lapAvgMs === null ? '—' : fmtLap(d.lapAvgMs)}</span></div>
       <div><span class="label">最長</span><span class="value">${d.lapMaxMs === null ? '—' : fmtLap(d.lapMaxMs)}</span></div>
-    </div>`;
+    </div>
+    ${leaveLine(sessions)}`;
 
   const tabs = `
     <div class="seg detail-tabs" role="group" aria-label="グラフの種類">
@@ -317,6 +332,12 @@ export function renderStats(view: HTMLElement, reset = false): void {
     <div class="pair">
       <div><span class="label">${weekLabel}のラップ</span><span class="value">${s.weekLaps}</span></div>
       <div><span class="label">平均</span><span class="value">${s.weekLapAvgMs === null ? '—' : fmtLap(s.weekLapAvgMs)}</span></div>
+      ${(() => {
+        const l = leaveStats(s.daySessions.flat());
+        return l
+          ? `<div><span class="label">離脱</span><span class="value">${l.count}回</span>${l.count > 0 ? `<span class="sub">${fmtHM(l.ms)}</span>` : ''}</div>`
+          : '';
+      })()}
     </div>`;
 
   // 日をタップしたら、その日の詳細に切り替える

@@ -1737,7 +1737,8 @@ button.list-row {
 
 .pair {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
@@ -1748,6 +1749,24 @@ button.list-row {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+.pair .sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.leave-line {
+  margin-top: -4px;
+  padding: 0 4px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.leave-line span:last-child {
+  color: #fff;
 }
 
 .pair > div + div {

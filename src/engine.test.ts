@@ -7,6 +7,8 @@ import {
   finish,
   isOver,
   lapEndView,
+  markBack,
+  markLeft,
   lap,
   newRun,
   normalizeMode,
@@ -452,5 +454,26 @@ describe('計っていた時間帯', () => {
     expect(h[14].get('')).toBe(30 * MIN);
     expect(h[16].get('ma')).toBeCloseTo(50 * MIN);
     expect(h[15].size).toBe(0);
+  });
+});
+
+describe('離脱の記録', () => {
+  it('30秒以上離れたときだけ数え、記録に残す', () => {
+    const r = newRun('stopwatch', T0);
+    markLeft(r, T0 + MIN);
+    expect(markBack(r, T0 + MIN + 10 * SEC)).toBeNull(); // 10秒は数えない
+    markLeft(r, T0 + 5 * MIN);
+    expect(markBack(r, T0 + 17 * MIN)).toBe(12 * MIN);
+    const s = finish(r, T0 + 30 * MIN)!;
+    expect(s.leaves).toEqual([[T0 + 5 * MIN, T0 + 17 * MIN]]);
+    expect(s.studyMs).toBe(30 * MIN); // 計測は止めない
+  });
+
+  it('一時停止中に離れたのは数えない', () => {
+    const r = newRun('stopwatch', T0);
+    pause(r, T0 + MIN);
+    markLeft(r, T0 + 2 * MIN);
+    expect(markBack(r, T0 + 20 * MIN)).toBeNull();
+    expect(finish(r, T0 + 20 * MIN)?.leaves).toBeUndefined();
   });
 });

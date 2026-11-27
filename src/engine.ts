@@ -51,6 +51,10 @@ export interface Run {
   material?: string;
   /** 計っていた時間帯（一時停止で区切ったもの。今動いている区間は入らない） */
   spans?: [number, number][];
+  /** アプリから離れていた時間帯（30秒以上のもの） */
+  leaves?: [number, number][];
+  /** 今アプリから離れている（離れた時刻）。戻ったら null */
+  leftAt?: number | null;
   // ポモドーロ
   workMs: number;
   breakMs: number;
@@ -70,6 +74,8 @@ export interface Session {
   material?: string;
   /** 実際に計っていた時間帯 [始まり, 終わり] の一覧（一時停止のあいだを除く）。古い記録にはない */
   spans?: [number, number][];
+  /** 計測中にアプリから離れていた時間帯 [離れた, 戻った]（30秒以上のもの、設定がオンのときだけ） */
+  leaves?: [number, number][];
 }
 
 /** finish のとき、最後のラップがこれより短ければ記録しない（lap 直後の finish 対策） */
@@ -227,6 +233,30 @@ export function cycleRemaining(r: Run, now: number, v: CycleView = cycleView(r, 
   }
 }
 
+// ---- 離脱の記録 ----
+
+/** これより短く離れたもの（通知をちらっと見ただけなど）は数えない */
+export const LEAVE_MIN_MS = 30 * 1000;
+
+/** アプリから離れた。計っているとき（一時停止中でないとき）だけ数える */
+export function markLeft(r: Run, now: number): void {
+  if (r.resumedAt !== null && r.leftAt == null) r.leftAt = now;
+}
+
+/** アプリに戻った。数える長さだったら、その離れていた時間を返す（数えなければ null） */
+export function markBack(r: Run, now: number): number | null {
+  if (r.leftAt == null) return null;
+  const from = r.leftAt;
+  r.leftAt = null;
+  const ms = now - from;
+  if (ms < LEAVE_MIN_MS) return null;
+  (r.leaves ??= []).push([from, now]);
+  return ms;
+}
+
+export const leaveTotal = (leaves: [number, number][] | undefined): number =>
+  (leaves ?? []).reduce((a, [x, y]) => a + Math.max(0, y - x), 0);
+
 /** 計っていた時間帯の一覧（終わった時刻までの区間を足して、隣り合う区間はつなげる） */
 function finishedSpans(r: Run, now: number): [number, number][] {
   // 時間帯を記録していなかった古い版の計測は、始めから終わりまでを1つの区間にする
@@ -253,6 +283,7 @@ export function finish(r: Run, now: number): Session | null {
     firstLap: r.firstLap,
     ...(r.material ? { material: r.material } : {}),
     spans: finishedSpans(r, now),
+    ...(r.leaves?.length ? { leaves: r.leaves.map(([a, b]): [number, number] => [a, Math.min(b, now)]) } : {}),
   };
 
   if (r.mode === 'pomoCycle') {

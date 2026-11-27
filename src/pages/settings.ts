@@ -22,7 +22,7 @@ import { pickDrums, pickInteger, pickList, pickOption, pickText } from '../ui/sh
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
 
-type ToggleKey = 'overrun' | 'finishHold' | 'lapAdvance' | 'keepAwake' | 'tilt' | 'sound' | 'lapSound';
+type ToggleKey = 'overrun' | 'finishHold' | 'lapAdvance' | 'keepAwake' | 'tilt' | 'sound' | 'lapSound' | 'leaveTrack';
 
 interface ToggleRow {
   kind: 'toggle';
@@ -101,6 +101,12 @@ const GROUPS: Group[] = [
         key: 'finishHold',
         label: 'finish は長押しで終える',
         note: 'オフにすると1回タップで終わります。押し間違えやすいので注意',
+      },
+      {
+        kind: 'toggle',
+        key: 'leaveTrack',
+        label: '離脱を記録する',
+        note: '計測中にほかのアプリへ移ったり画面を消したりして、30秒以上離れたら回数と時間を記録します。計測は止まりません',
       },
     ],
   },

@@ -14,11 +14,15 @@ import {
   timerRemaining,
   totalElapsed,
   lapEndView,
+  LEAVE_MIN_MS,
+  markBack,
+  markLeft,
   usesLapNumbers,
   type Run,
   type Session,
 } from './engine';
-import { addSession, clearRun, loadRun, materialName, saveRun, setNextLap, settings } from './store';
+import { addSession, clearRun, getSessions, loadRun, materialName, saveRun, setNextLap, settings } from './store';
+import { studyDayStart } from './summary';
 import { getTilt, onTiltChange } from './tilt';
 import { HOUR, fmtElapsed, fmtHM, fmtLap, fmtRemain, pad2 } from './time';
 import { $, html, setText } from './ui/dom';
@@ -145,7 +149,14 @@ export function initRun(exit: () => void): void {
   bindHoldToFinish();
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') render();
+    if (document.visibilityState === 'visible') {
+      cameBack();
+      render();
+    } else if (run && settings.leaveTrack) {
+      // 計測中にアプリから離れた（ほかのアプリ・画面を消した）
+      markLeft(run, Date.now());
+      saveRun(run);
+    }
   });
   onTiltChange(applyLayout);
   window.addEventListener('resize', applyLayout);
@@ -154,8 +165,23 @@ export function initRun(exit: () => void): void {
   const saved = loadRun();
   if (saved) {
     run = saved;
+    cameBack(); // 離れているあいだにアプリが閉じられていたときも、戻ったことにする
     show();
   }
+}
+
+/** アプリに戻ったとき。30秒以上離れていたら記録して、お知らせを出す */
+function cameBack(): void {
+  if (!run || run.leftAt == null) return;
+  const ms = markBack(run, Date.now());
+  saveRun(run);
+  if (ms === null) return;
+  // 今日の何回目か（終えた記録＋今の計測）
+  const today = studyDayStart(Date.now(), settings.dayBoundaryMin);
+  const before = getSessions()
+    .filter((s) => studyDayStart(s.start, settings.dayBoundaryMin) === today)
+    .reduce((a, s) => a + (s.leaves?.length ?? 0), 0);
+  toast(`${fmtHM(ms)}離れていました（今日${before + (run.leaves?.length ?? 0)}回目）`);
 }
 
 export function startRun(r: Run): void {
@@ -195,9 +221,16 @@ function nextLapAfter(r: Run, s: Session): number {
   return partial && settings.lapAdvance ? inProgress + 1 : inProgress;
 }
 
-/** 計測を終えて記録する。at は終了時刻（終了条件に達した時刻など）。 */
+/**
+ * 計測を終えて記録する。at は終了時刻（終了条件に達した時刻など）。
+ * 離れているあいだに終わったときは、終わった時刻までを離脱にする。
+ */
 function end(at = Date.now()): void {
   if (!run) return;
+  if (run.leftAt != null) {
+    if (at - run.leftAt >= LEAVE_MIN_MS) (run.leaves ??= []).push([run.leftAt, at]);
+    run.leftAt = null;
+  }
   const mode = run.mode;
   const session = finish(run, at);
   if (session) {
@@ -277,7 +310,12 @@ function bindHoldToFinish(): void {
 }
 
 /** 計測中の画面の一番上の小さい見出し。教材があれば並べる */
-const kicker = (r: Run, mode: string): string => (r.material ? `${mode} · ${materialName(r.material)}` : mode);
+const kicker = (r: Run, mode: string): string => {
+  const parts = [mode];
+  if (r.material) parts.push(materialName(r.material));
+  if (settings.leaveTrack && r.leaves?.length) parts.push(`離脱${r.leaves.length}回`);
+  return parts.join(' · ');
+};
 
 function setBig(text: string, over = false): void {
   setText(el.big, text);
