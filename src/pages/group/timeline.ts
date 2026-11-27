@@ -4,7 +4,10 @@ import { api } from '../../cloud/api';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
 import { matBreakdown, ranking, sumDays, type Icon } from '../../cloud/model';
 import type { Post, Reply } from '../../cloud/posts';
+import { settings } from '../../store';
+import { chartAxis, fmtAxis } from '../../summary';
 import { fmtHM, fmtLap } from '../../time';
+import { memberScreen } from './member';
 import { $, esc, html } from '../../ui/dom';
 import { pickList } from '../../ui/sheet';
 import { toast } from '../../ui/toast';
@@ -14,8 +17,6 @@ import { avatar, busy, groupIcon, header, nameHtml, type Nav, type Screen } from
 
 let tab: 'timeline' | 'ranking' = 'timeline';
 let range: 'today' | 'week' = 'today';
-/** ランキングで教材ごとの時間を開いている人 */
-let openRank: string | null = null;
 
 interface Ctx {
   gid: string;
@@ -57,8 +58,8 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
   return `
     <article class="post${p.pending ? ' pending' : ''}" data-pid="${esc(p.id)}">
       <div class="post-head">
-        ${avatar(author.icon, 36)}
-        <div class="post-who">
+        <button type="button" class="post-avatar" data-who aria-label="${esc(author.name)}の統計">${avatar(author.icon, 36)}</button>
+        <div class="post-who" data-who>
           <div class="sns-row-title">${nameHtml(p.uid, author.name)}</div>
           <div class="post-time">${p.pending ? '送信待ち' : esc(postTime(p.at))}</div>
         </div>
@@ -92,7 +93,9 @@ function bindPosts(root: HTMLElement, nav: Nav, ctx: Ctx, find: (pid: string) =>
     const art = t.closest<HTMLElement>('[data-pid]');
     const p = art && find(art.dataset.pid!);
     if (!p) return;
-    if (t.closest('[data-like]')) {
+    if (t.closest('[data-who]')) {
+      nav.push((n) => memberScreen(n, ctx.gid, p.uid));
+    } else if (t.closest('[data-like]')) {
       void api.setLike(ctx.gid, p.id, !p.likes.includes(me())).catch(() => toast('いいねできませんでした'));
     } else if (t.closest('[data-reply]')) {
       nav.push((n) => postScreen(n, ctx.gid, p.id));
@@ -149,56 +152,55 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
     const rows = ranking([...ctx.members.values()], keys);
     const active = rows.filter((r) => r.ms > 0);
     const total = active.reduce((a, r) => a + r.ms, 0);
-    const max = Math.max(1, ...rows.map((r) => r.ms));
+    // 横軸（時間）は、いちばん長い人に合わせたきりのいい目盛り
+    const axis = chartAxis(Math.max(1, ...rows.map((r) => r.ms)));
+    const ticks = [0, ...axis.ticks];
+    const x = (ms: number) => (ms / axis.top) * 100;
+    const tickHtml = ticks
+      .map(
+        (ms, i) =>
+          `<div class="rank-tick${i === 0 ? ' first' : ''}${i === ticks.length - 1 ? ' last' : ''}" style="left:${x(ms)}%"><span>${
+            ms === 0 ? '0' : esc(fmtAxis(ms, settings.durationStyle))
+          }</span></div>`,
+      )
+      .join('');
     body.innerHTML = `
       <div class="sns-seg small" role="group" style="margin-bottom:12px">
         <button type="button" data-range="today" aria-pressed="${range === 'today'}">今日</button>
         <button type="button" data-range="week" aria-pressed="${range === 'week'}">今週</button>
       </div>
       <div class="sns-summary" style="margin-bottom:8px"><span>${active.length}人が勉強</span><span>みんなで ${esc(fmtHM(total))}</span></div>
-      <div class="sns-card">${rows
-        .map((r) => {
-          const parts = r.ms > 0 ? matBreakdown(r.item, keys) : [];
-          const open = openRank === r.item.uid && parts.length > 0;
-          // 棒の長さは、いちばん長い人を 100% にする。教材ごとに色を分けて、間を 2px あける
-          const bar = parts
-            .map((m) => `<span style="flex:${m.ms} 1 0;background:${esc(m.c)}" title="${esc(m.n)} ${esc(fmtHM(m.ms))}"></span>`)
-            .join('');
-          const detail = open
-            ? `<div class="rank-detail">${parts
-                .map(
-                  (m) => `<div class="rank-mat"><i style="background:${esc(m.c)}"></i><span class="sns-name">${esc(m.n)}</span>
-                    <span class="rank-mat-ms">${esc(fmtHM(m.ms))}</span><span class="rank-mat-pct">${Math.round((m.ms / r.ms) * 100)}%</span></div>`,
-                )
-                .join('')}</div>`
-            : '';
-          return `
-        <${parts.length ? 'button type="button"' : 'div'} class="sns-row rank-row${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}${open ? ' open' : ''}" data-rank="${esc(r.item.uid)}" ${parts.length ? `aria-expanded="${open}"` : ''}>
-          <span class="rank">${r.ms > 0 ? r.rank : '–'}</span>
-          ${avatar(r.item.icon, 36)}
-          <span class="sns-row-main">
-            <span class="rank-line">
-              <span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid })}</span>
-              <span class="ms">${r.ms > 0 ? esc(fmtHM(r.ms)) : '—'}</span>
+      <div class="sns-card rank-chart">
+        <div class="rank-axis" aria-hidden="true">${tickHtml}</div>
+        ${rows
+          .map((r) => {
+            const parts = r.ms > 0 ? matBreakdown(r.item, keys) : [];
+            // 教材ごとに色を分けて、間を 2px あける
+            const bar = parts.map((m) => `<span style="flex:${m.ms} 1 0;background:${esc(m.c)}"></span>`).join('');
+            return `
+          <button type="button" class="sns-row rank-row${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}" data-rank="${esc(r.item.uid)}" aria-label="${esc(r.item.name)} ${esc(fmtHM(r.ms))}・統計を見る">
+            <span class="rank">${r.ms > 0 ? r.rank : '–'}</span>
+            ${avatar(r.item.icon, 36)}
+            <span class="sns-row-main">
+              <span class="rank-line">
+                <span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid })}</span>
+                <span class="ms">${r.ms > 0 ? esc(fmtHM(r.ms)) : '—'}</span>
+              </span>
+              ${r.ms > 0 ? `<span class="rank-bar" style="width:${x(r.ms)}%" aria-hidden="true">${bar}</span>` : ''}
             </span>
-            ${r.ms > 0 ? `<span class="rank-bar" style="width:${(r.ms / max) * 100}%" aria-hidden="true">${bar}</span>` : ''}
-            ${detail}
-          </span>
-        </${parts.length ? 'button' : 'div'}>`;
-        })
-        .join('')}</div>
-      <p class="sns-note" style="margin-top:8px">${range === 'today' ? '今日' : '今週'}の勉強時間です。色はそれぞれの人の教材で、タップすると教材ごとの時間が出ます。日付は、それぞれの人の「1日の区切り」の設定で数えます</p>`;
+          </button>`;
+          })
+          .join('')}
+      </div>
+      <p class="sns-note" style="margin-top:8px">${range === 'today' ? '今日' : '今週'}の勉強時間です。色はそれぞれの人の教材です。タップすると、その人の統計が見られます</p>`;
     body.querySelectorAll<HTMLElement>('[data-range]').forEach((b) => {
       b.onclick = () => {
         range = b.dataset.range as typeof range;
         render();
       };
     });
-    body.querySelectorAll<HTMLElement>('button[data-rank]').forEach((b) => {
-      b.onclick = () => {
-        openRank = openRank === b.dataset.rank ? null : b.dataset.rank!;
-        render();
-      };
+    body.querySelectorAll<HTMLElement>('[data-rank]').forEach((b) => {
+      b.onclick = () => nav.push((n) => memberScreen(n, gid, b.dataset.rank!));
     });
   };
 
@@ -367,15 +369,14 @@ export async function groupSettingsScreen(nav: Nav, gid: string): Promise<Screen
           <div class="sns-card">${members
             .map((m) => {
               const ms = sumDays(m.days, today);
-              const tappable = owner && m.uid !== me();
-              return `<${tappable ? 'button type="button"' : 'div'} class="sns-row" data-uid="${esc(m.uid)}">
+              return `<button type="button" class="sns-row" data-uid="${esc(m.uid)}">
                 ${avatar(m.icon, 36)}
                 <span class="sns-row-main"><span class="sns-row-title">${nameHtml(m.uid, m.name, { owner: m.uid === group!.ownerId })}</span></span>
-                <span class="sns-row-end">${ms > 0 ? `今日 ${esc(fmtHM(ms))}` : '—'}</span>
-              </${tappable ? 'button' : 'div'}>`;
+                <span class="sns-row-end">${ms > 0 ? `今日 ${esc(fmtHM(ms))}` : '—'}<span class="chevron" aria-hidden="true">›</span></span>
+              </button>`;
             })
             .join('')}</div>
-          ${owner ? '<p class="sns-note" style="margin-top:8px">メンバーをタップすると、グループから外せます</p>' : ''}
+          <p class="sns-note" style="margin-top:8px">メンバーをタップすると、その人の統計が見られます${owner ? '。作成者はグループから外すこともできます' : ''}</p>
         </div>
         <div class="sns-card">
           ${owner ? '<button type="button" class="sns-row" data-edit><span class="sns-row-main">グループ名・色を変える</span><span class="chevron">›</span></button>' : ''}
@@ -396,8 +397,11 @@ export async function groupSettingsScreen(nav: Nav, gid: string): Promise<Screen
       b.onclick = async () => {
         const m = members.find((x) => x.uid === b.dataset.uid);
         if (!m) return;
-        const i = await pickList(m.name, [{ label: 'グループから外す', danger: true }]);
-        if (i !== 0 || !confirm(`${m.name}さんをグループから外しますか？\n今の招待コードではまた入れるので、必要ならコードも作り直してください`)) return;
+        // 作成者は外すこともできる。それ以外は統計を見るだけ
+        if (!owner || m.uid === me()) return nav.push((n) => memberScreen(n, gid, m.uid));
+        const i = await pickList(m.name, [{ label: '統計を見る' }, { label: 'グループから外す', danger: true }]);
+        if (i === 0) return nav.push((n) => memberScreen(n, gid, m.uid));
+        if (i !== 1 || !confirm(`${m.name}さんをグループから外しますか？\n今の招待コードではまた入れるので、必要ならコードも作り直してください`)) return;
         if (await busy(b, () => api.removeMember(gid, m.uid))) toast('外しました');
       };
     });

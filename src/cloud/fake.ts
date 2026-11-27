@@ -61,7 +61,9 @@ function split(uid: string, days: Record<string, number>) {
 function member(uid: string, todayMin: number, weekMin: number, joined: number): Member {
   const p = uid === 'me' && profile ? profile : people[uid];
   const days = d(todayMin, weekMin);
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), lastStudyAt: now };
+  const month = Object.values(days).reduce((a, b) => a + b, 0) * 3;
+  const sums = { all: month * 7, months: { [today.slice(0, 7)]: month } };
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now };
 }
 
 interface FakeGroup {

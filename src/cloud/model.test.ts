@@ -13,6 +13,7 @@ import {
   ranking,
   recentDays,
   recentMats,
+  studySums,
   dateKey,
   weekKeys,
   replyError,
@@ -194,5 +195,20 @@ describe('ランキングの教材ごとの内訳', () => {
     ].map((x, i) => ({ id: String(i), mode: 'timer' as const, end: x.start + x.studyMs, laps: [], firstLap: 1, ...x }));
     const r = recentMats(ss, now, 0, (id) => ({ n: id ?? '教材なし', c: id ? '#338ced' : '#d9d9d9' }));
     expect(r['2026-11-27']).toEqual({ m1: { n: 'm1', c: '#338ced', ms: 2 * H }, _: { n: '教材なし', c: '#d9d9d9', ms: H } });
+  });
+});
+
+describe('累計と月の合計', () => {
+  it('今月と先月だけ残し、累計は全部', () => {
+    const H = 3600000;
+    const now = new Date(2026, 10, 27, 20).getTime();
+    const ss = [
+      { start: new Date(2026, 10, 3).getTime(), studyMs: H },
+      { start: new Date(2026, 9, 30).getTime(), studyMs: 2 * H },
+      { start: new Date(2026, 5, 1).getTime(), studyMs: 4 * H },
+    ].map((x, i) => ({ id: String(i), mode: 'timer' as const, end: x.start + x.studyMs, laps: [], firstLap: 1, ...x }));
+    expect(studySums(ss, now)).toEqual({ all: 7 * H, months: { '2026-11': H, '2026-10': 2 * H } });
+    // 1月なら先月は前の年の12月
+    expect(Object.keys(studySums([], new Date(2027, 0, 5).getTime()).months)).toEqual(['2027-01', '2026-12']);
   });
 });

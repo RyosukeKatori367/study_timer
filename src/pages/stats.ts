@@ -6,6 +6,7 @@ import { leaveTotal, type Mode, type Session } from '../engine';
 import { getSessions, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
 import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
+import { donutHtml } from '../ui/charts';
 import { esc } from '../ui/dom';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -45,6 +46,12 @@ const fmtMD = (ts: number): string => {
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 };
+
+/** 上のカードの大きな数字（「13時間10分」のように長いときは少し小さくして、折り返さない） */
+function statValue(ms: number): string {
+  const t = fmtHM(ms);
+  return `<span class="stat-value${t.length >= 6 ? ' long' : ''}">${t}</span>`;
+}
 
 /** 目標の進み具合（目標がなければ空） */
 function goalHtml(ms: number): string {
@@ -209,9 +216,9 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
     </section>`;
 }
 
-/** 教材ごとの内訳（教材を付けた記録がある週だけ出す） */
+/** 教材ごとの割合の円グラフ（その週に記録があるときだけ出す） */
 function materialsHtml(sessions: Session[], weekLabel: string): string {
-  if (!sessions.some((s) => s.material)) return '';
+  if (sessions.length === 0) return '';
   const totals = new Map<string, { ms: number; laps: number }>();
   for (const s of sessions) {
     const key = s.material ?? '';
@@ -220,14 +227,21 @@ function materialsHtml(sessions: Session[], weekLabel: string): string {
     t.laps += s.laps.length;
     totals.set(key, t);
   }
-  const rows = [...totals.entries()]
+  const segs = [...totals.entries()]
+    .filter(([, t]) => t.ms > 0)
     .sort((a, b) => b[1].ms - a[1].ms)
-    .map(
-      ([id, t]) =>
-        `<div class="list-row"><span>${esc(materialName(id || null))}</span><span>${t.laps > 0 ? `<small>${t.laps}ラップ</small>` : ''}${fmtHM(t.ms)}</span></div>`,
-    )
-    .join('');
-  return `<div class="list"><div class="section-label">${weekLabel}の教材ごとの内訳</div>${rows}</div>`;
+    .map(([key, t]) => ({
+      ms: t.ms,
+      color: colorOf(key),
+      label: materialName(key || null),
+      sub: t.laps > 0 ? `${t.laps}ラップ` : undefined,
+    }));
+  if (segs.length === 0) return '';
+  return `
+    <section class="material-share" aria-label="${weekLabel}の教材の割合">
+      <div class="section-label">${weekLabel}の教材の割合</div>
+      ${donutHtml(segs, weekLabel)}
+    </section>`;
 }
 
 /** reset = true のときは今週に戻す（下のメニューから開いたとき） */
@@ -272,9 +286,9 @@ export function renderStats(view: HTMLElement, reset = false): void {
       const segs = dayDetail(s.daySessions[i]).segments;
       // ラップの区切りが細かすぎて線だらけになるときは、区切り線を引かない
       const dense = segs.length > h / 3 ? ' dense' : '';
-      // 選んだ日だけ教材の色で塗る（ほかの日は灰色）
+      // どの日も教材の色で塗る（ラップごとの区切り線はそのまま）
       const segHtml = segs
-        .map((v) => `<div class="bar-seg" style="flex-grow:${v.ms}${i === sel ? `;background:${colorOf(v.key)}` : ''}"></div>`)
+        .map((v) => `<div class="bar-seg" style="flex-grow:${v.ms};background:${colorOf(v.key)}"></div>`)
         .join('');
       const cls = [i === sel ? 'sel' : '', i === s.todayIndex ? 'today' : '', ms >= goal && goal > 0 ? 'goal-done' : '']
         .filter(Boolean)
@@ -297,8 +311,8 @@ export function renderStats(view: HTMLElement, reset = false): void {
   view.innerHTML = `
     <h1>統計</h1>
     <div class="stat-cards">
-      <div class="stat-card"><span class="card-label">今日</span><span class="stat-value">${fmtHM(s.todayMs)}</span>${goalHtml(s.todayMs)}</div>
-      <div class="stat-card"><span class="card-label">${weekLabel}</span><span class="stat-value">${fmtHM(s.weekMs)}</span></div>
+      <div class="stat-card"><span class="card-label">今日</span>${statValue(s.todayMs)}${goalHtml(s.todayMs)}</div>
+      <div class="stat-card"><span class="card-label">${weekLabel}</span>${statValue(s.weekMs)}</div>
     </div>
     <div class="chart">
       <div class="week-nav">
@@ -312,13 +326,13 @@ export function renderStats(view: HTMLElement, reset = false): void {
       </div>
     </div>
     ${detailHtml(s.dayStarts[sel], s.daySessions[sel], dayDetail(s.daySessions[sel]))}
+    ${materialsHtml(s.daySessions.flat(), weekLabel)}
     <div class="list">
       <div class="section-label">${weekLabel}の内訳</div>
       <div class="list-row"><span>ストップウォッチ</span><span>${fmtHM(s.byMode.stopwatch)}</span></div>
       <div class="list-row"><span>タイマー</span><span>${fmtHM(s.byMode.timer)}</span></div>
       <div class="list-row"><span>ポモドーロ</span><span>${fmtHM(s.byMode.pomodoro)}</span></div>
     </div>
-    ${materialsHtml(s.daySessions.flat(), weekLabel)}
     <div class="pair">
       <div><span class="label">${weekLabel}のラップ</span><span class="value">${s.weekLaps}</span></div>
       <div><span class="label">平均</span><span class="value">${s.weekLapAvgMs === null ? '—' : fmtLap(s.weekLapAvgMs)}</span></div>

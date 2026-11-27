@@ -81,6 +81,7 @@ const member = (code: string) => ({
   joinCode: code,
   days: { '2026-11-27': 3600000 },
   mats: { '2026-11-27': { m1: { n: 'リードα', c: '#338ced', ms: 3600000 } } },
+  sums: { all: 3600000, months: { '2026-11': 3600000, '2026-10': 0 } },
   lastStudyAt: 0,
 });
 const post = (uid: string) => ({
@@ -203,6 +204,12 @@ async function run(): Promise<void> {
         mats: { '2026-11-27': { _: { n: '教材なし', c: '#d9d9d9', ms: 60000 } } },
         lastStudyAt: 2,
       }),
+    );
+    await allow('累計と月の合計を書ける', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { sums: { all: 7200000, months: { '2026-11': 7200000 } } }),
+    );
+    await deny('累計に知らない項目は入れられない', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { sums: { all: 1, months: {}, extra: 1 } }),
     );
     await deny('教材ごとの内訳も14日分まで', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), {

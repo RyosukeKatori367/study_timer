@@ -148,6 +148,8 @@ export interface MemberDoc {
   days: Record<string, number>;
   /** 日ごと・教材ごとの内訳（ランキングのグラフの色分けに使う。古い文書にはない） */
   mats?: DayMats;
+  /** 累計と月ごとの合計（人の統計の画面に出す。古い文書にはない） */
+  sums?: StudySums;
   lastStudyAt: number;
 }
 
@@ -264,6 +266,27 @@ export function matBreakdown(
   // 内訳がない日の分（古いデータ）は灰色でまとめる
   if (total - known >= 60000) list.push({ key: '?', n: '内訳なし', c: '#5a5a5a', ms: total - known });
   return list;
+}
+
+/** 累計と、直近の月の合計 { all: ms, months: { '2026-11': ms } } */
+export interface StudySums {
+  all: number;
+  months: Record<string, number>;
+}
+
+/** 記録から累計と月ごとの合計を出す（月は今月と先月だけ残す） */
+export function studySums(sessions: readonly Session[], now: number, boundaryMin = 0): StudySums {
+  const thisMonth = dateKey(now, boundaryMin).slice(0, 7);
+  const d = new Date(thisMonth + '-01T00:00:00');
+  d.setMonth(d.getMonth() - 1);
+  const lastMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const out: StudySums = { all: 0, months: { [thisMonth]: 0, [lastMonth]: 0 } };
+  for (const s of sessions) {
+    out.all += s.studyMs;
+    const m = dateKey(s.start, boundaryMin).slice(0, 7);
+    if (m in out.months) out.months[m] += s.studyMs;
+  }
+  return out;
 }
 
 /** 今週の 7 日の日付（週の始まりから） */

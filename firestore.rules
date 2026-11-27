@@ -37,6 +37,12 @@ service cloud.firestore {
     function validDays(d) { return d is map && d.size() <= 14; }
     /** 日ごと・教材ごとの内訳（あってもなくてもよい） */
     function validMats(data) { return !('mats' in data) || (data.mats is map && data.mats.size() <= 14); }
+    /** 累計と月ごとの合計（あってもなくてもよい） */
+    function validSums(data) {
+      return !('sums' in data)
+        || (data.sums is map && data.sums.keys().hasOnly(['all', 'months'])
+            && data.sums.all is number && data.sums.months is map && data.sums.months.size() <= 3);
+    }
     function validIcon(i) {
       return i is map
         && i.keys().hasAll(['c', 'h'])
@@ -122,12 +128,13 @@ service cloud.firestore {
         allow read: if isMember(gid);
 
         allow create: if isMe(uid)
-          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'mats', 'lastStudyAt'])
+          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'mats', 'sums', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && request.resource.data.joinedAt == request.time
           && validDays(request.resource.data.days)
           && validMats(request.resource.data)
+          && validSums(request.resource.data)
           && request.resource.data.lastStudyAt is number
           // 今の招待コードを知っている
           && request.resource.data.joinCode == getAfter(groupPath(gid)).data.code
@@ -141,11 +148,12 @@ service cloud.firestore {
           && getAfter(userPath(uid)).data.groupIds.size() <= 10;
 
         allow update: if isMe(uid)
-          && changed().hasOnly(['name', 'icon', 'days', 'mats', 'lastStudyAt'])
+          && changed().hasOnly(['name', 'icon', 'days', 'mats', 'sums', 'lastStudyAt'])
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && validDays(request.resource.data.days)
           && validMats(request.resource.data)
+          && validSums(request.resource.data)
           && request.resource.data.lastStudyAt is number;
 
         // 抜ける（自分）・外す（作成者）。同時に人数を1減らすか、グループごと消す

@@ -15,8 +15,10 @@ import {
   normalizeCode,
   recentDays,
   recentMats,
+  studySums,
   weekKeys,
   type DayMats,
+  type StudySums,
   type GroupDoc,
   type InviteDoc,
   type MemberDoc,
@@ -48,6 +50,8 @@ const myDays = (now = Date.now()): Record<string, number> => recentDays(getSessi
 /** メンバー文書に入れる、日ごと・教材ごとの時間（ランキングのグラフの色分け用） */
 const myMats = (now = Date.now()): DayMats =>
   recentMats(getSessions(), now, settings.dayBoundaryMin, (id) => ({ n: materialName(id), c: materialColor(id) }));
+
+const mySums = (now = Date.now()): StudySums => studySums(getSessions(), now, settings.dayBoundaryMin);
 
 /** ランキングで使う「今日」と「今週」の日付（見ている人の設定で決める） */
 export function rankKeys(now = Date.now()): { today: string[]; week: string[] } {
@@ -117,6 +121,7 @@ function memberData(F: Fb['F'], p: { name: string; icon: MemberDoc['icon'] }, co
     joinCode: code,
     days: myDays(),
     mats: myMats(),
+    sums: mySums(),
     lastStudyAt: getSessions().at(-1)?.end ?? 0,
   };
 }
@@ -329,10 +334,11 @@ export async function publishStudy(): Promise<void> {
   const uid = me();
   const days = myDays();
   const mats = myMats();
+  const sums = mySums();
   const last = getSessions().at(-1);
   await Promise.all(
     p.groupIds.map((gid) =>
-      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, mats, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
+      F.updateDoc(F.doc(db, 'groups', gid, 'members', uid), { days, mats, sums, lastStudyAt: last?.end ?? 0 }).catch(() => undefined),
     ),
   );
 }

@@ -1070,6 +1070,11 @@ nav button:focus-visible {
 .stat-value {
   font-size: 26px;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.stat-value.long {
+  font-size: 21px;
 }
 
 /* 目標の進み具合 */
@@ -2788,4 +2793,313 @@ button.sns-row:active {
 nav {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 320px;
+}
+
+/* ---------- グラフの部品（円グラフ・日ごとの積み上げ棒） ---------- */
+
+.donut-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.donut {
+  position: relative;
+  flex: none;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.donut-center small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.donut-center b {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.donut-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donut-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #d0d0d0;
+}
+
+.donut-row i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.donut-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.donut-row small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.donut-ms {
+  color: #fff;
+  text-align: right;
+}
+
+.donut-pct {
+  color: var(--muted);
+  text-align: right;
+}
+
+.vc-plot {
+  position: relative;
+  margin: 8px 0 0 40px;
+}
+
+.vc-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #2e2e2e;
+}
+
+.vc-grid span {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: -7px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.vc-cols {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.vc-col {
+  position: relative;
+}
+
+.vc-bar {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 0;
+  min-height: 3px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+
+.vc-bar span {
+  min-height: 1px;
+}
+
+.vc-val {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vc-col.mark .vc-val {
+  color: #fff;
+  font-weight: 600;
+}
+
+.vc-labels {
+  margin: 6px 0 0 40px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.vc-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.vc-label small {
+  font-size: 10px;
+}
+
+.vc-label.mark {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---------- ランキングのグラフ（目盛り線つきの横棒） ---------- */
+
+.rank-chart {
+  position: relative;
+  padding-top: 22px;
+}
+
+/* 目盛り線は、棒の始まり（順位とアイコンの右）から右の端まで */
+.rank-axis {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 102px;
+  right: 16px;
+  pointer-events: none;
+}
+
+.rank-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.rank-tick::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 0;
+  border-left: 1px solid #2e2e2e;
+}
+
+.rank-tick span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rank-tick.first span {
+  transform: none;
+}
+
+.rank-tick.last span {
+  transform: translateX(-100%);
+}
+
+.rank-chart .sns-row {
+  position: relative;
+}
+
+.rank-chart .rank-row.mine {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rank-chart .rank-bar {
+  height: 16px;
+}
+
+/* 人の統計 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-grid > div {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-grid .label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat-grid .value {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.sns-section {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sns-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sns-section-head .week-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.week-switch button {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 20px;
+}
+
+.week-switch button:disabled {
+  opacity: 0.3;
+}
+
+.post-avatar {
+  flex: none;
+  border-radius: 50%;
+}
+
+.post-who {
+  cursor: pointer;
+}
+
+/* 統計タブの教材の割合 */
+.material-share {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.material-share .section-label {
+  padding-bottom: 12px;
 }
