@@ -32,7 +32,7 @@ export const PASSWORD_MIN = 8;
  * 開発者のアカウント（名前の横に「開発者」のしるしを出す）。
  * UID はログインの番号で、公開しても困らない（なりすましもできない）。メールアドレスは書かない
  */
-export const DEVELOPER_UIDS: string[] = [];
+export const DEVELOPER_UIDS: string[] = ['WrJppVm6T2VDHKUC1otLdn9rC7w1'];
 export const isDeveloper = (uid: string): boolean => DEVELOPER_UIDS.includes(uid);
 
 // ---- アイコン ----
