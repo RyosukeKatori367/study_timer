@@ -3,6 +3,7 @@
 // キーには必ず接頭辞をつける。
 
 import { normalizeMode, usesLapNumbers, type Run, type Session } from './engine';
+import { MATERIAL_COLORS, defaultColor } from './palette';
 import { MIN, setDurationStyle, type DurationStyle } from './time';
 
 const PREFIX = 'studytimer:';
@@ -198,6 +199,8 @@ export interface Material {
   nextLap: number | null;
   /** 終了条件「ラップ番号」で、何番まで（教材ごと）。まだ決めていなければ null */
   endLapNo?: number | null;
+  /** 自分で選んだ色（なければ作った順の色） */
+  color?: string;
   archived?: boolean;
 }
 
@@ -232,7 +235,10 @@ function saveMaterials(): void {
 }
 
 export function addMaterial(name: string): Material {
-  const m: Material = { id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, nextLap: null };
+  // 色は、ほかの教材（消したものを除く）とかぶらない最初の色にする
+  const used = new Set(materials.filter((x) => !x.archived).map((x) => x.color ?? defaultColor(materialOrder(x.id))));
+  const color = MATERIAL_COLORS.find((c) => !used.has(c)) ?? defaultColor(materials.length);
+  const m: Material = { id: `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, nextLap: null, color };
   materials.push(m);
   saveMaterials();
   return m;
@@ -242,6 +248,14 @@ export function renameMaterial(id: string, name: string): void {
   const m = materialById(id);
   if (!m) return;
   m.name = name;
+  saveMaterials();
+}
+
+/** 教材の色を変える */
+export function setMaterialColor(id: string, color: string): void {
+  const m = materialById(id);
+  if (!m) return;
+  m.color = color;
   saveMaterials();
 }
 
@@ -385,7 +399,7 @@ export function importBackup(text: string): number {
   // 知らない教材は足す（名前が分かるように。消した扱いのものもそのまま）
   for (const m of data.materials ?? []) {
     if (m && typeof m.id === 'string' && typeof m.name === 'string' && !materialById(m.id)) {
-      materials.push({ id: m.id, name: m.name, nextLap: null, archived: !!m.archived });
+      materials.push({ id: m.id, name: m.name, nextLap: null, archived: !!m.archived, ...(m.color ? { color: m.color } : {}) });
     }
   }
   saveMaterials();

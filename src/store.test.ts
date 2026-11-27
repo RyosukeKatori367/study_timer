@@ -120,3 +120,20 @@ describe('クラウドから取り込む', () => {
     expect('bogus' in settings).toBe(false);
   });
 });
+
+describe('教材の色', () => {
+  it('新しい教材は、ほかとかぶらない色になり、あとから変えられる', async () => {
+    const { addMaterial, activeMaterials, setMaterialColor } = await import('./store');
+    const { materialColor } = await import('./colors');
+    const a = addMaterial('色テストA');
+    const b = addMaterial('色テストB');
+    // 新しく作った教材の色は、ほかの教材の色とかぶらない
+    for (const x of [a, b]) {
+      const others = activeMaterials().filter((m) => m.id !== x.id).map((m) => materialColor(m.id));
+      expect(others).not.toContain(materialColor(x.id));
+    }
+    setMaterialColor(a.id, materialColor(b.id));
+    expect(materialColor(a.id)).toBe(materialColor(b.id));
+    expect(materialColor(null)).toBe('#d9d9d9');
+  });
+});

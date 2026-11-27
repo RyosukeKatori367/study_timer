@@ -161,3 +161,20 @@ export async function pickText(title: string, value = '', placeholder = '', maxL
   setTimeout(() => input.focus(), 50);
   return (await opened) ? text : null;
 }
+
+/** 色を選ぶ（丸い色見本を並べる）。タップしたらすぐ閉じる。キャンセルなら null */
+export async function pickColor(title: string, colors: string[], current: string): Promise<string | null> {
+  const body = html(`<div class="sheet-colors" role="group"></div>`);
+  let picked = colors.indexOf(current);
+  colors.forEach((c, i) => {
+    const b = html<HTMLButtonElement>(`<button type="button" class="sheet-color" style="background:${esc(c)}" aria-label="色${i + 1}"></button>`);
+    b.setAttribute('aria-pressed', String(c === current));
+    b.onclick = () => {
+      picked = i;
+      (body.closest('.sheet-panel') as (HTMLElement & { submit?: () => void }) | null)?.submit?.();
+    };
+    body.append(b);
+  });
+  const result = await open(title, body, () => [picked], { withOk: false });
+  return result && result[0] >= 0 ? colors[result[0]] : null;
+}

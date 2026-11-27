@@ -11,6 +11,7 @@ import {
   nextLapNumber,
   renameMaterial,
   saveSettings,
+  setMaterialColor,
   setNextLap,
   settings,
   type Settings,
@@ -18,7 +19,9 @@ import {
 import { MATERIAL_CHANGE, createMaterial } from './material';
 import { HOUR, MIN, fmtHM, fmtTimeOfDay, type DurationStyle } from '../time';
 import { $, esc, html, setText } from '../ui/dom';
-import { pickDrums, pickInteger, pickList, pickOption, pickText } from '../ui/sheet';
+import { pickColor, pickDrums, pickInteger, pickList, pickOption, pickText } from '../ui/sheet';
+import { materialColor } from '../colors';
+import { MATERIAL_COLORS } from '../palette';
 import { toast } from '../ui/toast';
 import { disableTilt, enableTilt } from '../tilt';
 
@@ -332,7 +335,7 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
         .map(
           (m) => `
         <button type="button" class="row" data-material="${m.id}">
-          <span class="row-label">${esc(m.name)}</span>
+          <span class="row-label"><i class="mat-dot" style="background:${materialColor(m.id)}"></i>${esc(m.name)}</span>
           <span class="row-value"><span>次は${nextLapNumber(m.id)}番</span><span class="chevron" aria-hidden="true">›</span></span>
         </button>`,
         )
@@ -345,6 +348,7 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
       b.onclick = async () => {
         const i = await pickList(m.name, [
           { label: '名前を変える' },
+          { label: '色を変える' },
           { label: '次のラップ番号を変える', sub: `今は${nextLapNumber(m.id)}番` },
           { label: '削除する', danger: true },
         ]);
@@ -354,10 +358,14 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
           if (activeMaterials().some((x) => x.name === name)) return toast('同じ名前の教材があります');
           renameMaterial(m.id, name);
         } else if (i === 1) {
+          const c = await pickColor(`${m.name}の色`, MATERIAL_COLORS, materialColor(m.id));
+          if (!c || c === materialColor(m.id)) return;
+          setMaterialColor(m.id, c);
+        } else if (i === 2) {
           const n = await pickInteger(`${m.name}の次のラップ番号`, nextLapNumber(m.id), 1, 99999, '1以上にしてください');
           if (n === null) return;
           setNextLap(n, m.id);
-        } else if (i === 2) {
+        } else if (i === 3) {
           if (!confirm(`「${m.name}」を削除しますか？\nこれまでの記録は消えず、統計にも残ります。`)) return;
           archiveMaterial(m.id);
         } else {

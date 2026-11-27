@@ -21,10 +21,16 @@ export function initCloud(refresh: () => void): void {
     else stopSync();
   });
 
+  let publishTimer: ReturnType<typeof setTimeout> | undefined;
   onStoreChange((c) => {
     if (!cloudUser()) return;
     onLocalChange(c);
     if (c.kind !== 'state') void publishStudy().catch(() => undefined);
+    else {
+      // 教材の名前や色を変えたときも、ランキングの色分けを直す（まとめて少しあとに送る）
+      clearTimeout(publishTimer);
+      publishTimer = setTimeout(() => void publishStudy().catch(() => undefined), 5000);
+    }
   });
 
   document.addEventListener('visibilitychange', () => {
