@@ -1,0 +1,231 @@
+rules_version = '2';
+
+// グミ勉のセキュリティルール。
+// Firebase コンソールの「Firestore Database → ルール」に、このファイルの中身をそのまま貼って「公開」する。
+//
+// 考え方
+// - 自分のデータ（プロフィール・バックアップ）は自分だけが読み書きできる
+// - グループの中身（メンバー・投稿）は、そのグループのメンバーだけが読める
+// - 招待コードは、コードを知っている1件だけ読める（一覧は取れない）
+// - 人数の増減は、本当にその人が入った・抜けたときだけ認める（人数の上限を守るため）
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- 共通 ----
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isMe(uid) { return signedIn() && me() == uid; }
+
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function groupPath(gid) { return /databases/$(database)/documents/groups/$(gid); }
+    function memberPath(gid, uid) { return /databases/$(database)/documents/groups/$(gid)/members/$(uid); }
+    function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+
+    function isMember(gid) { return signedIn() && exists(memberPath(gid, me())); }
+
+    /** 書き換えたフィールド */
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    function validName(s) { return s is string && s.size() >= 1 && s.size() <= 40; }
+    function validHue(h) { return h is int && h >= 0 && h < 360; }
+    function validCode(c) { return c is string && c.matches('^[A-HJKMNP-Z2-9]{8}$'); }
+    function validIcon(i) {
+      return i is map
+        && i.keys().hasAll(['c', 'h'])
+        && i.keys().hasOnly(['c', 'h', 'img'])
+        && i.c is string && i.c.size() >= 1 && i.c.size() <= 16
+        && validHue(i.h)
+        && (!('img' in i) || (i.img is string && i.img.size() <= 30000
+            && i.img.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$')));
+    }
+
+    // ---- 自分のデータ ----
+
+    match /users/{uid} {
+      allow read, delete: if isMe(uid);
+      allow create, update: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'icon', 'groupIds', 'postPrefs', 'updatedAt'])
+        && validName(request.resource.data.name)
+        && request.resource.data.bio is string && request.resource.data.bio.size() <= 120
+        && validIcon(request.resource.data.icon)
+        && request.resource.data.groupIds is list && request.resource.data.groupIds.size() <= 10
+        && request.resource.data.postPrefs is map;
+
+      // 記録・設定・教材のバックアップ
+      match /backup/{doc} {
+        allow read, write: if isMe(uid);
+      }
+    }
+
+    // ---- グループ ----
+
+    match /groups/{gid} {
+      allow read: if isMember(gid);
+
+      // 作る：自分が作成者で、自分だけがメンバー。招待コードの文書も同時に作る
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'hue', 'ownerId', 'code', 'memberCount', 'lastMember', 'createdAt'])
+        && validName(request.resource.data.name)
+        && validHue(request.resource.data.hue)
+        && request.resource.data.ownerId == me()
+        && request.resource.data.memberCount == 1
+        && request.resource.data.lastMember == me()
+        && request.resource.data.createdAt == request.time
+        && validCode(request.resource.data.code)
+        && existsAfter(memberPath(gid, me()))
+        && getAfter(invitePath(request.resource.data.code)).data.groupId == gid;
+
+      allow update: if signedIn() && (
+        // 作成者が名前・色・招待コード・作成者を変える
+        (resource.data.ownerId == me()
+          && changed().hasOnly(['name', 'hue', 'code', 'ownerId'])
+          && validName(request.resource.data.name)
+          && validHue(request.resource.data.hue)
+          && validCode(request.resource.data.code)
+          && (request.resource.data.code == resource.data.code
+              || (getAfter(invitePath(request.resource.data.code)).data.groupId == gid
+                  && !existsAfter(invitePath(resource.data.code))))
+          && (request.resource.data.ownerId == resource.data.ownerId
+              || exists(memberPath(gid, request.resource.data.ownerId))))
+        // 参加する：自分のメンバー文書を作るときだけ、人数を1増やせる
+        || (changed().hasOnly(['memberCount', 'lastMember'])
+          && request.resource.data.lastMember == me()
+          && request.resource.data.memberCount == resource.data.memberCount + 1
+          && request.resource.data.memberCount <= 50
+          && !exists(memberPath(gid, me()))
+          && existsAfter(memberPath(gid, me())))
+        // 抜ける・外す：その人のメンバー文書を消すときだけ、人数を1減らせる。作成者は抜けられない
+        || (changed().hasOnly(['memberCount', 'lastMember'])
+          && request.resource.data.memberCount == resource.data.memberCount - 1
+          && request.resource.data.lastMember != resource.data.ownerId
+          && (request.resource.data.lastMember == me() || resource.data.ownerId == me())
+          && exists(memberPath(gid, request.resource.data.lastMember))
+          && !existsAfter(memberPath(gid, request.resource.data.lastMember)))
+      );
+
+      // 消す：作成者が1人だけのとき。自分のメンバー文書と招待コードも同時に消す
+      allow delete: if signedIn()
+        && resource.data.ownerId == me()
+        && resource.data.memberCount == 1
+        && !existsAfter(memberPath(gid, me()))
+        && !existsAfter(invitePath(resource.data.code));
+
+      match /members/{uid} {
+        allow read: if isMember(gid);
+
+        allow create: if isMe(uid)
+          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'todayStart', 'todayMs', 'lastStudyAt'])
+          && validName(request.resource.data.name)
+          && validIcon(request.resource.data.icon)
+          && request.resource.data.joinedAt == request.time
+          && request.resource.data.todayStart is number
+          && request.resource.data.todayMs is number
+          && request.resource.data.lastStudyAt is number
+          // 今の招待コードを知っている
+          && request.resource.data.joinCode == getAfter(groupPath(gid)).data.code
+          // 同時に人数を1増やしている（作るときは1人目）
+          && getAfter(groupPath(gid)).data.lastMember == uid
+          && ((exists(groupPath(gid))
+                && getAfter(groupPath(gid)).data.memberCount == get(groupPath(gid)).data.memberCount + 1)
+              || (!exists(groupPath(gid)) && getAfter(groupPath(gid)).data.memberCount == 1))
+          // 自分の「入っているグループ」に入れていて、10個まで
+          && getAfter(userPath(uid)).data.groupIds.hasAny([gid])
+          && getAfter(userPath(uid)).data.groupIds.size() <= 10;
+
+        allow update: if isMe(uid)
+          && changed().hasOnly(['name', 'icon', 'todayStart', 'todayMs', 'lastStudyAt'])
+          && validName(request.resource.data.name)
+          && validIcon(request.resource.data.icon)
+          && request.resource.data.todayStart is number
+          && request.resource.data.todayMs is number
+          && request.resource.data.lastStudyAt is number;
+
+        // 抜ける（自分）・外す（作成者）。同時に人数を1減らすか、グループごと消す
+        allow delete: if signedIn()
+          && (uid == me() || get(groupPath(gid)).data.ownerId == me())
+          && (!existsAfter(groupPath(gid))
+              || (getAfter(groupPath(gid)).data.memberCount == get(groupPath(gid)).data.memberCount - 1
+                  && getAfter(groupPath(gid)).data.lastMember == uid));
+      }
+
+      match /posts/{pid} {
+        allow read: if isMember(gid);
+
+        allow create: if isMember(gid)
+          && request.resource.data.keys().hasAll(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'comment', 'likes'])
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'material', 'laps', 'lapMs', 'comment', 'likes'])
+          && request.resource.data.uid == me()
+          && validName(request.resource.data.name)
+          && validIcon(request.resource.data.icon)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 64
+          && request.resource.data.mode in ['timer', 'timerUp', 'stopwatch', 'pomoCycle']
+          && request.resource.data.start is number
+          && request.resource.data.end is number
+          && request.resource.data.studyMs is number
+          && request.resource.data.studyMs >= 0 && request.resource.data.studyMs <= 86400000
+          && request.resource.data.comment is string && request.resource.data.comment.size() <= 280
+          && request.resource.data.likes == []
+          && (!('material' in request.resource.data)
+              || (request.resource.data.material is map
+                  && request.resource.data.material.keys().hasOnly(['name', 'color'])
+                  && request.resource.data.material.name is string
+                  && request.resource.data.material.name.size() <= 60
+                  && request.resource.data.material.color is string
+                  && request.resource.data.material.color.size() <= 16))
+          && (!('laps' in request.resource.data)
+              || (request.resource.data.laps is map
+                  && request.resource.data.laps.keys().hasOnly(['from', 'count'])
+                  && request.resource.data.laps.from is int
+                  && request.resource.data.laps.count is int))
+          && (!('lapMs' in request.resource.data)
+              || (request.resource.data.lapMs is list && request.resource.data.lapMs.size() <= 200));
+
+        // いいね：自分の uid を足すか消すだけ
+        allow update: if isMember(gid)
+          && changed().hasOnly(['likes'])
+          && request.resource.data.likes is list
+          && request.resource.data.likes.size() <= 60
+          && request.resource.data.likes.size() <= resource.data.likes.size() + 1
+          && request.resource.data.likes.removeAll([me()]) == resource.data.likes.removeAll([me()]);
+
+        // 消す：投稿した本人か、グループの作成者
+        allow delete: if signedIn()
+          && (resource.data.uid == me() || get(groupPath(gid)).data.ownerId == me());
+      }
+    }
+
+    // ---- 招待コード ----
+
+    match /invites/{code} {
+      // コードを知っている人だけが、その1件を読める
+      allow get: if signedIn();
+      allow list: if false;
+
+      // 作成者が作る（グループを作るとき・コードを作り直すとき）。中身はグループと同じ
+      allow create: if signedIn()
+        && validCode(code)
+        && request.resource.data.keys().hasOnly(['groupId', 'name', 'hue', 'memberCount'])
+        && getAfter(groupPath(request.resource.data.groupId)).data.code == code
+        && getAfter(groupPath(request.resource.data.groupId)).data.ownerId == me()
+        && request.resource.data.name == getAfter(groupPath(request.resource.data.groupId)).data.name
+        && request.resource.data.hue == getAfter(groupPath(request.resource.data.groupId)).data.hue
+        && request.resource.data.memberCount == getAfter(groupPath(request.resource.data.groupId)).data.memberCount;
+
+      // グループの名前・色・人数に合わせるだけなら、誰でも直せる（違う値は入れられない）
+      allow update: if signedIn()
+        && changed().hasOnly(['name', 'hue', 'memberCount'])
+        && request.resource.data.name == getAfter(groupPath(resource.data.groupId)).data.name
+        && request.resource.data.hue == getAfter(groupPath(resource.data.groupId)).data.hue
+        && request.resource.data.memberCount == getAfter(groupPath(resource.data.groupId)).data.memberCount;
+
+      // 作成者が消す（コードを作り直したとき・グループを消したとき）
+      allow delete: if signedIn()
+        && get(groupPath(resource.data.groupId)).data.ownerId == me()
+        && (!existsAfter(groupPath(resource.data.groupId))
+            || getAfter(groupPath(resource.data.groupId)).data.code != code);
+    }
+  }
+}

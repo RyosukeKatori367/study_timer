@@ -126,6 +126,25 @@ function remove(key: string): void {
   }
 }
 
+// ---- 変更の知らせ（ログインしている人のバックアップに使う） ----
+
+/** sessions = 記録が増えた・変わった（ids）、clear = 記録を全部消した、state = 設定か教材が変わった */
+export type StoreChange = { kind: 'sessions'; ids: string[] } | { kind: 'clear' } | { kind: 'state' };
+
+const listeners = new Set<(c: StoreChange) => void>();
+/** クラウドから取り込んでいる間は知らせない（取り込んだものを送り返さないため） */
+let quiet = false;
+
+export function onStoreChange(fn: (c: StoreChange) => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function emit(c: StoreChange): void {
+  if (quiet) return;
+  for (const fn of listeners) fn(c);
+}
+
 // ---- 設定 ----
 
 export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('settings') ?? {}) };
@@ -136,6 +155,7 @@ export function saveSettings(patch: Partial<Settings> = {}): void {
   Object.assign(settings, patch);
   setDurationStyle(settings.durationStyle);
   write('settings', settings);
+  emit({ kind: 'state' });
 }
 
 // ---- 記録 ----
@@ -155,6 +175,7 @@ export const getSessions = (): readonly Session[] => sessions;
 export function addSession(s: Session): void {
   sessions.push(s);
   write('sessions', sessions);
+  emit({ kind: 'sessions', ids: [s.id] });
 }
 
 export function clearSessions(): void {
@@ -163,6 +184,7 @@ export function clearSessions(): void {
   saveSettings({ nextLap: null });
   for (const m of materials) m.nextLap = null;
   write('materials', materials);
+  emit({ kind: 'clear' });
 }
 
 // ---- 教材 ----
@@ -185,6 +207,9 @@ let materials: Material[] = read<Material[]>('materials') ?? [];
 export const materialOrder = (id: string): number => materials.findIndex((m) => m.id === id);
 
 /** 選べる教材（削除したものを除く） */
+/** すべての教材（削除したものも含む。バックアップ用） */
+export const allMaterials = (): readonly Material[] => materials;
+
 export const activeMaterials = (): Material[] => materials.filter((m) => !m.archived);
 
 export const materialById = (id: string | null | undefined): Material | null =>
@@ -203,6 +228,7 @@ export function currentMaterialId(): string | null {
 
 function saveMaterials(): void {
   write('materials', materials);
+  emit({ kind: 'state' });
 }
 
 export function addMaterial(name: string): Material {
@@ -236,8 +262,10 @@ export const untaggedLapSessions = (): number =>
 export function assignUntagged(id: string): void {
   const m = materialById(id);
   if (!m) return;
+  const changed = sessions.filter((s) => !s.material).map((s) => s.id);
   sessions = sessions.map((s) => (s.material ? s : { ...s, material: id }));
   write('sessions', sessions);
+  emit({ kind: 'sessions', ids: changed });
   m.nextLap = settings.nextLap;
   saveMaterials();
   saveSettings({ nextLap: null });
@@ -365,7 +393,84 @@ export function importBackup(text: string): number {
   const incoming = migrate(data.sessions.filter(isSession)).filter((s) => !known.has(s.id));
   sessions = [...sessions, ...incoming].sort((a, b) => a.start - b.start);
   write('sessions', sessions);
+  if (incoming.length) emit({ kind: 'sessions', ids: incoming.map((s) => s.id) });
   return incoming.length;
+}
+
+// ---- クラウドのバックアップを取り込む ----
+
+/** 設定か教材を一度でも保存したか（入れ直した直後なら false） */
+export const hasSavedState = (): boolean => read('settings') !== null || read('materials') !== null;
+
+export interface CloudData {
+  /** これがあれば、端末の設定をこれで置き換える */
+  settings?: Partial<Settings>;
+  /** 教材。同じ id はクラウドのものにするか（replace）、端末にないものだけ足すか */
+  materials?: Material[];
+  replaceMaterials?: boolean;
+  /** 記録。端末にないものを足す */
+  sessions?: Session[];
+  /** この時刻までに終わった記録は消す（別の端末で「記録を全部消す」をしたとき） */
+  clearedAt?: number;
+}
+
+/**
+ * クラウドのバックアップを端末に取り込む。何か変わったら true。
+ * 取り込んだ分は変更として知らせない（送り返さない）。
+ */
+export function mergeCloud(data: CloudData): boolean {
+  let changed = false;
+  quiet = true;
+  try {
+    if (data.settings) {
+      const patch: Partial<Settings> = {};
+      for (const key of Object.keys(DEFAULTS) as (keyof Settings)[]) {
+        if (key in data.settings) (patch as Record<string, unknown>)[key] = data.settings[key];
+      }
+      saveSettings(patch);
+      changed = true;
+    }
+    if (data.materials?.length) {
+      const byId = new Map(materials.map((m) => [m.id, m]));
+      for (const m of data.materials) {
+        if (!m || typeof m.id !== 'string' || typeof m.name !== 'string') continue;
+        const mine = byId.get(m.id);
+        if (!mine) byId.set(m.id, { ...m, nextLap: m.nextLap ?? null });
+        else if (data.replaceMaterials) Object.assign(mine, m, { nextLap: m.nextLap ?? null });
+        else continue;
+        changed = true;
+      }
+      // 色は作った順で決まるので、どの端末でも同じ順になるように id（作った時刻）で並べる
+      materials = [...byId.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      write('materials', materials);
+    }
+    if (data.clearedAt) {
+      const before = sessions.length;
+      sessions = sessions.filter((s) => s.end > data.clearedAt!);
+      if (sessions.length !== before) changed = true;
+    }
+    if (data.sessions?.length) {
+      const index = new Map(sessions.map((s, i) => [s.id, i]));
+      for (const s of migrate(data.sessions.filter(isSession))) {
+        if (data.clearedAt && s.end <= data.clearedAt) continue;
+        const i = index.get(s.id);
+        if (i === undefined) {
+          index.set(s.id, sessions.length);
+          sessions.push(s);
+          changed = true;
+        } else if (!sessions[i].material && s.material) {
+          // 別の端末で、教材なしの記録を教材に入れた
+          sessions[i] = { ...sessions[i], material: s.material };
+          changed = true;
+        }
+      }
+      sessions.sort((a, b) => a.start - b.start);
+    }
+    if (changed) write('sessions', sessions);
+  } finally {
+    quiet = false;
+  }
+  return changed;
 }
 
 /** ブラウザに「このデータは勝手に消さないで」と頼む。 */

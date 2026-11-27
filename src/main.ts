@@ -5,6 +5,7 @@ import { initSettingsPage } from './pages/settings';
 import { renderStats } from './pages/stats';
 import { initStopwatchPage } from './pages/stopwatch';
 import { initTimerPage } from './pages/timer';
+import { initCloud } from './cloud';
 import { initRun } from './run';
 import { requestPersistence } from './store';
 import { armTilt } from './tilt';
@@ -40,6 +41,7 @@ function refreshAll(): void {
 initSettingsPage($('.view[data-view="settings"]'), refreshAll);
 document.addEventListener('material:change', refreshAll);
 initRun(refreshAll);
+initCloud(refreshAll);
 
 armTilt();
 

@@ -1,6 +1,7 @@
 // 統計画面。週の棒グラフ（日ごとの時間・ラップの区切り・目標線）と、
 // タップした日の詳細（ラップごとの棒グラフ・記録の一覧）。
 
+import { materialColor } from '../colors';
 import { leaveTotal, type Mode, type Session } from '../engine';
 import { getSessions, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
@@ -14,19 +15,8 @@ const LABEL_H = 34; // 曜日・日付の部分の高さ(px)
 const LONG_LAP = 1.5;
 const HOUR_H = 90; // 時間帯のグラフの高さ(px)
 
-/**
- * 教材の色。作った順に決まった色を使う（多い順ではないので、色は教材についてまわる）。
- * 暗い背景で見分けやすいように確かめた並び。8 つ目からはまとめて灰色。教材なしは明るい灰色。
- */
-const PALETTE = ['#338ced', '#e76624', '#00a888', '#d28e05', '#e24d8b', '#0aac23', '#9887ef'];
-const NONE_COLOR = '#d9d9d9';
-const OTHER_COLOR = '#7a7a7a';
 const keyOrder = (key: string): number => (key ? materialOrder(key) : -1);
-function colorOf(key: string): string {
-  if (!key) return NONE_COLOR;
-  const i = materialOrder(key);
-  return i >= 0 && i < PALETTE.length ? PALETTE[i] : OTHER_COLOR;
-}
+const colorOf = (key: string): string => materialColor(key);
 
 /** 1日の詳細で出すグラフ */
 let detailTab: 'hour' | 'lap' = 'hour';

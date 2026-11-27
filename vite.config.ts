@@ -7,6 +7,17 @@ const base = '/study_timer/';
 
 export default defineConfig({
   base,
+  build: {
+    // Firebase（グループ機能）は、使う人だけが後から読み込む別のファイルになる。大きいのはそのため
+    chunkSizeWarningLimit: 700,
+    rolldownOptions: {
+      input: {
+        main: 'index.html',
+        // セキュリティルールの確かめ用（アプリからはリンクしない）
+        cloudTest: 'cloud-test.html',
+      },
+    },
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
