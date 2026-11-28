@@ -275,7 +275,7 @@ export function themeVars(th: ThemeItem): Record<string, string> {
     '--accent-strong': th.strong,
     '--start-bg': th.start ?? th.strong,
     '--start-ink': th.ink ?? '#000',
-    '--ring': th.ring ?? th.strong,
+    '--ring-color': th.ring ?? th.strong,
     '--nav-bg': th.nav ?? shade(th.light, 0.94),
     '--nav-on': shade(th.light, 0.8),
   };

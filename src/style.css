@@ -9,7 +9,7 @@
   --accent-strong: #fff;
   --start-bg: #fff;
   --start-ink: #000;
-  --ring: #fff;
+  --ring-color: #fff;
   --nav-bg: #d9d9d9;
   --nav-on: #bdbdbd;
   /* 大きさは画面ではなく #app の幅・高さ（cqw / cqh）を基準にする。
@@ -235,7 +235,7 @@ nav button:focus-visible {
 }
 
 .ring-on {
-  stroke: var(--ring);
+  stroke: var(--ring-color);
 }
 
 .ring.over .ring-on {
