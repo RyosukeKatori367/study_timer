@@ -10,6 +10,8 @@ import { $, esc, html } from '../ui/dom';
 import { pickDrums, pickList } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { materialThumb, pickMaterial } from './material';
+import { api } from '../cloud/api';
+import { openCompose } from './group/compose';
 
 /** 記録が増えた・消えた（統計などを描き直す） */
 export const SESSIONS_CHANGE = 'sessions:change';
@@ -57,6 +59,9 @@ export function openManual(day?: number): void {
     const end = fixed === null ? toMinute(Date.now()) : fixed + dur;
     return { start: end - dur, end };
   };
+
+  // ログインしていてグループに入っていれば、記録して投稿できる
+  const canPost = !!api.user() && (api.cachedProfile()?.groupIds.length ?? 0) > 0;
 
   const render = () => {
     const { start, end } = range();
@@ -108,7 +113,13 @@ export function openManual(day?: number): void {
                 .join('、')}${over.length > 2 ? ' ほか' : ''}）。そのまま記録すると、時間が2重に数えられます</p>`
             : ''
         }
-        <button type="button" class="btn primary" data-save ${future ? 'disabled' : ''}>記録する</button>
+        ${
+          canPost
+            ? `<button type="button" class="btn primary" data-save="post" ${future ? 'disabled' : ''}>記録して投稿</button>
+               <button type="button" class="btn dark" data-save ${future ? 'disabled' : ''}>記録だけする</button>`
+            : `<button type="button" class="btn primary" data-save ${future ? 'disabled' : ''}>記録する</button>
+               <p class="sns-lead">ログインしてグループに入ると、グループに投稿もできます</p>`
+        }
       </div>`;
 
     $('[data-close]', root).onclick = close;
@@ -162,17 +173,23 @@ export function openManual(day?: number): void {
       fixed = null;
       render();
     });
-    $('[data-save]', root).onclick = () => {
-      const r = range();
-      if (r.end > Date.now() + MIN) return toast('まだ来ていない時間です');
-      const s = manualSession(r.start, dur, material);
-      addSession(s);
-      notify();
-      // ログインしていれば、投稿の確認画面が出る
-      queueMicrotask(() => document.dispatchEvent(new CustomEvent('session:saved', { detail: s })));
-      close();
-      toast(`記録しました（${fmtHM(dur)}・${clock(r.start)}〜${clock(r.end)}）`);
-    };
+    root.querySelectorAll<HTMLElement>('[data-save]').forEach((b) => {
+      b.onclick = () => {
+        const r = range();
+        if (r.end > Date.now() + MIN) return toast('まだ来ていない時間です');
+        const s = manualSession(r.start, dur, material);
+        addSession(s);
+        notify();
+        close();
+        toast(`記録しました（${fmtHM(dur)}・${clock(r.start)}〜${clock(r.end)}）`);
+        // 「記録して投稿」なら、投稿の画面を出す（ひとこと・投稿先を選んで投稿）
+        if (b.dataset.save === 'post') {
+          void openCompose(s).then((ok) => {
+            if (!ok) toast('投稿するには、ログインしてグループに入ってください');
+          });
+        }
+      };
+    });
   };
 
   render();

@@ -7078,3 +7078,144 @@ button.ev-season {
 .manual-warn.bad {
   color: var(--red);
 }
+
+.sess-btns {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- グミガチャのタグ（2026-11-28 に足した分） ---------- */
+
+/* N：1色 */
+.tag.tag-n-blue { background: #a9c8ff; color: #0f2b66; }
+.tag.tag-n-rose { background: #ffc2d4; color: #6b1633; }
+.tag.tag-n-cyan { background: #a8eef5; color: #0b4650; }
+.tag.tag-n-coral { background: #ffb8a3; color: #6b2414; }
+.tag.tag-n-sand { background: #eadcbf; color: #4d3d1c; }
+.tag.tag-n-red { background: #e6394a; color: #fff; }
+.tag.tag-n-orange { background: #ffc27a; color: #5c3200; }
+.tag.tag-n-dusk { background: #4b4470; color: #e6e0ff; }
+.tag.tag-n-sun { background: #ffe066; color: #5a4300; }
+.tag.tag-n-slate { background: #7c8794; color: #fff; }
+.tag.tag-n-paper {
+  background: repeating-linear-gradient(180deg, #fbfbf6 0 5px, #dfe6f2 5px 6px);
+  color: #2b3a55;
+}
+.tag.tag-n-matcha { background: #b7d68f; color: #2c4410; }
+
+/* R：2色 */
+.tag.tag-r-hunter { background: linear-gradient(135deg, #5b6b2f, #b48a3c); color: #fff6dc; font-weight: 700; }
+.tag.tag-r-kyote { background: linear-gradient(135deg, #2f7bff, #8fd3ff); color: #fff; font-weight: 700; }
+.tag.tag-r-killer { background: linear-gradient(135deg, #2b2b2b, #ff4d6d); color: #fff; font-weight: 700; }
+.tag.tag-r-tokkun { background: linear-gradient(135deg, #ff7a2f, #ffd23f); color: #4a1d00; font-weight: 700; }
+.tag.tag-r-drill { background: linear-gradient(135deg, #20c997, #1f7a8c); color: #fff; font-weight: 700; }
+/* マーカー職人：蛍光ペンの線 */
+.tag.tag-r-marker {
+  background: linear-gradient(180deg, transparent 45%, rgba(255, 243, 92, 0.8) 45%, rgba(255, 140, 210, 0.8) 85%, transparent 85%), #2a2a2a;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #555;
+}
+.tag.tag-r-memory { background: linear-gradient(135deg, #b07cff, #ff9ad5); color: #fff; font-weight: 700; }
+.tag.tag-r-owl { background: linear-gradient(135deg, #1b1f3a, #5a4fcf); color: #ffd98a; font-weight: 700; }
+.tag.tag-r-stationery {
+  background: linear-gradient(90deg, #ff8fa3 0 25%, #ffd36a 25% 50%, #7de3c3 50% 75%, #8fb6ff 75%);
+  color: #2a2a2a;
+  font-weight: 700;
+}
+
+/* SR：光る */
+.tag.tag-sr-formula {
+  background: #10162e;
+  color: #d9e4ff;
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(120, 160, 255, 0.55), inset 0 0 0 1px #6f8fff;
+}
+.tag.tag-sr-idea {
+  background: radial-gradient(circle at 30% 40%, #fff9c4, #ffd23f 60%, #f5a623);
+  color: #4a3000;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(255, 210, 63, 0.8);
+}
+.tag.tag-sr-comeback {
+  background: linear-gradient(135deg, #2b2b2b 0%, #2b2b2b 40%, #ff5f6d 60%, #ffc371 100%);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(255, 120, 100, 0.55);
+}
+.tag.tag-sr-lion {
+  background: linear-gradient(135deg, #8a3b00, #e2711d 50%, #ffb703);
+  color: #fffbe8;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 9px rgba(226, 113, 29, 0.6);
+}
+.tag.tag-sr-stars {
+  background:
+    radial-gradient(1px 1px at 12% 35%, #fff, transparent),
+    radial-gradient(1px 1px at 40% 75%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 66% 25%, #cfe3ff, transparent),
+    radial-gradient(1px 1px at 90% 60%, #fff, transparent),
+    linear-gradient(135deg, #1a0f3d, #3d2a8c, #0f4c75);
+  color: #e7dcff;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(140, 120, 255, 0.55);
+}
+.tag.tag-sr-clutch {
+  background: linear-gradient(135deg, #0f2027, #2c5364);
+  color: #7cffcb;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(124, 255, 203, 0.5), inset 0 0 0 1px #3fd1a2;
+}
+
+/* SSR：動く */
+.tag.tag-ssr-dream {
+  background: linear-gradient(110deg, #ff9a9e 0%, #fad0c4 25%, #fbc2eb 50%, #a6c1ee 75%, #ff9a9e 100%);
+  background-size: 220% 100%;
+  color: #5a1d3a;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(251, 194, 235, 0.7);
+  animation: gold-shine 3.2s linear infinite;
+}
+.tag.tag-ssr-dream::before {
+  content: '★';
+  margin-right: 3px;
+}
+.tag.tag-ssr-tenka {
+  background: linear-gradient(110deg, #000 0%, #3a0000 30%, #d4af37 50%, #3a0000 70%, #000 100%);
+  background-size: 220% 100%;
+  color: #ffe9a8;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.6), inset 0 0 0 1px #d4af37;
+  animation: gold-shine 2.6s linear infinite;
+}
+.tag.tag-ssr-infinite {
+  background: linear-gradient(90deg, #00f0ff, #7a5cff, #ff3cac, #00f0ff);
+  background-size: 300% 100%;
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  animation: gold-shine 2s linear infinite, tag-pulse 1.6s ease-in-out infinite;
+}
+.tag.tag-ssr-infinite::before {
+  content: '∞';
+  margin-right: 3px;
+}
+
+@keyframes tag-pulse {
+  50% {
+    box-shadow: 0 0 14px rgba(122, 92, 255, 0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag.tag-ssr-dream,
+  .tag.tag-ssr-tenka,
+  .tag.tag-ssr-infinite {
+    animation: none;
+  }
+}

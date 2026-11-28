@@ -10,6 +10,11 @@ import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
 import { donutHtml } from '../ui/charts';
 import { esc } from '../ui/dom';
 import { confirmRemove, openManual } from './manual';
+import { api } from '../cloud/api';
+import { openCompose } from './group/compose';
+
+/** ログインしていてグループに入っていれば、手入力の記録をあとから投稿できる */
+const canPost = (): boolean => !!api.user() && (api.cachedProfile()?.groupIds.length ?? 0) > 0;
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const PLOT_H = 120; // 棒の部分の高さ(px)
@@ -80,7 +85,12 @@ function sessionHtml(s: Session): string {
   }
   if (s.leaves?.length) parts.push(`離脱${s.leaves.length}回（${fmtHM(leaveTotal(s.leaves))}）`);
   // 手入力の記録は消せる
-  const del = s.mode === 'manual' ? `<button type="button" class="sess-del" data-del="${esc(s.id)}">消す</button>` : '';
+  const del =
+    s.mode === 'manual'
+      ? `<span class="sess-btns">${
+          canPost() ? `<button type="button" class="sess-del" data-post-sess="${esc(s.id)}">投稿</button>` : ''
+        }<button type="button" class="sess-del" data-del="${esc(s.id)}">消す</button></span>`
+      : '';
   return `
     <div class="sess">
       <div class="sess-top"><span>${fmtClock(s.start)}〜${fmtClock(s.end)}</span><span>${fmtHM(s.studyMs)}</span></div>
@@ -375,6 +385,12 @@ export function renderStats(view: HTMLElement, reset = false): void {
 
   view.querySelector<HTMLElement>('[data-manual]')?.addEventListener('click', (e) => {
     openManual(Number((e.currentTarget as HTMLElement).dataset.manual));
+  });
+  view.querySelectorAll<HTMLElement>('[data-post-sess]').forEach((b) => {
+    b.onclick = () => {
+      const x = getSessions().find((y) => y.id === b.dataset.postSess);
+      if (x) void openCompose(x);
+    };
   });
   view.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => {
     b.onclick = () => {

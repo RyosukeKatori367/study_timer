@@ -45,8 +45,8 @@ describe('グミガチャ', () => {
     expect(noN.rarity.R).toBe(30); // ほかのレア度の確率は変わらない
     expect(sum(noN.item) + noN.dupe).toBeCloseTo(100, 6);
   });
-  it('全部で122種類（テーマと模様が100・タグ22）、ベースカラー12・シークレット1', () => {
-    expect(ALL_ITEMS.length).toBe(122);
+  it('全部で152種類（テーマと模様が100・タグ52）、ベースカラー12・シークレット1', () => {
+    expect(ALL_ITEMS.length).toBe(152);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'LEGEND').map((x) => x.name)).toEqual(['豪運']);
     expect(THEMES.filter((x) => x.rarity === 'BASE').length).toBe(12);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'SECRET').length).toBe(1);
@@ -58,7 +58,8 @@ describe('グミガチャ', () => {
   });
   it('ガチャのタグは全部 tags.ts にあり、名前が同じ', () => {
     for (const x of TAG_ITEMS) expect(tagById(x.tag)?.name).toBe(x.name);
-    expect(TAG_ITEMS.filter((x) => x.rarity === 'N').length).toBe(8);
-    expect(TAG_ITEMS.filter((x) => x.rarity === 'SSR').length).toBe(3);
+    expect(TAG_ITEMS.filter((x) => x.rarity === 'N').length).toBe(20);
+    expect(TAG_ITEMS.filter((x) => x.rarity === 'SSR').length).toBe(6);
+    expect(new Set(TAG_ITEMS.map((x) => x.name)).size).toBe(TAG_ITEMS.length);
   });
 });

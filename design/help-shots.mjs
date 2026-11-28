@@ -200,7 +200,7 @@ const pager = (p, i) =>
 
 // ---- 統計 ----
 {
-  const p = await fresh();
+  const p = await fresh('?fake=in');
   await p.click('nav [data-view=stats]');
   await p.waitForTimeout(800);
   await shot(p, 'stats', ['.stat-cards', '.week-nav', '.chart']);
@@ -222,8 +222,8 @@ const pager = (p, i) =>
   await p.waitForTimeout(400);
   await p.click('[data-manual]');
   await p.waitForTimeout(600);
-  await shot(p, 'manual', ['#manual [data-dur]', '#manual [data-material]', '#manual .sns-card:has([data-date])', '#manual [data-save]']);
-  await p.click('#manual [data-save]');
+  await shot(p, 'manual', ['#manual [data-dur]', '#manual [data-material]', '#manual .sns-card:has([data-date])', '#manual [data-save="post"]']);
+  await p.click('#manual [data-save=""]');
   await p.waitForTimeout(400);
   // お知らせ（記録しました・勉強ボーナス）が消えるまで
   for (let i = 0; i < 3; i++) {

@@ -47,15 +47,24 @@ export function initCompose(): void {
   });
 }
 
-async function maybeShow(s: Session): Promise<void> {
+/**
+ * 投稿の確認画面を出す。always なら「終えたら投稿画面を出す」がオフでも出す（時間を入力して「記録して投稿」したとき）。
+ * 出せなかったら false（ログインしていない・グループに入っていない）
+ */
+export async function openCompose(s: Session, always = true): Promise<boolean> {
+  return maybeShow(s, always);
+}
+
+async function maybeShow(s: Session, always = false): Promise<boolean> {
   const profile = api.cachedProfile() ?? (await withTimeout(api.getProfile(), 4000).catch(() => null));
-  if (!profile?.name || profile.groupIds.length === 0 || !profile.postPrefs.ask) return;
+  if (!profile?.name || profile.groupIds.length === 0 || (!always && !profile.postPrefs.ask)) return false;
   // グループ名を最新にする（オフラインなら覚えている名前で出す）
   const fresh = await withTimeout(api.listGroups(), 2500).catch(() => null);
   if (fresh) rememberGroups(fresh);
   const groups = fresh ?? knownGroups(profile.groupIds);
-  if (groups.length === 0) return;
+  if (groups.length === 0) return false;
   show(s, { ...DEFAULT_POST_PREFS, ...profile.postPrefs }, groups);
+  return true;
 }
 
 function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; hue: number }[]): void {
