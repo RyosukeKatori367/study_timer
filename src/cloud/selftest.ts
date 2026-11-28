@@ -377,6 +377,34 @@ async function run(): Promise<void> {
     });
     await allow('外された人は、自分の投稿を消せる', () => F.deleteDoc(F.doc(b.db, 'groups', gid, 'posts', pid)));
 
+    // ---- みんなのイベント ----
+    // 本物の月とまざらないように、昔の年の月を使う
+    const month = `${1900 + Math.floor(Math.random() * 90)}-01`;
+    const ev = (w: Who, uid: string) => F.doc(w.db, 'events', month, 'users', uid);
+    await allow('イベント：自分の月の合計を書ける', () => F.setDoc(ev(a, a.uid), { ms: 3600000, updatedAt: F.serverTimestamp() }));
+    await F.setDoc(ev(b, b.uid), { ms: 7200000, updatedAt: F.serverTimestamp() });
+    await allow('イベント：自分の合計を直せる', () => F.setDoc(ev(a, a.uid), { ms: 5400000, updatedAt: F.serverTimestamp() }));
+    await deny('イベント：人の合計は書けない', () => F.setDoc(ev(a, b.uid), { ms: 1, updatedAt: F.serverTimestamp() }));
+    await deny('イベント：1か月より長い時間は書けない', () =>
+      F.setDoc(ev(a, a.uid), { ms: 3000000000, updatedAt: F.serverTimestamp() }),
+    );
+    await deny('イベント：ほかの項目は書けない', () =>
+      F.setDoc(ev(a, a.uid), { ms: 1, name: 'A', updatedAt: F.serverTimestamp() }),
+    );
+    await allow('イベント：全員の合計を集計で読める（1.5時間＋2時間）', async () => {
+      const snap = await F.getAggregateFromServer(F.collection(c.db, 'events', month, 'users'), {
+        total: F.sum('ms'),
+        n: F.count(),
+      });
+      const d = snap.data();
+      if (d.total !== 12600000 || d.n !== 2) throw new Error(`合計 ${d.total}・${d.n}人`);
+    });
+    await deny('イベント：人の合計は消せない', () => F.deleteDoc(ev(c, a.uid)));
+    await allow('イベント：自分の合計を消せる', async () => {
+      await F.deleteDoc(ev(a, a.uid));
+      await F.deleteDoc(ev(b, b.uid));
+    });
+
     // ---- 片付け（グループを消す） ----
     await allow('作成者は、残ったメッセージを消せる', async () => {
       const rest = await F.getDocs(F.collection(a.db, 'groups', gid, 'messages'));

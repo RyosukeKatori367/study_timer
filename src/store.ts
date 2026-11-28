@@ -73,8 +73,14 @@ export interface Settings {
   pattern: string;
   /** ガチャで手に入れたテーマ・模様の id */
   unlocked: string[];
-  /** 最後にガチャを引いた日（'2026-11-28'） */
+  /** 最後にガチャを引いた日（'2026-11-28'）。グミで引くようになってからは使わない */
   gachaDay: string;
+  /**
+   * グミの台帳。{ 'l:2026-11-28': 120, 'g:xxxx': -120 } のように、もらった・使った分を1件ずつ入れる。
+   * 残高は合計。キーが同じものは1回だけ（同じ日のログインボーナスを2回もらえない）。
+   * 端末どうしでは、キーを足し合わせて残す（同じキーは大きいほう）
+   */
+  gumi: Record<string, number>;
 }
 
 const DEFAULTS: Settings = {
@@ -111,6 +117,7 @@ const DEFAULTS: Settings = {
   pattern: 'p:none',
   unlocked: [],
   gachaDay: '',
+  gumi: {},
 };
 
 function read<T>(key: string): T | null {
@@ -160,6 +167,7 @@ function emit(c: StoreChange): void {
 // ---- 設定 ----
 
 export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('settings') ?? {}) };
+if (!settings.gumi || typeof settings.gumi !== 'object') settings.gumi = {};
 
 setDurationStyle(settings.durationStyle);
 
@@ -492,9 +500,8 @@ export function mergeCloud(data: CloudData): boolean {
       for (const key of Object.keys(DEFAULTS) as (keyof Settings)[]) {
         if (key in data.settings) (patch as Record<string, unknown>)[key] = data.settings[key];
       }
-      // 手に入れたスタイルは、どちらの端末で手に入れたものも残す。ガチャを引いた日は新しいほう
-      const cloudUnlocked = Array.isArray(data.settings.unlocked) ? data.settings.unlocked : [];
-      patch.unlocked = [...new Set([...settings.unlocked, ...cloudUnlocked])];
+      // 手に入れたスタイルとグミの台帳は、どちらの端末のものも残す。ガチャを引いた日は新しいほう
+      Object.assign(patch, collectibles(data.settings));
       const cloudDay = typeof data.settings.gachaDay === 'string' ? data.settings.gachaDay : '';
       patch.gachaDay = cloudDay > settings.gachaDay ? cloudDay : settings.gachaDay;
       saveSettings(patch);
@@ -541,6 +548,47 @@ export function mergeCloud(data: CloudData): boolean {
     quiet = false;
   }
   return changed;
+}
+
+/** グミの台帳を足し合わせる（同じキーは大きいほう。おかしな値は捨てる） */
+export function mergeLedger(a: Record<string, number>, b: unknown): Record<string, number> {
+  const out = { ...a };
+  if (!b || typeof b !== 'object') return out;
+  for (const [k, v] of Object.entries(b as Record<string, unknown>)) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    out[k] = k in out ? Math.max(out[k], v) : v;
+  }
+  return out;
+}
+
+/** 手に入れたスタイルとグミの台帳を、端末のものとクラウドのもので合わせた値 */
+function collectibles(cloud: Partial<Settings>): Pick<Settings, 'unlocked' | 'gumi'> {
+  const cloudUnlocked = Array.isArray(cloud.unlocked) ? cloud.unlocked.filter((x) => typeof x === 'string') : [];
+  return {
+    unlocked: [...new Set([...settings.unlocked, ...cloudUnlocked])],
+    gumi: mergeLedger(settings.gumi, cloud.gumi),
+  };
+}
+
+/**
+ * 端末の設定のほうが新しいときに、クラウドにだけある「手に入れたスタイル」と「グミ」を取り込む
+ * （送る前に呼ぶ。ほかの端末で引いたガチャやもらったグミが消えないように）。増えたら true
+ */
+export function mergeCollectibles(cloud: Partial<Settings> | undefined): boolean {
+  if (!cloud) return false;
+  const next = collectibles(cloud);
+  const grew =
+    next.unlocked.length !== settings.unlocked.length ||
+    Object.keys(next.gumi).length !== Object.keys(settings.gumi).length ||
+    Object.entries(next.gumi).some(([k, v]) => settings.gumi[k] !== v);
+  if (!grew) return false;
+  quiet = true;
+  try {
+    saveSettings(next);
+  } finally {
+    quiet = false;
+  }
+  return true;
 }
 
 /** ブラウザに「このデータは勝手に消さないで」と頼む。 */

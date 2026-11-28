@@ -4456,3 +4456,841 @@ html[data-anim='rainbow'] .ring-on {
     animation: none;
   }
 }
+
+/* ---------- 下のメニューのしるし・サブページの戻る ---------- */
+
+nav button {
+  position: relative;
+}
+
+.nav-dot {
+  position: absolute;
+  top: 9px;
+  right: calc(50% - 17px);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px var(--nav-bg);
+}
+
+/* マイページから開いたページ（スタイル・設定・ショップなど）の左上の「‹」 */
+.view-back {
+  position: absolute;
+  left: 10px;
+  top: calc(var(--pad-top) - 2px);
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  font-size: 30px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-back:active {
+  background: #262626;
+}
+
+/* ---------- グミ（お金） ---------- */
+
+.coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 9px;
+  border-radius: 18px;
+  background: #2a1a26;
+  box-shadow: inset 0 0 0 1px rgba(255, 139, 216, 0.25);
+  color: #ffd1ec;
+  white-space: nowrap;
+}
+
+.coin b {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coin small {
+  font-size: 11px;
+  color: #d6b3c9;
+}
+
+.coin svg {
+  flex: none;
+}
+
+/* ---------- スタイルのページ ---------- */
+
+.style-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.style-count {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.style-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffb6e0;
+  font-variant-numeric: tabular-nums;
+}
+
+.style-price::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #ffe0f3, #ff8bd8);
+  transform: rotate(45deg) translateY(-1px);
+}
+
+/* ---------- イベントタブ ---------- */
+
+.event-seg {
+  flex: none;
+}
+
+.event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ev-banner {
+  position: relative;
+  padding: 18px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(255, 211, 106, 0.35), transparent 55%),
+    linear-gradient(135deg, #3b2a6b, #8b3fa8 58%, #ff7ab8);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ev-month {
+  font-size: 12px;
+  color: #ffe1f0;
+}
+
+.ev-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.ev-bar {
+  position: relative;
+  height: 10px;
+  margin: 8px 0 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ev-bar > i {
+  display: block;
+  height: 100%;
+  min-width: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #ffd36a, #ff8bd8);
+  box-shadow: 0 0 12px rgba(255, 211, 106, 0.6);
+}
+
+.ev-tick {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.ev-tick.on {
+  background: #fff6c9;
+}
+
+.ev-nums {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.ev-nums b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-sub {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #ffe1f0;
+}
+
+.ev-banner .btn {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.ev-card {
+  padding: 6px 16px;
+}
+
+.ev-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ev-card-head .head-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+}
+
+.q-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #2c2c2c;
+}
+
+.ev-card-head + .q-row,
+.ev-card-head + .sns-seg {
+  border-top: 0;
+}
+
+.q-check {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #4d4d4d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: #1a1200;
+}
+
+.q-row.done .q-check {
+  border-color: #ffd36a;
+  background: #ffd36a;
+}
+
+.q-row.claimed .q-check {
+  border-color: #5a5236;
+  background: #5a5236;
+  color: #c9bf98;
+}
+
+.q-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.q-title {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.q-row.claimed .q-title {
+  color: var(--muted);
+}
+
+.q-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.q-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: #2e2e2e;
+  overflow: hidden;
+}
+
+.q-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd36a, #ff8bd8);
+}
+
+.q-prog {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.q-reward,
+.q-got,
+.q-note {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd36a;
+  white-space: nowrap;
+}
+
+.q-got {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.q-note {
+  max-width: 7.5em;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: right;
+  color: var(--muted);
+}
+
+.q-claim {
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  background: linear-gradient(135deg, #ffd36a, #ff8bd8);
+  color: #1a0a14;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: q-pulse 1.8s ease-in-out infinite;
+}
+
+.q-claim:active {
+  transform: scale(0.96);
+}
+
+@keyframes q-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 211, 106, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 211, 106, 0);
+  }
+}
+
+/* お知らせ */
+.news-card {
+  padding: 14px 16px;
+}
+
+.news-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.news-new {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.news-title {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.news-items {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #d0d0d0;
+}
+
+/* ---------- マイページ ---------- */
+
+.my-prof {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.my-prof .chevron {
+  margin-left: auto;
+}
+
+.av.guest {
+  background: #333;
+  color: #aaa;
+}
+
+.my-prof-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.my-prof-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.my-prof-sub {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.login-card {
+  padding: 14px 16px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(255, 139, 216, 0.28), transparent 60%),
+    #1d1420;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-card.done {
+  background: var(--card);
+  box-shadow: none;
+}
+
+.login-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15px;
+}
+
+.login-head span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.login-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.ld {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 0 6px;
+  border-radius: 10px;
+  background: #2a2a2a;
+  color: #bdbdbd;
+}
+
+.ld small {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.ld b {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ld.big b {
+  color: #ffd36a;
+}
+
+.ld.got {
+  background: #3a2f12;
+  color: #ffd36a;
+}
+
+.ld.got small {
+  color: #c9b06a;
+}
+
+.ld.today {
+  background: linear-gradient(160deg, #ffd36a, #ff8bd8);
+  color: #1a0a14;
+  box-shadow: 0 4px 14px rgba(255, 139, 216, 0.35);
+}
+
+.ld.today small {
+  color: #3a1a2a;
+}
+
+.ld.today b {
+  color: #1a0a14;
+}
+
+.login-card .btn {
+  margin: 0;
+}
+
+.login-note {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.my-coin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.my-coin .link {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.my-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.my-tile {
+  position: relative;
+  min-height: 112px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+}
+
+.my-tile.shop {
+  background:
+    radial-gradient(120% 100% at 100% 100%, rgba(106, 183, 255, 0.25), transparent 60%),
+    linear-gradient(135deg, #3a1d33, #1c1c1c);
+}
+
+.my-tile:active {
+  transform: scale(0.98);
+}
+
+.my-tile-icon {
+  height: 34px;
+  margin-bottom: auto;
+  display: flex;
+  align-items: center;
+  color: var(--light);
+}
+
+.my-tile-icon .jar {
+  width: 30px;
+  height: auto;
+}
+
+.my-tile b {
+  font-size: 16px;
+}
+
+.my-tile span:not(.my-tile-icon):not(.my-badge) {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.my-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- ショップ ---------- */
+
+.shop-coin {
+  display: flex;
+  justify-content: center;
+  margin-top: -6px;
+}
+
+.shop-gacha {
+  align-items: flex-start;
+}
+
+.gacha-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gacha-buttons .gacha-btn {
+  margin: 0;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.gacha-btn small {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.gacha-btn.ten:not(:disabled) {
+  background: linear-gradient(135deg, #b98bff, #6ab7ff);
+  box-shadow: 0 6px 18px rgba(106, 183, 255, 0.35);
+}
+
+.gacha-buttons .gacha-btn:disabled {
+  font-size: 15px;
+}
+
+.exch {
+  padding: 6px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exch .sns-seg {
+  background: #262626;
+}
+
+.exch .sns-seg button {
+  height: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+}
+
+.exch .sns-seg button small {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+/* ---------- 実績・グミの履歴 ---------- */
+
+.ach-sum {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+
+.ach-sum b {
+  font-size: 18px;
+  color: #fff;
+}
+
+.medal {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2a2a2a;
+  box-shadow: inset 0 0 0 2px #3a3a3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #1a1200;
+}
+
+.q-row.ach.done .medal {
+  background: radial-gradient(circle at 35% 30%, #fff6c9, #f2c94c 55%, #b8862b);
+  box-shadow: 0 0 10px rgba(242, 201, 76, 0.4);
+}
+
+.q-row.ach.claimed .medal {
+  background: radial-gradient(circle at 35% 30%, #e8dcae, #a89155 60%, #6e5a2a);
+  box-shadow: none;
+}
+
+.hist {
+  padding: 4px 16px;
+}
+
+.hist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid #2c2c2c;
+  font-size: 14px;
+}
+
+.hist-row:first-child {
+  border-top: 0;
+}
+
+.hist-label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hist-label small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hist-row b {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hist-row b.plus {
+  color: #ffd36a;
+}
+
+.hist-row b.minus {
+  color: #ff8bd8;
+}
+
+/* ---------- 10回ガチャの結果 ---------- */
+
+.g-rarity.small {
+  font-size: 30px;
+}
+
+#gacha.g-many .g-result {
+  width: min(360px, calc(100vw - 24px));
+}
+
+.g-multi {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px 6px;
+}
+
+.g-cell {
+  --c: #e6e6e6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  animation: g-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.g-cell.r-R {
+  --c: #6ab7ff;
+}
+
+.g-cell.r-SR {
+  --c: #ffd36a;
+}
+
+.g-cell.r-SSR,
+.g-cell.r-SECRET {
+  --c: #ff8bd8;
+}
+
+.g-cell.r-LEGEND {
+  --c: #f2c94c;
+}
+
+.g-cell-prev {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--c);
+}
+
+.g-cell.dupe .g-cell-prev {
+  box-shadow: 0 0 0 1px #444;
+  filter: saturate(0.5) brightness(0.7);
+}
+
+.g-cell-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  color: #e6dcea;
+}
+
+.g-cell-foot {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+}
+
+.g-cell-foot .rarity {
+  transform: scale(0.85);
+}
+
+.g-cell-foot b {
+  color: #ffd36a;
+}
+
+.g-cell-foot small {
+  color: #b9a9c4;
+}
+
+.g-refund {
+  color: #ffd36a;
+}
+
+.ev-banner .btn.small {
+  padding: 0 20px;
+}

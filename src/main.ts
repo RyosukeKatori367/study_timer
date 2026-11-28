@@ -7,15 +7,26 @@ import { initStopwatchPage } from './pages/stopwatch';
 import { initTimerPage } from './pages/timer';
 import { initCloud } from './cloud';
 import { api, setApi } from './cloud/api';
-import { SHOW_VIEW, initGroupPage } from './pages/group';
+import { SHOW_VIEW, initGroupPage, openGroupScreen } from './pages/group';
+import { authScreen } from './pages/group/account';
 import { initRun } from './run';
 import { initStylePage } from './pages/style';
+import { initEventPage } from './pages/event';
+import { initMyPage, myHome } from './pages/my';
+import { claimableAchievements } from './achievements';
+import { claimableTiers } from './events';
+import { GUMI_CHANGE, fmtGumi, loginStatus, syncStudyBonus } from './gumi';
+import { unseenNews } from './news';
+import { claimableQuests } from './quests';
 import { applyStyle } from './styles';
 import { requestPersistence } from './store';
 import { armTilt } from './tilt';
-import { $ } from './ui/dom';
+import { $, html } from './ui/dom';
+import { toast } from './ui/toast';
 
-type ViewName = 'main' | 'stats' | 'group' | 'style' | 'settings';
+type ViewName = 'main' | 'stats' | 'group' | 'event' | 'my' | 'style' | 'settings';
+/** 下のメニューのどれを光らせるか（スタイルと設定はマイページから開く） */
+const NAV_OF: Partial<Record<ViewName, ViewName>> = { style: 'my', settings: 'my' };
 
 // オフラインでも動くようにする。新しい版を公開したら自動で入れ替わる
 registerSW({ immediate: true });
@@ -42,10 +53,21 @@ function refreshAll(): void {
   refreshTimer();
   refreshStopwatch();
   if (current === 'stats') renderStats(statsView);
+  // 累計3時間ごとの勉強ボーナス（記録が増えたとき）
+  const got = syncStudyBonus();
+  if (got) window.setTimeout(() => toast(`勉強ボーナス +${fmtGumi(got)}グミ（累計3時間ごと）`), 2600);
+  updateBadges();
 }
 
-initSettingsPage($('.view[data-view="settings"]'), refreshAll);
+const openLogin = () => openGroupScreen((n) => authScreen(n, 'login'));
+const settingsView = $('.view[data-view="settings"]');
+initSettingsPage(settingsView, refreshAll);
+settingsView.prepend(html('<button type="button" class="view-back" aria-label="マイページに戻る">‹</button>'));
+$('.view-back', settingsView).onclick = () => showView('my');
 initStylePage($('.view[data-view="style"]'));
+initEventPage($('.view[data-view="event"]'), openLogin);
+initMyPage($('.view[data-view="my"]'), { openLogin, openView: (name) => showView(name) });
+syncStudyBonus();
 void applyStyle();
 document.addEventListener('material:change', refreshAll);
 initRun(refreshAll);
@@ -83,9 +105,10 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 function showView(name: ViewName): void {
   current = name;
+  const lit = NAV_OF[name] ?? name;
   views.forEach((v) => v.classList.toggle('active', v.dataset.view === name));
   navButtons.forEach((b) => {
-    if (b.dataset.view === name) b.setAttribute('aria-current', 'page');
+    if (b.dataset.view === lit) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   });
   dots.classList.toggle('hide', name !== 'main');
@@ -93,10 +116,43 @@ function showView(name: ViewName): void {
   if (name === 'settings') document.dispatchEvent(new CustomEvent('settings:show'));
   if (name === 'group') document.dispatchEvent(new CustomEvent('group:show'));
   if (name === 'style') document.dispatchEvent(new CustomEvent('style:show'));
+  if (name === 'event') document.dispatchEvent(new CustomEvent('event:show'));
+  if (name === 'my') document.dispatchEvent(new CustomEvent('my:show'));
+  updateBadges();
 }
 document.addEventListener(SHOW_VIEW, (e) => showView((e as CustomEvent<ViewName>).detail));
 navButtons.forEach((b) => {
-  b.onclick = () => showView(b.dataset.view as ViewName);
+  b.onclick = () => {
+    const to = b.dataset.view as ViewName;
+    // マイページ（とそこから開いたページ）でもう一度押したら、マイページのいちばん上に戻る
+    if (to === 'my' && (current === 'my' || NAV_OF[current] === 'my')) myHome();
+    showView(to);
+  };
+});
+
+// ---- 下のメニューのしるし（受け取れるグミ・新しいお知らせ） ----
+
+function setBadge(view: ViewName, on: boolean): void {
+  const b = document.querySelector<HTMLElement>(`nav button[data-view="${view}"]`);
+  if (!b) return;
+  let dot = b.querySelector('.nav-dot');
+  if (on && !dot) b.append((dot = html('<span class="nav-dot" aria-hidden="true"></span>')));
+  if (!on) dot?.remove();
+  const base = b.getAttribute('aria-label')!.replace(/（.*）$/, '');
+  b.setAttribute('aria-label', on ? `${base}（受け取れるものがあります）` : base);
+}
+
+function updateBadges(): void {
+  try {
+    setBadge('event', claimableQuests() + claimableTiers() + unseenNews() > 0);
+    setBadge('my', !loginStatus().claimed || claimableAchievements().length > 0);
+  } catch (e) {
+    console.warn(e);
+  }
+}
+document.addEventListener(GUMI_CHANGE, updateBadges);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') updateBadges(); // 日付が変わったとき
 });
 
 // ---- 横スワイプ ----

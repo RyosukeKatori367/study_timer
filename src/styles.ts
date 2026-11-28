@@ -1,9 +1,9 @@
-// 見た目のスタイル（テーマの色と、背景の模様）と、1日1回のグミガチャ。
+// 見た目のスタイル（テーマの色と、背景の模様）と、グミガチャの確率。
 // テーマはボタン・選んでいるところ・計測の円・下のメニューの色を変える。背景は黒のまま
 // （常時表示で明るい画面をつけっぱなしにしないため）。模様は計測中の画面には出さない。
 // 模様の画像は public/patterns/ に置いた SVG（GitHub Pages から配る）。テーマの色に塗って使う。
 
-import { dateKey, isDeveloper } from './cloud/model';
+import { isDeveloper } from './cloud/model';
 import { GENERATED_PATTERNS } from './patterns.gen';
 import { saveSettings, settings } from './store';
 
@@ -163,70 +163,67 @@ export const currentTheme = (): ThemeItem => THEMES.find((x) => x.id === setting
 export const currentPattern = (): PatternItem => PATTERNS.find((p) => p.id === settings.pattern && isOwned(p.id)) ?? PATTERNS[0];
 
 // ---- ガチャ ----
+// 1回 GACHA_COST グミ。先にレア度を決まった確率で選び、そのレア度のまだ持っていないものから同じ確率で選ぶ。
+// そのレア度を全部持っていたら「かぶり」で、グミが少し返ってくる（レア度の確率は、いつでも書いてあるとおり）。
 
-/** レア度ごとの確率（%）。まだ持っていないものがあるレア度の中で割り振り直す */
-export const RARITY_RATE: Record<Exclude<Rarity, 'BASE'>, number> = { N: 50, R: 30, SR: 14, SSR: 4.95, SECRET: 1, LEGEND: 0.05 };
 export const GACHA_RARITIES = ['N', 'R', 'SR', 'SSR', 'SECRET', 'LEGEND'] as const;
+export type GachaRarity = (typeof GACHA_RARITIES)[number];
+/** レア度ごとの確率（%） */
+export const RARITY_RATE: Record<GachaRarity, number> = { N: 50, R: 30, SR: 14, SSR: 4.95, SECRET: 1, LEGEND: 0.05 };
+export const GACHA_COST = 120;
+export const GACHA10_COST = 1200;
+/** かぶったときに返ってくるグミ */
+export const REFUND: Record<GachaRarity, number> = { N: 20, R: 40, SR: 80, SSR: 200, SECRET: 400, LEGEND: 1000 };
+/** 交換所の値段（シークレットと豪運は交換できない） */
+export const EXCHANGE_PRICE: Partial<Record<Rarity, number>> = { N: 300, R: 600, SR: 1200, SSR: 3000 };
 
-/** 今の確率（レア度ごとと、1つずつ）。持っていないものがないレア度は 0 */
-export function currentRates(locked: StyleItem[]): { rarity: Record<string, number>; item: Map<string, number> } {
-  const live = GACHA_RARITIES.filter((r) => locked.some((x) => x.rarity === r));
-  const total = live.reduce((t, r) => t + RARITY_RATE[r], 0);
+export const exchangePrice = (item: StyleItem): number | undefined => EXCHANGE_PRICE[item.rarity];
+
+/** レア度を確率で選ぶ */
+export function pickRarity(rand: () => number = Math.random): GachaRarity {
+  let roll = rand() * 100;
+  for (const r of GACHA_RARITIES) {
+    roll -= RARITY_RATE[r];
+    if (roll < 0) return r;
+  }
+  return 'N'; // 小数の誤差で 100 ちょうどになったとき
+}
+
+export interface DrawResult {
+  item: StyleItem;
+  /** もう持っていた（そのレア度を全部持っていた） */
+  dupe: boolean;
+  /** かぶりで返ってくるグミ */
+  refund: number;
+}
+
+/** 1回引く（持っているかどうかは owned で調べる） */
+export function pickReward(owned: (id: string) => boolean, rand: () => number = Math.random): DrawResult {
+  const rarity = pickRarity(rand);
+  const pool = GACHA_ITEMS.filter((x) => x.rarity === rarity);
+  const fresh = pool.filter((x) => !owned(x.id));
+  const list = fresh.length ? fresh : pool;
+  const item = list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
+  const dupe = fresh.length === 0;
+  return { item, dupe, refund: dupe ? REFUND[rarity] : 0 };
+}
+
+/** 次に引くときの確率（レア度ごと・1つずつ・かぶり） */
+export function currentRates(owned: (id: string) => boolean = isOwned): { rarity: Record<string, number>; item: Map<string, number>; dupe: number } {
   const rarity: Record<string, number> = {};
   const item = new Map<string, number>();
+  let dupe = 0;
   for (const r of GACHA_RARITIES) {
-    const p = live.includes(r) ? (RARITY_RATE[r] / total) * 100 : 0;
-    rarity[r] = p;
-    const pool = locked.filter((x) => x.rarity === r);
-    for (const x of pool) item.set(x.id, p / pool.length);
+    rarity[r] = RARITY_RATE[r];
+    const fresh = GACHA_ITEMS.filter((x) => x.rarity === r && !owned(x.id));
+    if (fresh.length === 0) dupe += RARITY_RATE[r];
+    for (const x of fresh) item.set(x.id, RARITY_RATE[r] / fresh.length);
   }
-  return { rarity, item };
+  return { rarity, item, dupe };
 }
-
-/**
- * まだ持っていないものから1つ選ぶ。先にレア度を確率で選び、その中から同じ確率で選ぶ。
- * 全部持っていたら null。
- */
-export function pickReward(locked: StyleItem[], rand: () => number = Math.random): StyleItem | null {
-  const live = GACHA_RARITIES.filter((r) => locked.some((x) => x.rarity === r));
-  if (live.length === 0) return null;
-  const total = live.reduce((t, r) => t + RARITY_RATE[r], 0);
-  let roll = rand() * total;
-  let rarity: Rarity = live[live.length - 1];
-  for (const r of live) {
-    roll -= RARITY_RATE[r];
-    if (roll < 0) {
-      rarity = r;
-      break;
-    }
-  }
-  const pool = locked.filter((x) => x.rarity === rarity);
-  return pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))];
-}
-
-const today = (now = Date.now()): string => dateKey(now, settings.dayBoundaryMin);
-
-/** 今日まだ引いていないか */
-export const canDraw = (now = Date.now()): boolean => settings.gachaDay !== today(now);
 
 /** まだ持っていないもの（ガチャで出るもののうち） */
 export const lockedItems = (): StyleItem[] => GACHA_ITEMS.filter((x) => !isOwned(x.id));
-
-/** ガチャを引く。出たもの（全部持っていたら null）。今日はもう引けなくなる */
-export function draw(now = Date.now(), rand: () => number = Math.random): StyleItem | null {
-  if (!canDraw(now)) return null;
-  const item = pickReward(lockedItems(), rand);
-  saveSettings({ gachaDay: today(now), unlocked: item ? [...settings.unlocked, item.id] : settings.unlocked });
-  return item;
-}
-
-/** 次に引ける時刻（1日の区切り） */
-export function nextDrawAt(now = Date.now()): Date {
-  const d = new Date(now - settings.dayBoundaryMin * 60000);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 1);
-  return new Date(d.getTime() + settings.dayBoundaryMin * 60000);
-}
 
 // ---- 見た目に反映する ----
 

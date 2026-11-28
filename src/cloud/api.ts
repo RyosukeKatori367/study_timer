@@ -3,6 +3,7 @@
 
 import * as account from './account';
 import * as chat from './chat';
+import * as events from './events';
 import * as groups from './groups';
 import { deleteAccount } from './index';
 import * as posts from './posts';
@@ -50,6 +51,9 @@ const real = {
   watchMessages: chat.watchMessages,
   deleteMessage: chat.deleteMessage,
   chatUnread: chat.chatUnread,
+
+  eventTotal: events.eventTotal,
+  publishEvent: events.publishEvent,
 
   syncInfo,
   syncNow,

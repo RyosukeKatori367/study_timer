@@ -52,6 +52,13 @@ export function initGroupPage(view: HTMLElement, settingsView: HTMLElement): voi
   }
 }
 
+/** ほかのタブから、グループタブのこの画面を開く（ログイン・登録など） */
+export function openGroupScreen(fn: ScreenFn): void {
+  if (!nav) return void document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'group' }));
+  ensureStarted();
+  openGroup(fn);
+}
+
 function ensureStarted(): void {
   if (started) return;
   started = true;

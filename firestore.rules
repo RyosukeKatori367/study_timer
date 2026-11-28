@@ -8,6 +8,7 @@ rules_version = '2';
 // - グループの中身（メンバー・投稿）は、そのグループのメンバーだけが読める
 // - 招待コードは、コードを知っている1件だけ読める（一覧は取れない）
 // - 人数の増減は、本当にその人が入った・抜けたときだけ認める（人数の上限を守るため）
+// - みんなのイベントは、一人ひとりが自分のその月の合計だけを書き、全員の合計を集計で読む
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -315,6 +316,21 @@ service cloud.firestore {
         && get(groupPath(resource.data.groupId)).data.ownerId == me()
         && (!existsAfter(groupPath(resource.data.groupId))
             || getAfter(groupPath(resource.data.groupId)).data.code != code);
+    }
+
+    // ---- みんなのイベント ----
+    // events/{月}/users/{uid}：その人のその月の勉強時間の合計（自分の分だけ書ける）。
+    // 全員の合計は集計（sum）で読むので、ログインしている人は読める（中身は時間だけ）
+    match /events/{month}/users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isMe(uid)
+        && month.matches('^[0-9]{4}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['ms', 'updatedAt'])
+        && request.resource.data.ms is number
+        && request.resource.data.ms >= 0
+        && request.resource.data.ms <= 2678400000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isMe(uid);
     }
   }
 }

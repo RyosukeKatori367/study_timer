@@ -370,6 +370,14 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
     },
     chatUnread: async (gid, since) => groups.get(gid)?.messages.filter((m) => m.at > since && m.uid !== 'me').length ?? 0,
 
+    // みんなのイベント：今月 342 時間・先月 1120 時間（6人）
+    eventTotal: async (month) => {
+      await wait(400);
+      const now = dateKey(Date.now(), settings.dayBoundaryMin).slice(0, 7);
+      return { total: (month === now ? 342 : 1120) * 3600000, people: 6 };
+    },
+    publishEvent: async () => {},
+
     syncInfo: () => ({ status: 'idle', syncedAt: synced, pending: 0 }),
     syncNow: async () => {
       await wait(600);

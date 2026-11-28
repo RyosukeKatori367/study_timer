@@ -6,6 +6,7 @@ import { USER_CHANGE, cloudUser, deleteLogin, reauth, startCloud } from './accou
 import { fb } from './firebase';
 import { leaveGroup, publishStudy } from './groups';
 import { deleteMyMessages } from './chat';
+import { deleteMyEvents, publishEvent } from './events';
 import { deleteMyPosts } from './posts';
 import { getProfile } from './profile';
 import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sync';
@@ -17,7 +18,7 @@ import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sy
 export function initCloud(refresh: () => void): void {
   document.addEventListener(USER_CHANGE, () => {
     const u = cloudUser();
-    if (u) void startSync(u.uid, refresh).then(() => publishStudy().catch(() => undefined));
+    if (u) void startSync(u.uid, refresh).then(publishAll);
     else stopSync();
   });
 
@@ -25,7 +26,7 @@ export function initCloud(refresh: () => void): void {
   onStoreChange((c) => {
     if (!cloudUser()) return;
     onLocalChange(c);
-    if (c.kind !== 'state') void publishStudy().catch(() => undefined);
+    if (c.kind !== 'state') publishAll();
     else {
       // 教材の名前や色を変えたときも、ランキングの色分けを直す（まとめて少しあとに送る）
       clearTimeout(publishTimer);
@@ -47,12 +48,18 @@ export function initCloud(refresh: () => void): void {
       void startCloud()
         .then(() => {
           const now = cloudUser();
-          if (now) return startSync(now.uid, refresh).then(() => publishStudy().catch(() => undefined));
+          if (now) return startSync(now.uid, refresh).then(publishAll);
         })
         .catch((e) => console.warn('Firebase を読み込めませんでした', e));
     if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 });
     else setTimeout(go, 1500);
   }
+}
+
+/** グループのメンバー文書と、みんなのイベントの自分の合計を送る（失敗しても次にまた送る） */
+function publishAll(): void {
+  void publishStudy().catch(() => undefined);
+  void publishEvent().catch(() => undefined);
 }
 
 /**
@@ -74,6 +81,7 @@ export async function deleteAccount(password: string): Promise<void> {
       console.warn('グループの片付けができませんでした', gid, e);
     }
   }
+  await deleteMyEvents(u.uid);
   await deleteBackup(u.uid);
   const { db, F } = await fb();
   await F.deleteDoc(F.doc(db, 'users', u.uid));

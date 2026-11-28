@@ -6,7 +6,7 @@
 // - 「記録を全部消す」は clearedAt に時刻を入れて、ほかの端末でもその時刻までの記録を消す
 // - オフラインのあいだに書いたものは、Firestore が端末に覚えておいて、つながったときに送る
 
-import { getSessions, hasSavedState, mergeCloud, settings, allMaterials, type StoreChange, type Material, type Settings } from '../store';
+import { getSessions, hasSavedState, mergeCloud, mergeCollectibles, settings, allMaterials, type StoreChange, type Material, type Settings } from '../store';
 import { fb } from './firebase';
 import { chunkKey, fromCloud, isChunkKey, toCloud, type CloudSession } from './model';
 
@@ -148,9 +148,11 @@ async function pull(): Promise<void> {
     changed = mergeCloud({ settings: cloud.settings, materials: cloud.materials, replaceMaterials: true }) || changed;
     meta.stateAt = cloud.stateAt ?? 0;
   } else {
-    // 端末のほうが新しい（か同じ）。ほかの端末で作った教材だけ足して、送る
+    // 端末のほうが新しい（か同じ）。ほかの端末で作った教材・手に入れたスタイル・グミだけ足して、送る
     if (cloud?.materials) changed = mergeCloud({ materials: cloud.materials }) || changed;
-    if (!cloud || meta.stateAt > (cloud.stateAt ?? 0) || clearedAt > (cloud.clearedAt ?? 0)) await pushState();
+    const grew = mergeCollectibles(cloud?.settings);
+    changed = grew || changed;
+    if (!cloud || grew || meta.stateAt > (cloud.stateAt ?? 0) || clearedAt > (cloud.clearedAt ?? 0)) await pushState();
   }
 
   // 記録（前回読んだあとに変わった文書だけ読む）
