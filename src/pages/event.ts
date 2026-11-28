@@ -1,4 +1,6 @@
-// イベントタブ。「イベント」（ログインボーナス・シーズンの箱・今週の箱）・「クエスト」（今日のクエスト）・「お知らせ」。
+// ホーム（下のメニューの4つ目。中の名前は event のまま）。
+// ウィジェットを並べる：ログインボーナス・今日のやること・今日の勉強・今日のクエスト・シーズン・今週の目標・お知らせ。
+// 「編集」で並べ替えと、出す・出さないを決める（settings.homeOrder・homeHidden）。
 // シーズンの箱を押すと、報酬・貢献度ランキング・期間限定ガチャ・シーズンの説明が開く。今週の箱を押すと、今週の目標と日曜ボーナスが開く。
 
 import { api } from '../cloud/api';
@@ -9,7 +11,14 @@ import { dateKey } from '../cloud/model';
 import { GUMI_CHANGE, STUDY_BLOCK, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
 import { NEWS, isNewNews, markNewsSeen } from '../news';
 import { claimQuest, dailyAllClear, dailyQuests, sundayBonus, weekInfo, weeklyQuests, type Quest } from '../quests';
-import { saveSettings, settings } from '../store';
+import { getSessions, saveSettings, settings } from '../store';
+import { summarize } from '../summary';
+import { PLANS_CHANGE, dayPlans, leftovers, todayKey } from '../planbook';
+import { bindPlanRows, planRow } from './calendar';
+import { openCalendarAt } from './stats';
+import { SHOW_VIEW } from './group';
+import { HANDLE, bindDrag } from '../ui/drag';
+import { html } from '../ui/dom';
 import type { RankEntry } from '../cloud/events';
 import { tagById, tagHtml } from '../tags';
 import { avatar } from './group/ui';
@@ -19,8 +28,27 @@ import { HOUR, fmtHM, fmtTimeOfDay } from '../time';
 import { esc } from '../ui/dom';
 import { toast } from '../ui/toast';
 
-type Seg = 'event' | 'quest' | 'news';
-let seg: Seg = 'event';
+/** ホームのウィジェット（並びのはじめ） */
+const WIDGETS = [
+  { id: 'login', name: 'ログインボーナス' },
+  { id: 'todo', name: '今日のやること' },
+  { id: 'stats', name: '今日の勉強' },
+  { id: 'quest', name: '今日のクエスト' },
+  { id: 'season', name: 'シーズン（みんなのイベント）' },
+  { id: 'week', name: '今週の目標' },
+  { id: 'news', name: 'お知らせ' },
+] as const;
+type WidgetId = (typeof WIDGETS)[number]['id'];
+
+/** 今の並び（知らないものは捨て、足りないものは後ろに） */
+function widgetOrder(): WidgetId[] {
+  const known = new Set<string>(WIDGETS.map((w) => w.id));
+  const saved = settings.homeOrder.filter((id): id is WidgetId => known.has(id));
+  return [...new Set([...saved, ...WIDGETS.map((w) => w.id)])];
+}
+
+/** 並べ替え中 */
+let editing = false;
 /** シーズンと今週の箱を開いているか */
 const boxOpen = { season: false, week: false };
 
@@ -91,13 +119,13 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     void loadTotal(id)
       .then(() => {
         failed.delete(id);
-        if (view.classList.contains('active') && seg === 'event') render();
+        if (view.classList.contains('active')) render();
         document.dispatchEvent(new CustomEvent(GUMI_CHANGE)); // 下のメニューのしるしを直す
       })
       .catch((e) => {
         console.warn('イベントの合計を読めませんでした', e);
         failed.add(id);
-        if (view.classList.contains('active') && seg === 'event') render();
+        if (view.classList.contains('active')) render();
       })
       .finally(() => loading.delete(id));
   };
@@ -119,7 +147,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       .eventRanking(id)
       .then((data) => {
         ranks.set(id, { at: Date.now(), data });
-        if (view.classList.contains('active') && seg === 'event') render();
+        if (view.classList.contains('active')) render();
       })
       .catch((e) => console.warn('ランキングを読めませんでした', e));
   };
@@ -193,13 +221,12 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       </section>`;
   };
 
-  const eventHtml = (): string => {
+  /** シーズンの箱（開くと報酬・ランキング・限定ガチャ・説明）と、前のシーズンの受け取り忘れ */
+  const seasonWidget = (): string => {
     const now = Date.now();
     const { cur, prev } = liveSeasons(now);
     const signed = !!api.user();
-    if (!cur) {
-      return `${loginCardHtml()}<section class="ev-banner"><div class="ev-title">次のシーズンをお楽しみに</div></section>${weekBox(now)}`;
-    }
+    if (!cur) return '<section class="ev-banner"><div class="ev-title">次のシーズンをお楽しみに</div></section>';
     const c = cachedTotal(cur.id);
     const total = signed ? (c?.total ?? null) : null;
     const mine = mySeasonMs(cur);
@@ -210,7 +237,6 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     const open = boxOpen.season;
     const ready = list.some((t) => t.ready);
     return `
-      ${loginCardHtml()}
       <section class="ev-banner ev-box season-box${cur.look ? ` season-${esc(cur.look)}` : ''}${open ? ' open' : ''}">
         <div class="ev-box-head" role="button" tabindex="0" aria-expanded="${open}" data-box="season">
           ${cur.title ? `<span class="ev-emblem">${emblemSvg(96, cur.look)}</span>` : ''}
@@ -257,34 +283,83 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
                ${tierRows(prevList, mySeasonMs(prev))}
              </section>`
           : ''
-      }
-      ${weekBox(now)}`;
+      }`;
   };
 
-  const questHtml = (): string => {
+  /** 今日のクエストと、勉強ボーナスの次まで */
+  const questWidget = (): string => {
     const now = Date.now();
     const daily = dailyQuests(now);
     const all = dailyAllClear(now);
     const left = nextStudyBonusIn();
     return `
-      <section class="sns-card ev-card">
+      <section class="sns-card ev-card home-quest">
         <div class="ev-card-head"><span>今日のクエスト</span><span class="head-note">${fmtTimeOfDay(settings.dayBoundaryMin)}に入れ替わる</span></div>
         ${daily.map(questRow).join('')}
         ${questRow({ key: all.key, title: '3つ全部 達成する', reward: all.reward, done: all.done, claimed: all.claimed })}
-      </section>
-      <section class="sns-card ev-card">
-        <div class="ev-card-head"><span>勉強ボーナス</span><span class="head-note">自動でもらえる</span></div>
-        <div class="q-row">
+        <div class="q-row bonus-row">
           <span class="q-check" aria-hidden="true"></span>
           <span class="q-main">
-            <span class="q-title">累計 3時間ごとに ${STUDY_BONUS}グミ</span>
+            <span class="q-title">勉強ボーナス（累計3時間ごとに自動で ${STUDY_BONUS}）</span>
             <span class="q-bar"><i style="width:${pctOf(STUDY_BLOCK - left, STUDY_BLOCK)}%"></i></span>
             <span class="q-prog">次まで あと ${esc(fmtHM(left))}</span>
           </span>
           <span class="q-reward">+${STUDY_BONUS}</span>
         </div>
-      </section>
-      <p class="settings-foot">グミはショップのグミガチャや交換所で使えます。進み具合はこの端末の記録で数えます</p>`;
+      </section>`;
+  };
+
+  /** 今日のやること（カレンダーの今日の予定と、過ぎた日の残り） */
+  const todoWidget = (): string => {
+    const today = todayKey();
+    const list = dayPlans(today);
+    const left = leftovers(today);
+    const shown = left.slice(0, 4);
+    return `
+      <section class="sns-card ev-card home-todo">
+        <div class="ev-card-head"><span>今日のやること</span><button type="button" class="head-link" data-open-cal>カレンダー<span class="chevron">›</span></button></div>
+        ${list.map((p) => planRow(p, { today })).join('')}
+        ${shown.map((p) => planRow(p, { today, showDate: true })).join('')}
+        ${left.length > shown.length ? `<button type="button" class="home-more" data-open-cal>ほかに残りが${left.length - shown.length}件</button>` : ''}
+        ${list.length + left.length === 0 ? '<p class="cal-empty">今日の予定はありません。カレンダーで予定を立てると、ここに出ます</p>' : ''}
+        <div class="home-todo-foot"><button type="button" class="btn dark small" data-plan-add="${today}">＋ 予定を追加</button></div>
+      </section>`;
+  };
+
+  /** 今日の勉強（今日・今週と、目標の進み具合）。押すと統計へ */
+  const statsWidget = (): string => {
+    const s = summarize(getSessions(), Date.now(), { boundaryMin: settings.dayBoundaryMin, weekStartsOn: settings.weekStartsOn });
+    const goal = settings.dailyGoalMs;
+    return `
+      <button type="button" class="sns-card ev-card home-stats" data-open-stats>
+        <span class="ev-card-head"><span>今日の勉強</span><span class="head-note">統計<span class="chevron">›</span></span></span>
+        <span class="home-stats-nums">
+          <span><small>今日</small><b>${esc(fmtHM(s.todayMs))}</b></span>
+          <span><small>今週</small><b>${esc(fmtHM(s.weekMs))}</b></span>
+        </span>
+        ${
+          goal > 0
+            ? `<span class="home-goal${s.todayMs >= goal ? ' done' : ''}"><span class="q-bar"><i style="width:${pctOf(s.todayMs, goal)}%"></i></span><small>${
+                s.todayMs >= goal ? '今日の目標 達成' : `目標 ${fmtHM(goal)}まで あと${fmtHM(goal - s.todayMs)}`
+              }</small></span>`
+            : ''
+        }
+      </button>`;
+  };
+
+  /** お知らせ（いちばん新しいもの） */
+  const newsWidget = (): string => {
+    const n = NEWS[0];
+    if (!n) return '';
+    const fresh = NEWS.filter((x) => isNewNews(x.id)).length;
+    return `
+      <section class="sns-card ev-card home-news">
+        <div class="ev-card-head"><span>お知らせ${fresh ? '<i class="box-dot" aria-label="新しいお知らせがあります"></i>' : ''}</span><button type="button" class="head-link" data-open-news>すべて<span class="chevron">›</span></button></div>
+        <button type="button" class="home-news-item" data-open-news>
+          <span class="news-head">${isNewNews(n.id) ? '<span class="news-new">NEW</span>' : ''}<span class="news-date">${esc(n.date.replaceAll('-', '/'))}</span>${fresh > 1 ? `<span class="news-date">ほか${fresh - 1}件</span>` : ''}</span>
+          <span class="news-title">${esc(n.title)}</span>
+        </button>
+      </section>`;
   };
 
   const newsHtml = (): string =>
@@ -297,26 +372,126 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       </section>`,
     ).join('');
 
+  /** お知らせの一覧（全画面） */
+  const openNews = () => {
+    document.getElementById('news-page')?.remove();
+    const root = html(`
+      <div id="news-page" class="fullpage" role="dialog" aria-modal="true" aria-label="お知らせ">
+        <div class="sns">
+          <div class="sns-head">
+            <button type="button" class="sns-back" data-close aria-label="閉じる">×</button>
+            <div class="sns-head-title">お知らせ</div>
+            <span class="sns-head-side"></span>
+          </div>
+          ${newsHtml()}
+        </div>
+      </div>`);
+    document.getElementById('app')!.append(root);
+    root.querySelector<HTMLElement>('[data-close]')!.onclick = () => {
+      root.remove();
+      render();
+    };
+    markNewsSeen();
+    document.dispatchEvent(new CustomEvent(GUMI_CHANGE));
+  };
+
+  const widgetHtml = (id: WidgetId): string => {
+    switch (id) {
+      case 'login':
+        return loginCardHtml();
+      case 'todo':
+        return todoWidget();
+      case 'stats':
+        return statsWidget();
+      case 'quest':
+        return questWidget();
+      case 'season':
+        return seasonWidget();
+      case 'week':
+        return weekBox(Date.now());
+      case 'news':
+        return newsWidget();
+    }
+  };
+
+  /** 編集（並べ替えと、出す・出さない） */
+  const editHtml = (): string => {
+    const hidden = new Set(settings.homeHidden);
+    return `
+      <div class="home-head"><h1>ホーム</h1><button type="button" class="home-edit" data-home-done>完了</button></div>
+      <p class="sns-lead">≡ をつかんで並べ替え、スイッチで出す・出さないを決めます</p>
+      <section class="sns-card home-sort">
+        ${widgetOrder()
+          .map((id) => {
+            const w = WIDGETS.find((x) => x.id === id)!;
+            const on = !hidden.has(id);
+            return `
+              <div class="sort-row home-sort-row" data-id="${id}">
+                <button type="button" class="home-sort-main" role="switch" aria-checked="${on}" data-home-toggle="${id}">
+                  <span class="switch" aria-hidden="true"></span><span>${esc(w.name)}</span>
+                </button>
+                <span class="sort-handle" role="button" aria-label="${esc(w.name)}を動かす">${HANDLE}</span>
+              </div>`;
+          })
+          .join('')}
+      </section>
+      <button type="button" class="btn ghost small" data-home-reset>はじめの並びにもどす</button>`;
+  };
+
   const render = () => {
-    view.innerHTML = `
-      <h1>イベント</h1>
-      <div class="sns-seg event-seg" role="group">
-        <button type="button" data-seg="event" aria-pressed="${seg === 'event'}">イベント</button>
-        <button type="button" data-seg="quest" aria-pressed="${seg === 'quest'}">クエスト</button>
-        <button type="button" data-seg="news" aria-pressed="${seg === 'news'}">お知らせ</button>
-      </div>
-      <div class="event-body">${seg === 'event' ? eventHtml() : seg === 'quest' ? questHtml() : newsHtml()}</div>`;
-    view.querySelectorAll<HTMLElement>('[data-seg]').forEach((b) => {
-      b.onclick = () => {
-        seg = b.dataset.seg as Seg;
+    if (editing) {
+      view.innerHTML = editHtml();
+      view.querySelector<HTMLElement>('[data-home-done]')!.onclick = () => {
+        editing = false;
+        render();
         show();
       };
-    });
+      view.querySelectorAll<HTMLElement>('[data-home-toggle]').forEach((b) => {
+        b.onclick = () => {
+          const id = b.dataset.homeToggle!;
+          const hidden = new Set(settings.homeHidden);
+          if (hidden.has(id)) hidden.delete(id);
+          else hidden.add(id);
+          saveSettings({ homeHidden: [...hidden] });
+          render();
+        };
+      });
+      view.querySelectorAll<HTMLElement>('.sort-handle').forEach((h) =>
+        bindDrag(h, () => saveSettings({ homeOrder: [...view.querySelectorAll<HTMLElement>('.home-sort-row')].map((r) => r.dataset.id!) })),
+      );
+      view.querySelector<HTMLElement>('[data-home-reset]')!.onclick = () => {
+        saveSettings({ homeOrder: [], homeHidden: [] });
+        render();
+      };
+      return;
+    }
+    const hidden = new Set(settings.homeHidden);
+    const list = widgetOrder().filter((id) => !hidden.has(id));
+    view.innerHTML = `
+      <div class="home-head"><h1>ホーム</h1><button type="button" class="home-edit" data-home-edit>編集</button></div>
+      <div class="event-body">${list.map(widgetHtml).join('')}${
+        list.length === 0 ? '<p class="sns-lead">何も出していません。右上の「編集」で選べます</p>' : ''
+      }</div>`;
+    view.querySelector<HTMLElement>('[data-home-edit]')!.onclick = () => {
+      editing = true;
+      render();
+    };
     view.querySelector<HTMLElement>('[data-login]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       openLogin();
     });
     bindLoginCard(view);
+    bindPlanRows(view);
+    view.querySelectorAll<HTMLElement>('[data-open-cal]').forEach((b) => {
+      b.onclick = () => {
+        openCalendarAt(todayKey());
+        document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'stats' }));
+      };
+    });
+    view.querySelector<HTMLElement>('[data-open-stats]')?.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'stats' }));
+    });
+    view.querySelectorAll<HTMLElement>('[data-open-news]').forEach((b) => (b.onclick = openNews));
     view.querySelectorAll<HTMLElement>('[data-box]').forEach((b) => {
       const toggle = () => {
         const k = b.dataset.box as keyof typeof boxOpen;
@@ -375,7 +550,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     // シーズン中にはじめて開いたときは、シーズンのはじまりの演出
     const { cur } = liveSeasons();
     if (cur && introUnseen(cur)) playSeasonIntro(cur);
-    if (seg === 'event' && api.user()) {
+    if (api.user() && !settings.homeHidden.includes('season')) {
       // 先に自分の分を送ってから、全員の合計を読む（送ったときは読み直す）
       const { cur, prev } = liveSeasons();
       void api
@@ -387,21 +562,14 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
           if (cur && boxOpen.season) loadRanking(cur.id, sent);
         });
     }
-    if (seg === 'news') {
-      markNewsSeen();
-      document.dispatchEvent(new CustomEvent(GUMI_CHANGE));
-    }
   };
 
   document.addEventListener('event:show', show);
-  // 記録が増えたとき・グミが変わったときに、開いていれば描き直す
-  document.addEventListener(GUMI_CHANGE, () => {
-    if (view.classList.contains('active')) render();
-  });
+  // 記録が増えたとき・グミが変わったとき・予定が変わったときに、開いていれば描き直す
+  const again = () => {
+    if (view.classList.contains('active') && !editing) render();
+  };
+  document.addEventListener(GUMI_CHANGE, again);
+  document.addEventListener(PLANS_CHANGE, again);
   render();
-}
-
-/** 開いたときにお知らせを見るように、最初の区切りを選ぶ */
-export function openEventSeg(next: Seg): void {
-  seg = next;
 }

@@ -16,11 +16,33 @@ const errs = [];
 const browser = await chromium.launch();
 
 /** 記録・教材・設定を入れた新しい画面 */
+const BASE = (() => {
+  const d = new Date();
+  d.setHours(21, 0, 0, 0);
+  return d.getTime();
+})();
+/** 予定の見本（今日から n 日後の日付で） */
+const dk = (n) => {
+  const d = new Date(BASE + n * 86400000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const PLANS = [
+  { id: 'p1', d: dk(0), t: '', m: 'm2', a: 8, b: 9, at: 19 * 60, u: 1 },
+  { id: 'p2', d: dk(0), t: '単語 50語', m: 'm3', ms: 30 * 60000, u: 1 },
+  { id: 'p3', d: dk(0), t: '学校のプリント', u: 1, done: 1 },
+  { id: 'p4', d: dk(-1), t: '過去問 2019 大問1', u: 1 },
+  { id: 'p5', d: dk(1), t: '', m: 'm2', a: 10, b: 11, u: 1 },
+  { id: 'p6', d: dk(2), t: '模試の復習', u: 1 },
+  { id: 'p7', d: dk(3), t: '', m: 'm2', a: 12, b: 13, u: 1 },
+  { id: 'p8', d: dk(-3), t: '', m: 'm1', a: 220, b: 230, u: 1 },
+];
+
 async function fresh(query = '', extra = {}) {
   const ctx = await browser.newContext({ ...devices['iPhone 13'], deviceScaleFactor: 2 });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errs.push(e.message));
-  await p.clock.install();
+  // 時計は今日の21時にそろえる（夜中に撮っても「今日の記録」があるように）
+  await p.clock.install({ time: BASE });
   await p.addInitScript((extra) => {
     if (sessionStorage.getItem('seeded')) return;
     sessionStorage.setItem('seeded', '1');
@@ -62,7 +84,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-29a');
+    localStorage.setItem('studytimer:news', '2026-11-29b');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -200,7 +222,7 @@ const pager = (p, i) =>
 
 // ---- 統計 ----
 {
-  const p = await fresh('?fake=in');
+  const p = await fresh('?fake=in', { plans: PLANS });
   await p.click('nav [data-view=stats]');
   await p.waitForTimeout(800);
   await shot(p, 'stats', ['.stat-cards', '.week-nav', '.chart']);
@@ -236,6 +258,39 @@ const pager = (p, i) =>
   });
   await scrollView(p, 'stats', y3);
   await shot(p, 'manual_list', ['.sess:has([data-del])']);
+  // カレンダー
+  await scrollView(p, 'stats', 0);
+  await p.click('[data-stats-tab=cal]');
+  await p.waitForTimeout(600);
+  await shot(p, 'calendar', ['.stats-tabs', '.cal-mode', '.cal-ics']);
+  const yc = await p.evaluate(() => document.querySelector('.cal-day').getBoundingClientRect().top + document.querySelector('.view[data-view=stats]').scrollTop - 300);
+  await scrollView(p, 'stats', yc);
+  await shot(p, 'calendar_day', ['.cal-cell.today', '.cal-day .pl-row', '.cal-day-actions']);
+  await scrollView(p, 'stats', 0);
+  await p.click('[data-cal-mode=week]');
+  await p.waitForTimeout(400);
+  const y4 = await p.evaluate(() => document.querySelector('.wk-day.today').getBoundingClientRect().top + document.querySelector('.view[data-view=stats]').scrollTop - 330);
+  await scrollView(p, 'stats', y4);
+  await shot(p, 'calendar_week', []);
+  await p.click('[data-cal-mode=month]');
+  await p.waitForTimeout(300);
+  await p.click('.cal-day [data-plan-edit=p1]');
+  await p.waitForTimeout(500);
+  await shot(p, 'plan_edit', ['#plan-edit [data-f=t]', '#plan-edit .sns-card:has([data-material])', '#plan-edit [data-ms]', '#plan-edit .sns-card:has([data-f=d])']);
+  await p.click('#plan-edit [data-close]');
+  await p.waitForTimeout(300);
+  await p.click('.cal-day [data-plan-bulk]');
+  await p.waitForTimeout(400);
+  await p.click('#plan-bulk [data-material]');
+  await p.waitForTimeout(600);
+  await p.click('.sheet-panel .sheet-item:has-text("東進 数学"), #materials :text("東進 数学")');
+  await p.waitForTimeout(500);
+  await p.fill('#plan-bulk [data-f=b]', '20');
+  await p.dispatchEvent('#plan-bulk [data-f=b]', 'change');
+  await p.click('#plan-bulk [data-per="1"]');
+  await p.waitForTimeout(300);
+  await p.evaluate(() => document.querySelector('#plan-bulk').scrollTo(0, 120));
+  await shot(p, 'plan_bulk', ['#plan-bulk .pe-range', '#plan-bulk .wd-chips', '#plan-bulk .bulk-preview']);
   await p.context().close();
 }
 
@@ -295,10 +350,19 @@ const pager = (p, i) =>
 
 // ---- イベント・マイページ ----
 {
-  const p = await fresh('?fake=in', { gumi: { b: 4200, 'l:2026-11-27': 120 }, unlocked: ['g:asagata', 'g:shuchu', 'g:keisan', 'g:zone', 'g:kami'] });
+  const p = await fresh('?fake=in', { gumi: { b: 4200, 'l:2026-11-27': 120 }, unlocked: ['g:asagata', 'g:shuchu', 'g:keisan', 'g:zone', 'g:kami'], plans: PLANS });
   await p.click('nav [data-view=event]');
   await p.waitForTimeout(1500);
-  await shot(p, 'event', ['.login-card', '.season-box']);
+  await shot(p, 'event', ['.home-edit', '.login-card', '.home-todo']);
+  const yh = await p.evaluate(() => document.querySelector('.home-stats').getBoundingClientRect().top + document.querySelector('.view[data-view=event]').scrollTop - 70);
+  await scrollView(p, 'event', yh);
+  await shot(p, 'home_more', ['.home-stats', '.home-quest']);
+  await scrollView(p, 'event', 0);
+  await p.click('[data-home-edit]');
+  await p.waitForTimeout(400);
+  await shot(p, 'home_edit', ['.home-sort-row:nth-child(2) .home-sort-main', '.home-sort-row:nth-child(2) .sort-handle']);
+  await p.click('[data-home-done]');
+  await p.waitForTimeout(600);
   // シーズンの箱を開く
   await p.click('[data-box=season]');
   await p.waitForTimeout(900);
@@ -315,13 +379,12 @@ const pager = (p, i) =>
   await shot(p, 'event_week', []);
   await p.click('[data-box=week]');
   await scrollView(p, 'event', 0);
-  await p.click('[data-seg=quest]');
-  await shot(p, 'quest', ['.ev-card', '.ev-card:nth-of-type(2)']);
-  await p.click('[data-seg=news]');
+  await p.click('.home-news [data-open-news]');
+  await p.waitForTimeout(400);
   await shot(p, 'news', []);
-  // はじまりの演出
-  await p.click('[data-seg=event]');
+  await p.click('#news-page [data-close]');
   await p.waitForTimeout(300);
+  // はじまりの演出
   await p.click('[data-box=season]');
   await p.waitForTimeout(500);
   await p.click('[data-intro]');

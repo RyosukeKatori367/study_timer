@@ -12,6 +12,8 @@ import { esc } from '../ui/dom';
 import { confirmRemove, openManual } from './manual';
 import { api } from '../cloud/api';
 import { openCompose } from './group/compose';
+import { bindCalendar, calendarHtml, setCalendarDay } from './calendar';
+import { dateOf, studyDayKey } from '../plans';
 
 /** ログインしていてグループに入っていれば、手入力の記録をあとから投稿できる */
 const canPost = (): boolean => !!api.user() && (api.cachedProfile()?.groupIds.length ?? 0) > 0;
@@ -28,6 +30,9 @@ const colorOf = (key: string): string => materialColor(key);
 
 /** 1日の詳細で出すグラフ */
 let detailTab: 'hour' | 'lap' = 'hour';
+
+/** 統計とカレンダーのどちらを出しているか */
+let statsTab: 'stats' | 'cal' = 'stats';
 
 /** 何週前を見ているか（0 = 今週） */
 let weekOffset = 0;
@@ -267,11 +272,52 @@ function materialsHtml(sessions: Session[], weekLabel: string): string {
     </section>`;
 }
 
+const tabsHtml = (): string => `
+  <h1>統計</h1>
+  <div class="seg stats-tabs" role="group" aria-label="統計とカレンダー">
+    <button type="button" data-stats-tab="stats" aria-pressed="${statsTab === 'stats'}">統計</button>
+    <button type="button" data-stats-tab="cal" aria-pressed="${statsTab === 'cal'}">カレンダー</button>
+  </div>`;
+
+/** 次に統計タブを開いたとき、カレンダーのその日を出す */
+export function openCalendarAt(key: string, mode?: 'month' | 'week'): void {
+  statsTab = 'cal';
+  setCalendarDay(key, mode);
+}
+
+/** 統計のその日（'2026-11-29'）を出す */
+function showStatsDay(view: HTMLElement, key: string): void {
+  statsTab = 'stats';
+  const now = Date.now();
+  const opts = { boundaryMin: settings.dayBoundaryMin, weekStartsOn: settings.weekStartsOn };
+  const thisWeek = summarize(getSessions(), now, opts);
+  const day = dateOf(key).getTime() + settings.dayBoundaryMin * MIN;
+  weekOffset = day < thisWeek.weekStart ? Math.ceil((thisWeek.weekStart - day) / (7 * 24 * HOUR)) : 0;
+  const ref = weekOffset === 0 ? thisWeek : summarize(getSessions(), now, { ...opts, ref: addDays(thisWeek.weekStart, -7 * weekOffset, opts.boundaryMin) });
+  const i = ref.dayStarts.findIndex((t) => studyDayKey(t + 1000, settings.dayBoundaryMin) === key);
+  selected = i >= 0 ? i : null;
+  renderStats(view);
+  view.scrollTo(0, 0);
+}
+
 /** reset = true のときは今週に戻す（下のメニューから開いたとき） */
 export function renderStats(view: HTMLElement, reset = false): void {
   if (reset) {
     weekOffset = 0;
     selected = null;
+  }
+  const bindTabs = () =>
+    view.querySelectorAll<HTMLElement>('[data-stats-tab]').forEach((b) => {
+      b.onclick = () => {
+        statsTab = b.dataset.statsTab as 'stats' | 'cal';
+        renderStats(view);
+      };
+    });
+  if (statsTab === 'cal') {
+    view.innerHTML = tabsHtml() + calendarHtml();
+    bindTabs();
+    bindCalendar(view, () => renderStats(view), (key) => showStatsDay(view, key));
+    return;
   }
   const now = Date.now();
   const opts = { boundaryMin: settings.dayBoundaryMin, weekStartsOn: settings.weekStartsOn };
@@ -332,7 +378,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
   const range = `${fmtMD(s.dayStarts[0])}〜${fmtMD(s.dayStarts[6])}`;
 
   view.innerHTML = `
-    <h1>統計</h1>
+    ${tabsHtml()}
     <div class="stat-cards">
       <div class="stat-card"><span class="card-label">今日</span>${statValue(s.todayMs)}${goalHtml(s.todayMs)}</div>
       <div class="stat-card"><span class="card-label">${weekLabel}</span>${statValue(s.weekMs)}</div>
@@ -368,6 +414,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       })()}
     </div>`;
 
+  bindTabs();
   // 日をタップしたら、その日の詳細に切り替える
   view.querySelectorAll<HTMLElement>('.day').forEach((b) => {
     b.onclick = () => {

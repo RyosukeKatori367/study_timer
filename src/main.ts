@@ -21,6 +21,7 @@ import { claimableAchievements } from './achievements';
 import { claimableTiers } from './events';
 import { GUMI_CHANGE, fmtGumi, loginStatus, syncStudyBonus } from './gumi';
 import { unseenNews } from './news';
+import { PLANS_CHANGE } from './planbook';
 import { claimableQuests } from './quests';
 import { applyStyle } from './styles';
 import { requestPersistence } from './store';
@@ -79,6 +80,10 @@ initMyPage($('.view[data-view="my"]'), { openLogin, openView: (name) => showView
 syncStudyBonus();
 void applyStyle();
 document.addEventListener('material:change', refreshAll);
+// 予定が変わったら、統計（カレンダー）を開いていれば描き直す
+document.addEventListener(PLANS_CHANGE, () => {
+  if (current === 'stats') renderStats(statsView);
+});
 initRun(refreshAll);
 
 // ---- グループとバックアップ ----

@@ -4,6 +4,7 @@
 
 import { normalizeMode, usesLapNumbers, type Run, type Session } from './engine';
 import { MATERIAL_COLORS, defaultColor } from './palette';
+import { mergePlans, samePlans, type Plan } from './plans';
 import { MIN, setDurationStyle, type DurationStyle } from './time';
 
 const PREFIX = 'studytimer:';
@@ -92,6 +93,11 @@ export interface Settings {
   removed: string[];
   /** みんなのイベントの貢献度ランキングに名前を出す */
   eventName: boolean;
+  /** カレンダーの予定（src/plans.ts。端末どうしでは id ごとに新しいほう） */
+  plans: Plan[];
+  /** ホームのウィジェットの並び（知らないものは後ろに足す）と、出さないもの */
+  homeOrder: string[];
+  homeHidden: string[];
 }
 
 export interface PlanBlock {
@@ -139,6 +145,9 @@ const DEFAULTS: Settings = {
   pomoPlan: [],
   removed: [],
   eventName: true,
+  plans: [],
+  homeOrder: [],
+  homeHidden: [],
 };
 
 function read<T>(key: string): T | null {
@@ -197,6 +206,9 @@ export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('se
 if (!settings.gumi || typeof settings.gumi !== 'object') settings.gumi = {};
 if (!Array.isArray(settings.pomoPlan)) settings.pomoPlan = [];
 if (!Array.isArray(settings.removed)) settings.removed = [];
+if (!Array.isArray(settings.plans)) settings.plans = [];
+if (!Array.isArray(settings.homeOrder)) settings.homeOrder = [];
+if (!Array.isArray(settings.homeHidden)) settings.homeHidden = [];
 
 setDurationStyle(settings.durationStyle);
 
@@ -647,13 +659,15 @@ export function mergeLedger(a: Record<string, number>, b: unknown): Record<strin
 }
 
 /** 手に入れたスタイルとグミの台帳を、端末のものとクラウドのもので合わせた値 */
-function collectibles(cloud: Partial<Settings>): Pick<Settings, 'unlocked' | 'gumi' | 'removed'> {
+function collectibles(cloud: Partial<Settings>): Pick<Settings, 'unlocked' | 'gumi' | 'removed' | 'plans'> {
   const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
   return {
     unlocked: [...new Set([...settings.unlocked, ...strings(cloud.unlocked)])],
     gumi: mergeLedger(settings.gumi, cloud.gumi),
     // 消した記録は、どちらの端末で消したものも覚えておく
     removed: [...new Set([...settings.removed, ...strings(cloud.removed)])],
+    // 予定は id ごとに、新しく変えたほうを残す
+    plans: mergePlans(settings.plans, cloud.plans),
   };
 }
 
@@ -667,6 +681,7 @@ export function mergeCollectibles(cloud: Partial<Settings> | undefined): boolean
   const grew =
     next.unlocked.length !== settings.unlocked.length ||
     next.removed.length !== settings.removed.length ||
+    !samePlans(next.plans, settings.plans) ||
     Object.keys(next.gumi).length !== Object.keys(settings.gumi).length ||
     Object.entries(next.gumi).some(([k, v]) => settings.gumi[k] !== v);
   if (!grew) return false;
