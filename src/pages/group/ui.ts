@@ -2,7 +2,8 @@
 
 import { api } from '../../cloud/api';
 import { errorMessage } from '../../cloud/account';
-import { firstGrapheme, iconColors, isDeveloper, type Icon } from '../../cloud/model';
+import { firstGrapheme, iconColors, type Icon } from '../../cloud/model';
+import { shownTag, tagHtml } from '../../tags';
 import { esc, html } from '../../ui/dom';
 import { toast } from '../../ui/toast';
 
@@ -22,9 +23,10 @@ export function groupIcon(name: string, hue: number, size = 44): string {
 }
 
 /** 名前と、そのあとのしるし（開発者・作成者・自分） */
-export function nameHtml(uid: string, name: string, opt: { owner?: boolean } = {}): string {
+export function nameHtml(uid: string, name: string, opt: { owner?: boolean; tag?: string } = {}): string {
   const me = api.user()?.uid === uid;
-  return `<span class="sns-name">${esc(name)}</span>${isDeveloper(uid) ? '<span class="tag dev">開発者</span>' : ''}${
+  const t = shownTag(uid, opt.tag);
+  return `<span class="sns-name">${esc(name)}</span>${t ? tagHtml(t) : ''}${
     opt.owner ? '<span class="tag">作成者</span>' : ''
   }${me ? '<span class="tag me">自分</span>' : ''}`;
 }

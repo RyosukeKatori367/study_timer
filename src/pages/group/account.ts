@@ -4,6 +4,8 @@ import { api } from '../../cloud/api';
 import { credentialError } from '../../cloud/account';
 import { BIO_MAX, ICON_IMAGE_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
 import { cropImage } from '../../ui/cropper';
+import { ownedTags } from '../../styles';
+import { tagById, tagHtml } from '../../tags';
 import { $, html } from '../../ui/dom';
 import { toast } from '../../ui/toast';
 import { avatar, busy, field, header, hueSlider, type Nav, type Screen } from './ui';
@@ -144,6 +146,7 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
       ${field('アイコンの色', '<span data-hue></span>')}
       ${field(`表示名（グループの人に見える・${NAME_MAX}文字まで）`, `<input class="input" name="name" autocomplete="nickname" placeholder="そら">`)}
       ${field(`ひとこと（なくてもいい・${BIO_MAX}文字まで）`, `<input class="input" name="bio" autocomplete="off" placeholder="物理がんばる">`)}
+      <div class="field"><span class="field-label">タグ（名前の横に出る）</span><div class="chip-row" data-tags></div></div>
       <button type="submit" class="btn primary">${setup ? 'はじめる' : '保存'}</button>
       ${setup ? '<p class="sns-lead">あとから設定のアカウントで変えられます</p>' : ''}
     </form>`) as HTMLFormElement;
@@ -193,11 +196,36 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
   };
   render();
 
+  // タグ：持っているものから選ぶ（なしも選べる）
+  const owned = ownedTags(api.user()?.uid);
+  let tag = p?.tag ?? (owned.includes('dev') ? 'dev' : 'none');
+  const renderTags = () => {
+    const box = $('[data-tags]', el);
+    if (owned.length === 0) {
+      box.innerHTML = '<span class="sns-note" style="margin:0">まだ持っていません。グミガチャなどで手に入ります</span>';
+      return;
+    }
+    box.innerHTML = [
+      `<button type="button" class="chip" data-tag="none" aria-pressed="${tag === 'none'}">なし</button>`,
+      ...owned.map((id) => {
+        const t = tagById(id)!;
+        return `<button type="button" class="chip chip-tag" data-tag="${id}" aria-pressed="${tag === id}">${tagHtml(t)}</button>`;
+      }),
+    ].join('');
+    box.querySelectorAll<HTMLElement>('[data-tag]').forEach((b) => {
+      b.onclick = () => {
+        tag = b.dataset.tag!;
+        renderTags();
+      };
+    });
+  };
+  renderTags();
+
   el.onsubmit = async (e) => {
     e.preventDefault();
     render();
     const ok = await busy($('[type="submit"]', el), () =>
-      api.saveProfile({ name: name.value, bio: bio.value, icon: { ...icon, c: firstGrapheme(char.value) || firstGrapheme(name.value) } }),
+      api.saveProfile({ name: name.value, bio: bio.value, icon: { ...icon, c: firstGrapheme(char.value) || firstGrapheme(name.value) }, tag }),
     );
     if (!ok) return;
     if (setup) nav.home();

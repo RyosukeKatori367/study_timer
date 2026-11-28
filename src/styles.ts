@@ -3,12 +3,12 @@
 // （常時表示で明るい画面をつけっぱなしにしないため）。模様は計測中の画面には出さない。
 // 模様の画像は public/patterns/ に置いた SVG（GitHub Pages から配る）。テーマの色に塗って使う。
 
-import { dateKey } from './cloud/model';
+import { dateKey, isDeveloper } from './cloud/model';
 import { GENERATED_PATTERNS } from './patterns.gen';
 import { saveSettings, settings } from './store';
 
-/** BASE ははじめから使えるもの（ガチャには出ない）。SECRET は1つだけの隠しもの */
-export type Rarity = 'BASE' | 'N' | 'R' | 'SR' | 'SSR' | 'SECRET';
+/** BASE ははじめから使えるもの（ガチャには出ない）。SECRET は1つだけの隠しもの。LEGEND は豪運タグ */
+export type Rarity = 'BASE' | 'N' | 'R' | 'SR' | 'SSR' | 'SECRET' | 'LEGEND';
 
 export interface ThemeItem {
   kind: 'theme';
@@ -42,7 +42,20 @@ export interface PatternItem {
   alpha: number;
 }
 
-export type StyleItem = ThemeItem | PatternItem;
+/** 名前の横に出すタグ（グループで見える） */
+export interface TagItem {
+  kind: 'tag';
+  id: string;
+  name: string;
+  rarity: Rarity;
+  /** src/tags.ts の id */
+  tag: string;
+}
+
+export type StyleItem = ThemeItem | PatternItem | TagItem;
+
+/** ガチャで出るタグ */
+export const TAG_ITEMS: TagItem[] = [{ kind: 'tag', id: 'g:gouun', name: '豪運', rarity: 'LEGEND', tag: 'gouun' }];
 
 const t = (id: string, name: string, rarity: Rarity, light: string, strong: string, more: Partial<ThemeItem> = {}): ThemeItem => ({
   kind: 'theme',
@@ -140,7 +153,7 @@ export const THEMES: ThemeItem[] = [
 
 export const PATTERNS: PatternItem[] = [{ kind: 'pattern', id: 'p:none', name: 'なし', rarity: 'BASE', alpha: 0 }, ...GENERATED_PATTERNS];
 
-export const ALL_ITEMS: StyleItem[] = [...THEMES, ...PATTERNS];
+export const ALL_ITEMS: StyleItem[] = [...THEMES, ...PATTERNS, ...TAG_ITEMS];
 /** ガチャで出るもの */
 export const GACHA_ITEMS: StyleItem[] = ALL_ITEMS.filter((x) => x.rarity !== 'BASE');
 
@@ -152,8 +165,8 @@ export const currentPattern = (): PatternItem => PATTERNS.find((p) => p.id === s
 // ---- ガチャ ----
 
 /** レア度ごとの確率（%）。まだ持っていないものがあるレア度の中で割り振り直す */
-export const RARITY_RATE: Record<Exclude<Rarity, 'BASE'>, number> = { N: 50, R: 30, SR: 14, SSR: 5, SECRET: 1 };
-export const GACHA_RARITIES = ['N', 'R', 'SR', 'SSR', 'SECRET'] as const;
+export const RARITY_RATE: Record<Exclude<Rarity, 'BASE'>, number> = { N: 50, R: 30, SR: 14, SSR: 4.95, SECRET: 1, LEGEND: 0.05 };
+export const GACHA_RARITIES = ['N', 'R', 'SR', 'SSR', 'SECRET', 'LEGEND'] as const;
 
 /** 今の確率（レア度ごとと、1つずつ）。持っていないものがないレア度は 0 */
 export function currentRates(locked: StyleItem[]): { rarity: Record<string, number>; item: Map<string, number> } {
@@ -217,6 +230,21 @@ export function nextDrawAt(now = Date.now()): Date {
 
 // ---- 見た目に反映する ----
 
+function rgba(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+/** 計測中以外の背景（黒に、テーマの色をうっすら混ぜたグラデーション） */
+export function themeBackground(th: ThemeItem): string {
+  const second = th.nav?.match(/#[0-9a-f]{6}/gi)?.at(-1) ?? th.light;
+  return [
+    `radial-gradient(120% 55% at 50% 0%, ${rgba(th.light, 0.2)}, transparent 70%)`,
+    `radial-gradient(90% 45% at 100% 100%, ${rgba(second, 0.12)}, transparent 70%)`,
+    `linear-gradient(180deg, ${rgba(th.light, 0.05)}, rgba(0, 0, 0, 0) 60%)`,
+  ].join(', ');
+}
+
 function shade(hex: string, k: number): string {
   const n = parseInt(hex.slice(1), 16);
   const f = (v: number) => Math.round(Math.max(0, Math.min(255, v * k)));
@@ -270,17 +298,30 @@ export async function applyStyle(): Promise<void> {
   else delete root.dataset.anim;
   const app = document.getElementById('app');
   if (!app) return;
+  // 模様を上に、テーマの色のグラデーションを下に重ねる（計測中の画面は黒い背景で隠れる）
+  const bg = themeBackground(t);
+  let pattern = 'none';
   try {
-    app.style.backgroundImage = await patternUrl(p, t.light);
+    pattern = await patternUrl(p, t.light);
   } catch {
-    app.style.backgroundImage = 'none'; // オフラインで模様を読めなかったときは、模様なし
-    applied = '';
+    applied = ''; // オフラインで模様を読めなかったときは、模様なし（次に開いたときにまた読む）
   }
+  const layers = pattern === 'none' ? [bg] : [pattern, bg];
+  app.style.backgroundImage = layers.join(', ');
+  const grads = bg.split('gradient(').length - 1;
+  app.style.backgroundRepeat = [...(pattern === 'none' ? [] : ['repeat']), ...Array(grads).fill('no-repeat')].join(', ');
+  app.style.backgroundSize = [...(pattern === 'none' ? [] : ['auto']), ...Array(grads).fill('100% 100%')].join(', ');
 }
 
 /** スタイルを選ぶ（持っているものだけ） */
 export function useStyle(item: StyleItem): void {
-  if (!isOwned(item.id)) return;
+  if (!isOwned(item.id) || item.kind === 'tag') return;
   saveSettings(item.kind === 'theme' ? { theme: item.id } : { pattern: item.id });
   void applyStyle();
+}
+
+/** 持っているタグ（src/tags.ts の id）。開発者タグは開発者だけ */
+export function ownedTags(uid: string | undefined): string[] {
+  const out = TAG_ITEMS.filter((x) => isOwned(x.id)).map((x) => x.tag);
+  return uid && isDeveloper(uid) ? ['dev', ...out] : out;
 }

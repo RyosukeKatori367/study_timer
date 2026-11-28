@@ -80,7 +80,8 @@ function member(uid: string, todayMin: number, weekMin: number, joined: number):
   const month = Object.values(days).reduce((a, b) => a + b, 0) * 3;
   const sums = { all: month * 7, months: { [today.slice(0, 7)]: month } };
   const matImgs = uid === 'haru' ? { m0: fakeImg('#1e5bd8', 'α'), m1: fakeImg('#ef6c1a', '化') } : undefined;
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}) };
+  const tag = uid === 'haru' ? { tag: 'gouun' } : {};
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}), ...tag };
 }
 
 interface FakeGroup {
@@ -237,7 +238,7 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       await wait();
       profile = { ...(profile ?? { groupIds: [], postPrefs: DEFAULT_POST_PREFS }), ...p, name: p.name.trim(), bio: p.bio.trim() };
       people.me = { name: profile.name, icon: profile.icon };
-      for (const x of groups.values()) for (const m of x.members) if (m.uid === 'me') Object.assign(m, people.me);
+      for (const x of groups.values()) for (const m of x.members) if (m.uid === 'me') Object.assign(m, people.me, profile.tag ? { tag: profile.tag } : {});
       changed();
     },
     savePostPrefs: async (prefs) => {

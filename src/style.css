@@ -2108,9 +2108,26 @@ textarea {
   line-height: 1.4;
 }
 
-.tag.dev {
+.tag.dev,
+.tag.tag-dev {
   background: linear-gradient(135deg, #9887ef, #e24d8b);
   color: #fff;
+}
+
+/* 豪運：金色のタグ（光が流れる） */
+.tag.tag-gold {
+  background: linear-gradient(110deg, #b8862b 0%, #f7d774 35%, #fff6c9 50%, #f2c94c 65%, #b8862b 100%);
+  background-size: 220% 100%;
+  color: #3a2600;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(242, 201, 76, 0.45);
+  animation: gold-shine 3.2s linear infinite;
+}
+
+@keyframes gold-shine {
+  to {
+    background-position: -220% 0;
+  }
 }
 
 .tag.me {
@@ -4370,4 +4387,72 @@ html[data-anim='rainbow'] .ring-on {
 
 .rate-row:last-child {
   padding-bottom: 14px;
+}
+
+/* ---------- タグ（スタイルタブ・ガチャ） ---------- */
+
+.rarity.r-LEGEND {
+  background: linear-gradient(110deg, #b8862b, #f7d774, #fff6c9, #f2c94c);
+  color: #3a2600;
+}
+
+.tag-prev {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, #2a2210, #0d0a04);
+}
+
+.tag-prev .tag {
+  margin: 0;
+  font-size: 15px;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.tag-prev.big .tag {
+  font-size: 30px;
+  padding: 8px 22px;
+  border-radius: 20px;
+}
+
+.style-tile.locked .tag-prev {
+  filter: saturate(0.4) brightness(0.5);
+}
+
+.chip-tag {
+  padding: 5px 10px;
+}
+
+.chip-tag .tag {
+  margin: 0;
+}
+
+#gacha.r-LEGEND {
+  --rc: #f2c94c;
+}
+
+#gacha.r-LEGEND .g-rays {
+  background: repeating-conic-gradient(from 0deg, #fff1b0 0deg 4deg, transparent 4deg 10deg, #f2c94c 10deg 14deg, transparent 14deg 20deg);
+}
+
+#gacha.r-LEGEND .g-rarity {
+  background: linear-gradient(110deg, #b8862b, #f7d774, #fff6c9, #f2c94c, #b8862b);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: g-rainbow 2s linear infinite;
+}
+
+.g-secret.gold {
+  color: #f7d774;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag.tag-gold {
+    animation: none;
+  }
 }

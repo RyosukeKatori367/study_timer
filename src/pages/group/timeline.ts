@@ -66,7 +66,7 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
       <div class="post-head">
         <button type="button" class="post-avatar" data-who aria-label="${esc(author.name)}の統計">${avatar(author.icon, 36)}</button>
         <div class="post-who" data-who>
-          <div class="sns-row-title">${nameHtml(p.uid, author.name)}</div>
+          <div class="sns-row-title">${nameHtml(p.uid, author.name, { tag: ctx.members.get(p.uid)?.tag })}</div>
           <div class="post-time">${p.pending ? '送信待ち' : esc(postTime(p.at))}</div>
         </div>
         ${canMenu ? '<button type="button" class="post-menu" data-menu aria-label="メニュー">⋯</button>' : ''}
@@ -208,7 +208,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
             ${avatar(r.item.icon, 36)}
             <span class="sns-row-main">
               <span class="rank-line">
-                <span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid })}</span>
+                <span class="sns-row-title">${nameHtml(r.item.uid, r.item.name, { owner: ctx.group?.ownerId === r.item.uid, tag: r.item.tag })}</span>
                 <span class="ms">${r.ms > 0 ? esc(fmtHM(r.ms)) : '—'}</span>
               </span>
               ${r.ms > 0 ? `<span class="rank-bar" style="width:${x(r.ms)}%" aria-hidden="true">${bar}</span>` : ''}
@@ -316,7 +316,7 @@ export async function postScreen(nav: Nav, gid: string, pid: string): Promise<Sc
             ${avatar(w.icon, 32)}
             <div class="reply-body">
               <div class="reply-head">
-                <span class="sns-row-title">${nameHtml(r.uid, w.name)}</span>
+                <span class="sns-row-title">${nameHtml(r.uid, w.name, { tag: ctx.members.get(r.uid)?.tag })}</span>
                 <span class="post-time">${r.pending ? '送信待ち' : esc(postTime(r.at))}</span>
                 ${canDelete ? '<button type="button" class="post-menu" data-reply-menu aria-label="メニュー">⋯</button>' : ''}
               </div>
@@ -409,7 +409,7 @@ export async function groupSettingsScreen(nav: Nav, gid: string): Promise<Screen
               const ms = sumDays(m.days, today);
               return `<button type="button" class="sns-row" data-uid="${esc(m.uid)}">
                 ${avatar(m.icon, 36)}
-                <span class="sns-row-main"><span class="sns-row-title">${nameHtml(m.uid, m.name, { owner: m.uid === group!.ownerId })}</span></span>
+                <span class="sns-row-main"><span class="sns-row-title">${nameHtml(m.uid, m.name, { owner: m.uid === group!.ownerId, tag: m.tag })}</span></span>
                 <span class="sns-row-end">${ms > 0 ? `今日 ${esc(fmtHM(ms))}` : '—'}<span class="chevron" aria-hidden="true">›</span></span>
               </button>`;
             })

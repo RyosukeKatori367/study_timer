@@ -32,13 +32,14 @@ function normalize(d: Partial<UserDoc>): UserDoc {
     name: d.name ?? '',
     bio: d.bio ?? '',
     icon: d.icon ?? { c: '🙂', h: 200 },
+    ...(d.tag ? { tag: d.tag } : {}),
     groupIds: d.groupIds ?? [],
     postPrefs: { ...DEFAULT_POST_PREFS, ...(d.postPrefs ?? {}) },
   };
 }
 
 /** プロフィールを保存する（初めてなら作る）。入っているグループにも反映する */
-export async function saveProfile(p: { name: string; bio: string; icon: Icon }): Promise<void> {
+export async function saveProfile(p: { name: string; bio: string; icon: Icon; tag?: string }): Promise<void> {
   const err = profileError(p);
   if (err) throw new Error(err);
   const { db, F } = await fb();
@@ -46,17 +47,19 @@ export async function saveProfile(p: { name: string; bio: string; icon: Icon }):
   const current = cache ?? (await getProfile());
   const icon: Icon = { c: p.icon.c, h: Math.round(p.icon.h) % 360 };
   if (p.icon.img) icon.img = p.icon.img;
+  const tag = p.tag ?? current?.tag;
   const next: UserDoc = {
     name: p.name.trim(),
     bio: p.bio.trim(),
     icon,
+    ...(tag ? { tag } : {}),
     groupIds: current?.groupIds ?? [],
     postPrefs: current?.postPrefs ?? DEFAULT_POST_PREFS,
   };
   const batch = F.writeBatch(db);
   batch.set(F.doc(db, 'users', me), { ...next, updatedAt: F.serverTimestamp() });
   for (const gid of next.groupIds) {
-    batch.update(F.doc(db, 'groups', gid, 'members', me), { name: next.name, icon: next.icon });
+    batch.update(F.doc(db, 'groups', gid, 'members', me), { name: next.name, icon: next.icon, ...(tag ? { tag } : {}) });
   }
   try {
     await batch.commit();

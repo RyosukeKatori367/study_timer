@@ -4,6 +4,7 @@
 import {
   ALL_ITEMS,
   GACHA_ITEMS,
+  TAG_ITEMS,
   GACHA_RARITIES,
   PATTERNS,
   RARITY_RATE,
@@ -24,6 +25,8 @@ import {
   type StyleItem,
   type ThemeItem,
 } from '../styles';
+import { api } from '../cloud/api';
+import { tagById, tagHtml } from '../tags';
 import { pad2 } from '../time';
 import { $, esc, html } from '../ui/dom';
 import { toast } from '../ui/toast';
@@ -57,7 +60,7 @@ function tileHtml(item: StyleItem, selected: boolean): string {
         ${rarityTag(item.rarity)}
       </button>`;
   }
-  const prev = item.kind === 'theme' ? themePreview(item) : `<span class="pattern-prev" data-pattern="${esc(item.id)}" aria-hidden="true"></span>`;
+  const prev = previewHtml(item);
   return `
     <button type="button" class="style-tile${owned ? '' : ' locked'}" data-id="${esc(item.id)}" aria-pressed="${selected}"
       aria-label="${esc(item.name)}${owned ? '' : '（まだ持っていません）'}">
@@ -66,6 +69,19 @@ function tileHtml(item: StyleItem, selected: boolean): string {
       ${rarityTag(item.rarity)}
     </button>`;
 }
+
+/** 見本（テーマは円とボタン、模様は柄、タグは名前の横に出るしるし） */
+function previewHtml(item: StyleItem, big = false): string {
+  if (item.kind === 'theme') return themePreview(item);
+  if (item.kind === 'tag') {
+    const t = tagById(item.tag);
+    return `<span class="tag-prev${big ? ' big' : ''}" aria-hidden="true">${t ? tagHtml(t) : ''}</span>`;
+  }
+  return `<span class="pattern-prev${big ? ' big' : ''}" data-pattern="${esc(item.id)}" aria-hidden="true"></span>`;
+}
+
+/** 今プロフィールで付けているタグ */
+const profileTag = (): string | undefined => api.cachedProfile()?.tag;
 
 /** 模様の見本を、テーマの色で塗る（見やすいように本番より濃くする） */
 function paintPatterns(root: HTMLElement, color: string): void {
@@ -127,6 +143,10 @@ export function initStylePage(view: HTMLElement): void {
         <h2 class="group-head">模様<span class="head-note">${ownedOf(PATTERNS.filter((x) => x.rarity !== 'BASE'))}</span></h2>
         ${grid(PATTERNS, pattern.id)}
       </section>
+      <section class="style-section">
+        <h2 class="group-head">タグ<span class="head-note">名前の横に出ます</span></h2>
+        ${grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === profileTag())?.id ?? '')}
+      </section>
       <p class="settings-foot">テーマはボタン・計測の円・下のメニューの色が変わります。模様は背景に出ます（計測中の画面には出しません）</p>`;
     paintPatterns(view, theme.light);
 
@@ -136,6 +156,7 @@ export function initStylePage(view: HTMLElement): void {
         if (!isOwned(item.id)) {
           return toast(item.rarity === 'SECRET' ? 'シークレット。何が出るかはお楽しみ' : `まだ持っていません。グミガチャで出ます（${item.rarity}）`);
         }
+        if (item.kind === 'tag') return void setTag(item.tag).then(render);
         useStyle(item);
         render();
       };
@@ -158,6 +179,21 @@ export function initStylePage(view: HTMLElement): void {
   render();
 }
 
+/** プロフィールのタグを付ける（ログインしていないときは、付け方を伝える） */
+async function setTag(tag: string): Promise<void> {
+  if (!api.user()) return toast('ログインすると、グループで名前の横に出せます');
+  try {
+    const p = api.cachedProfile() ?? (await api.getProfile());
+    if (!p) return toast('先にプロフィールを作ってください');
+    const next = p.tag === tag ? 'none' : tag;
+    await api.saveProfile({ name: p.name, bio: p.bio, icon: p.icon, tag: next });
+    toast(next === 'none' ? 'タグを外しました' : `「${tagById(next)?.name}」を付けました`);
+    document.dispatchEvent(new CustomEvent('style:show')); // 一覧の「付けている」を直す
+  } catch {
+    toast('付けられませんでした。オフラインかもしれません');
+  }
+}
+
 // ---- 排出確率 ----
 
 const RARITY_NOTE: Record<string, string> = {
@@ -166,9 +202,11 @@ const RARITY_NOTE: Record<string, string> = {
   SR: 'あざやかなグラデーション・動物や理科の模様',
   SSR: '特別なグラデーション・文字や宇宙の模様',
   SECRET: '1つだけの隠しもの',
+  LEGEND: '名前の横に出る金色のタグ「豪運」',
 };
 
 const pct = (p: number): string => (p === 0 ? '0%' : p < 0.1 ? `${p.toFixed(2)}%` : `${p.toFixed(1)}%`);
+const KIND_NAME = { theme: 'テーマ', pattern: '模様', tag: 'タグ' } as const;
 
 function openRates(): void {
   const locked = lockedItems();
@@ -187,7 +225,7 @@ function openRates(): void {
         ${items
           .map((x) => {
             const hidden = x.rarity === 'SECRET' && !isOwned(x.id);
-            const name = hidden ? '？？？' : `${x.name}<small>${x.kind === 'theme' ? 'テーマ' : '模様'}</small>`;
+            const name = hidden ? '？？？' : `${x.name}<small>${KIND_NAME[x.kind]}</small>`;
             const p = isOwned(x.id) ? '持っている' : pct(now.item.get(x.id) ?? 0);
             return `<div class="rate-row${isOwned(x.id) ? ' owned' : ''}"><span>${hidden ? name : name}</span><span>${p}</span></div>`;
           })
@@ -202,7 +240,7 @@ function openRates(): void {
         <span class="sns-head-side"></span>
       </div>
       <div class="prose">
-        <p>グミガチャは1日1回、まだ持っていないテーマか模様が1つ出ます（同じものは出ません）。</p>
+        <p>グミガチャは1日1回、まだ持っていないテーマ・模様・タグが1つ出ます（同じものは出ません）。</p>
         <p>先にレア度を下の確率で決め、そのレア度の中のまだ持っていないものから、同じ確率で1つ選びます。持っていないものがなくなったレア度の分は、残りのレア度に割り振り直します。ベースカラーは、はじめから使えるのでガチャには出ません。</p>
       </div>
       <table class="rate-table">
@@ -222,7 +260,7 @@ function openRates(): void {
 /** グミの立方体（上・左・右の面の色）。SSR は虹色 */
 function cubeSvg(rarity0: Rarity | 'jar', size: number, fill?: [string, string, string]): string {
   // シークレットは SSR と同じ虹色の立方体（演出のほうで、さらに特別にする）
-  const rarity = rarity0 === 'SECRET' ? 'SSR' : rarity0 === 'BASE' ? 'N' : rarity0;
+  const rarity = rarity0 === 'SECRET' ? 'SSR' : rarity0 === 'BASE' ? 'N' : rarity0 === 'LEGEND' ? 'SR' : rarity0;
   const k = Math.cos(Math.PI / 6);
   const s = 40;
   const c = 50;
@@ -317,9 +355,11 @@ function openGacha(item: StyleItem | null, onDone: () => void): void {
     set('g-open');
     host.querySelector<HTMLElement>('[data-use]')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (item) useStyle(item);
       close();
-      toast(`「${item?.name}」にしました`);
+      if (!item) return;
+      if (item.kind === 'tag') return void setTag(item.tag);
+      useStyle(item);
+      toast(`「${item.name}」にしました`);
     });
     $('[data-close]', host).addEventListener('click', (e) => {
       e.stopPropagation();
@@ -344,18 +384,18 @@ function resultHtml(item: StyleItem | null): string {
       <div class="g-kind">新しいスタイルが増えたら、また出ます</div>
       <div class="g-buttons"><button type="button" class="btn primary" data-close>閉じる</button></div>`;
   }
-  const prev =
-    item.kind === 'theme'
-      ? themePreview(item)
-      : `<span class="pattern-prev big" data-pattern="${esc(item.id)}" aria-hidden="true"></span>`;
+  const prev = previewHtml(item, true);
   return `
     <div class="g-rarity">${item.rarity}</div>
     ${item.rarity === 'SECRET' ? '<div class="g-secret">シークレットを引きました！</div>' : ''}
+    ${item.rarity === 'LEGEND' ? '<div class="g-secret gold">豪運！ 0.05%を引きました</div>' : ''}
     <div class="g-prev">${prev}</div>
     <div class="g-name">${esc(item.name)}</div>
-    <div class="g-kind">${item.kind === 'theme' ? 'テーマ' : '模様'}が使えるようになりました</div>
+    <div class="g-kind">${
+      item.kind === 'tag' ? '名前の横に出るタグです。スタイルかプロフィールで付けられます' : `${KIND_NAME[item.kind]}が使えるようになりました`
+    }</div>
     <div class="g-buttons">
       <button type="button" class="btn ghost" data-close>閉じる</button>
-      <button type="button" class="btn primary" data-use>使ってみる</button>
+      <button type="button" class="btn primary" data-use>${item.kind === 'tag' ? '付けてみる' : '使ってみる'}</button>
     </div>`;
 }

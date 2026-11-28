@@ -126,10 +126,11 @@ export async function watchMembers(gid: string, cb: (list: Member[]) => void): P
 // ---- 作る・入る ----
 
 /** 入るときのメンバー文書 */
-function memberData(F: Fb['F'], p: { name: string; icon: MemberDoc['icon'] }, code: string) {
+function memberData(F: Fb['F'], p: { name: string; icon: MemberDoc['icon']; tag?: string }, code: string) {
   return {
     name: p.name,
     icon: p.icon,
+    ...(p.tag ? { tag: p.tag } : {}),
     joinedAt: F.serverTimestamp(),
     joinCode: code,
     days: myDays(),

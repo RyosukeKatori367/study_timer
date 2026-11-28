@@ -35,6 +35,12 @@ service cloud.firestore {
     function validCode(c) { return c is string && c.matches('^[A-HJKMNP-Z2-9]{8}$'); }
     /** 日ごとの勉強時間 { '2026-11-27': ms }（直近14日） */
     function validDays(d) { return d is map && d.size() <= 14; }
+    /** 名前の横のタグ（あってもなくてもよい）。開発者タグは開発者だけ */
+    function validTag(data, uid) {
+      return !('tag' in data)
+        || (data.tag is string && data.tag.size() <= 24
+            && (data.tag != 'dev' || uid == 'WrJppVm6T2VDHKUC1otLdn9rC7w1'));
+    }
     /** 日ごと・教材ごとの内訳（あってもなくてもよい） */
     function validMats(data) { return !('mats' in data) || (data.mats is map && data.mats.size() <= 14); }
     /** 教材の画像 { 教材の id: data URL }（あってもなくてもよい） */
@@ -60,7 +66,8 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if isMe(uid);
       allow create, update: if isMe(uid)
-        && request.resource.data.keys().hasOnly(['name', 'bio', 'icon', 'groupIds', 'postPrefs', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'icon', 'tag', 'groupIds', 'postPrefs', 'updatedAt'])
+        && validTag(request.resource.data, uid)
         && validName(request.resource.data.name)
         && request.resource.data.bio is string && request.resource.data.bio.size() <= 120
         && validIcon(request.resource.data.icon)
@@ -130,7 +137,8 @@ service cloud.firestore {
         allow read: if isMember(gid);
 
         allow create: if isMe(uid)
-          && request.resource.data.keys().hasOnly(['name', 'icon', 'joinedAt', 'joinCode', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
+          && request.resource.data.keys().hasOnly(['name', 'icon', 'tag', 'joinedAt', 'joinCode', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
+          && validTag(request.resource.data, uid)
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && request.resource.data.joinedAt == request.time
@@ -151,7 +159,8 @@ service cloud.firestore {
           && getAfter(userPath(uid)).data.groupIds.size() <= 10;
 
         allow update: if isMe(uid)
-          && changed().hasOnly(['name', 'icon', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
+          && changed().hasOnly(['name', 'icon', 'tag', 'days', 'mats', 'matImgs', 'sums', 'lastStudyAt'])
+          && validTag(request.resource.data, uid)
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
           && validDays(request.resource.data.days)

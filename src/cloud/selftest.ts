@@ -125,6 +125,8 @@ async function run(): Promise<void> {
     await allow('自分のバックアップは書ける', () =>
       F.setDoc(F.doc(a.db, 'users', a.uid, 'backup', 'state'), { stateAt: 1 }),
     );
+    await deny('開発者のタグは開発者しか付けられない', () => F.setDoc(F.doc(a.db, 'users', a.uid), { ...profile('A'), tag: 'dev' }));
+    await allow('ほかのタグは付けられる', () => F.setDoc(F.doc(a.db, 'users', a.uid), { ...profile('A'), tag: 'gouun' }));
     await deny('表示名が長すぎると保存できない', () =>
       F.setDoc(F.doc(a.db, 'users', a.uid), { ...profile('あ'.repeat(41)) }),
     );
@@ -207,6 +209,12 @@ async function run(): Promise<void> {
         mats: { '2026-11-27': { _: { n: '教材なし', c: '#d9d9d9', ms: 60000 } } },
         lastStudyAt: 2,
       }),
+    );
+    await deny('メンバーの情報にも開発者のタグは付けられない', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { tag: 'dev' }),
+    );
+    await allow('メンバーの情報にタグを付けられる', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { tag: 'gouun' }),
     );
     await allow('教材の画像を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { matImgs: { m1: TINY_JPEG } }),

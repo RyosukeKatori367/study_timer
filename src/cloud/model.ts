@@ -108,6 +108,8 @@ export interface UserDoc {
   name: string;
   bio: string;
   icon: Icon;
+  /** 名前の横に出すタグ（src/tags.ts の id。'none' なら出さない。なければ開発者だけ開発者タグ） */
+  tag?: string;
   /** 入っているグループの id */
   groupIds: string[];
   postPrefs: PostPrefs;
@@ -143,6 +145,8 @@ export interface GroupDoc {
 export interface MemberDoc {
   name: string;
   icon: Icon;
+  /** 名前の横に出すタグ（プロフィールの写し） */
+  tag?: string;
   joinedAt: unknown;
   /** 入るときに使った招待コード（ルールで確かめるため） */
   joinCode: string;

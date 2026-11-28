@@ -93,13 +93,13 @@ export function createChat(gid: string, ctx: () => { members: Map<string, Member
       const head = !prev || prev.uid !== m.uid || m.at - prev.at > GROUP_MS || dayOf(prev.at) !== dayOf(m.at);
       const tail = !next || next.uid !== m.uid || next.at - m.at > GROUP_MS || dayOf(next.at) !== dayOf(m.at);
       const mine = m.uid === meId;
-      const who = members.get(m.uid) ?? { name: m.name, icon: m.icon };
+      const who: { name: string; icon: Message['icon']; tag?: string } = members.get(m.uid) ?? { name: m.name, icon: m.icon };
       const time = m.pending ? '送信待ち' : clock(m.at);
       out += `
         <div class="msg${mine ? ' mine' : ''}${head ? ' head' : ''}${tail ? ' tail' : ''}" data-mid="${esc(m.id)}">
           ${mine ? '' : `<span class="msg-av">${head ? avatar(who.icon, 30) : ''}</span>`}
           <div class="msg-body">
-            ${!mine && head ? `<div class="msg-name">${nameHtml(m.uid, who.name, { owner: m.uid === ownerId })}</div>` : ''}
+            ${!mine && head ? `<div class="msg-name">${nameHtml(m.uid, who.name, { owner: m.uid === ownerId, tag: who.tag })}</div>` : ''}
             <div class="msg-line">
               <div class="msg-bubble">${esc(m.text)}</div>
               ${tail ? `<span class="msg-time">${esc(time)}</span>` : ''}

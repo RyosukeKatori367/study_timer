@@ -64,7 +64,7 @@ export async function memberScreen(_nav: Nav, gid: string, uid: string): Promise
       <div class="sns">
         <div class="sns-card sns-hero" style="padding:20px 16px">
           ${avatar(m.icon, 64)}
-          <div class="sns-row-title" style="font-size:18px;justify-content:center">${nameHtml(m.uid, m.name, { owner: m.uid === ownerId })}</div>
+          <div class="sns-row-title" style="font-size:18px;justify-content:center">${nameHtml(m.uid, m.name, { owner: m.uid === ownerId, tag: m.tag })}</div>
         </div>
         <div class="stat-grid">
           <div><span class="label">今日</span><span class="value">${esc(fmtHM(sumDays(m.days, today)))}</span></div>

@@ -15,7 +15,7 @@ describe('グミガチャ', () => {
     // 回数を重ねると、N のほうが SSR より多い
     let seed = 1;
     const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    const count: Record<string, number> = { N: 0, R: 0, SR: 0, SSR: 0, SECRET: 0 };
+    const count: Record<string, number> = { N: 0, R: 0, SR: 0, SSR: 0, SECRET: 0, LEGEND: 0 };
     for (let i = 0; i < 2000; i++) count[pickReward(locked, rand)!.rarity]++;
     expect(count.N).toBeGreaterThan(count.R);
     expect(count.R).toBeGreaterThan(count.SR);
@@ -26,8 +26,9 @@ describe('グミガチャ', () => {
     const ssr = ALL_ITEMS.filter((x) => x.rarity === 'SSR') as StyleItem[];
     expect(pickReward(ssr, () => 0)!.rarity).toBe('SSR');
   });
-  it('全部で100種類、ベースカラー12・シークレット1', () => {
-    expect(ALL_ITEMS.length).toBe(100);
+  it('全部で101種類（テーマと模様が100・豪運タグ1）、ベースカラー12・シークレット1', () => {
+    expect(ALL_ITEMS.length).toBe(101);
+    expect(ALL_ITEMS.filter((x) => x.rarity === 'LEGEND').map((x) => x.name)).toEqual(['豪運']);
     expect(THEMES.filter((x) => x.rarity === 'BASE').length).toBe(12);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'SECRET').length).toBe(1);
     expect(GACHA_ITEMS.every((x) => x.rarity !== 'BASE')).toBe(true);
@@ -39,7 +40,8 @@ describe('グミガチャ', () => {
     expect(all.rarity.N).toBeCloseTo(50);
     const noN = currentRates(GACHA_ITEMS.filter((x) => x.rarity !== 'N'));
     expect(noN.rarity.N).toBe(0);
-    expect(noN.rarity.R).toBeCloseTo(60); // 30 / (30+14+5+1)
+    expect(noN.rarity.R).toBeCloseTo(60); // 30 / (30+14+4.95+1+0.05)
+    expect(all.rarity.LEGEND).toBeCloseTo(0.05);
     expect(sum(noN.item)).toBeCloseTo(100, 6);
   });
   it('id がかぶっていない', () => {
