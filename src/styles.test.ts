@@ -45,8 +45,8 @@ describe('グミガチャ', () => {
     expect(noN.rarity.R).toBe(30); // ほかのレア度の確率は変わらない
     expect(sum(noN.item) + noN.dupe).toBeCloseTo(100, 6);
   });
-  it('全部で161種類（テーマと模様が100・タグ52・期間限定9）、ベースカラー12・シークレット1', () => {
-    expect(ALL_ITEMS.length).toBe(161);
+  it('全部で176種類（テーマと模様が100・タグ52・期間限定9・ピックアップ15）、ベースカラー12・シークレット1', () => {
+    expect(ALL_ITEMS.length).toBe(176);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'LEGEND').map((x) => x.name)).toEqual(['豪運']);
     expect(THEMES.filter((x) => x.rarity === 'BASE').length).toBe(12);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'SECRET').length).toBe(1);

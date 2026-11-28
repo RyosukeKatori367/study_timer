@@ -249,6 +249,30 @@ void += ring(90, 88, 15, '16 6 3 6', 1.4) + ring(90, 88, 8, '3 4', 1) + f'<circl
 void += ''.join(f'<circle cx="{x}" cy="{y}" r="1.1" {F} fill-opacity=".7"/>' for x, y in [(70, 24), (16, 84), (104, 40), (50, 104)])
 add('void', '虚空の環', 'SSR', .18, svg(120, 120, void), 'c1s1')
 
+# 12月のピックアップ（pu2612）：雪とクリスマス
+_h = _r.Random(12)
+kona = ''.join(f'<circle cx="{f(_h.uniform(1, 71))}" cy="{f(_h.uniform(1, 71))}" r="{f(_h.uniform(.7, 1.9))}" {F} fill-opacity="{f(_h.uniform(.4, 1))}"/>' for _ in range(26))
+add('konayuki', '粉雪', 'R', .2, svg(72, 72, kona), 'pu2612')
+leaf = lambda x, y, rot: (f'<path transform="translate({x} {y}) rotate({rot})" d="M0 0q4 -3 3 -7q3 1 5 -1q0 3 3 4q-2 2 -1 5q-4 0 -5 3q-1 -3 -5 -4z" {F}/>')
+holly = leaf(10, 18, -20) + leaf(16, 20, 40) + ''.join(f'<circle cx="{x}" cy="{y}" r="2" {F}/>' for x, y in [(13, 16), (16, 14), (16, 18)])
+holly += leaf(40, 46, 160) + leaf(46, 44, 220) + ''.join(f'<circle cx="{x}" cy="{y}" r="1.8" {F}/>' for x, y in [(43, 47), (46, 49)])
+add('hiiragi', 'ひいらぎ', 'R', .18, svg(60, 60, holly), 'pu2612')
+kessho = flake(22, 22, 13) + f'<circle cx="22" cy="22" r="2.2" {F}/>' + flake(66, 64, 9) + flake(64, 18, 4) + flake(18, 70, 5)
+add('kessho', '雪の結晶', 'SR', .18, svg(88, 88, kessho), 'pu2612')
+def ball(cx, cy, r):
+    return (f'<path d="M{cx} {cy - r - 7}V{cy - r - 2}" {NOF} stroke-width="1"/>'
+            f'<rect x="{cx - 2.2}" y="{cy - r - 2.6}" width="4.4" height="3" rx="1" {F}/>'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" {NOF} stroke-width="1.6"/>'
+            f'<path d="M{cx - r + 1} {cy}q{r / 2} -3 {r - 1} 0t{r - 1} 0" {NOF} stroke-width="1.2"/>')
+add('ornament', 'オーナメント', 'SR', .2, svg(64, 64, ball(16, 20, 7) + ball(46, 48, 8.5)), 'pu2612')
+def tree(cx, by, h):
+    w = h * .62
+    t = poly([(cx, by - h), (cx + w * .45, by - h * .45), (cx + w * .25, by - h * .45), (cx + w * .55, by - h * .05), (cx - w * .55, by - h * .05), (cx - w * .25, by - h * .45), (cx - w * .45, by - h * .45)])
+    t += f'<rect x="{f(cx - h * .06)}" y="{f(by - h * .05)}" width="{f(h * .12)}" height="{f(h * .12)}" {F}/>'
+    return t + poly(star(cx, by - h - 3, 3.2))
+xtree = tree(26, 50, 34) + tree(84, 108, 26) + ''.join(f'<circle cx="{x}" cy="{y}" r="1.3" {F} fill-opacity=".8"/>' for x, y in [(70, 20), (100, 50), (12, 96), (50, 80), (110, 14)])
+add('xmastree', 'ツリーの森', 'SSR', .18, svg(120, 120, xtree), 'pu2612')
+
 # ---------------- 書き出し ----------------
 os.makedirs(OUT, exist_ok=True)
 for name in os.listdir(OUT):

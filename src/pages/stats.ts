@@ -306,15 +306,19 @@ export function renderStats(view: HTMLElement, reset = false): void {
     weekOffset = 0;
     selected = null;
   }
+  // 日を選んだりして描き直しても、見ている位置はそのまま
+  const keepY = view.scrollTop;
   const bindTabs = () =>
     view.querySelectorAll<HTMLElement>('[data-stats-tab]').forEach((b) => {
       b.onclick = () => {
         statsTab = b.dataset.statsTab as 'stats' | 'cal';
         renderStats(view);
+        view.scrollTop = 0;
       };
     });
   if (statsTab === 'cal') {
     view.innerHTML = tabsHtml() + calendarHtml();
+    view.scrollTop = keepY;
     bindTabs();
     bindCalendar(view, () => renderStats(view), (key) => showStatsDay(view, key));
     return;
@@ -414,6 +418,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       })()}
     </div>`;
 
+  view.scrollTop = keepY;
   bindTabs();
   // 日をタップしたら、その日の詳細に切り替える
   view.querySelectorAll<HTMLElement>('.day').forEach((b) => {

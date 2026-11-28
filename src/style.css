@@ -7562,7 +7562,8 @@ button.ev-season {
   margin-top: -2px;
 }
 
-.week-box .ev-box-head {
+.week-box .ev-box-head,
+.home-quest .ev-box-head {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -7575,7 +7576,8 @@ button.ev-season {
   font-weight: 600;
 }
 
-.week-box .ev-box-head .head-note {
+.week-box .ev-box-head .head-note,
+.home-quest .ev-box-head .head-note {
   flex: 1;
   min-width: 0;
   text-align: right;
@@ -7584,7 +7586,8 @@ button.ev-season {
   text-overflow: ellipsis;
 }
 
-.week-box.open .ev-box-head {
+.week-box.open .ev-box-head,
+.home-quest.open .ev-box-head {
   margin-bottom: 4px;
 }
 
@@ -8371,4 +8374,69 @@ button.ev-season {
 
 .plan-note {
   margin: -10px 4px 0;
+}
+
+/* ---------- 12月のピックアップ（雪とクリスマス） ---------- */
+.lim-banner.pickup-xmas {
+  background: radial-gradient(circle at 50% 0%, #2c3f78, #101a33 60%, #2a0d14 100%);
+  box-shadow: inset 0 0 0 1px rgba(200, 225, 255, 0.4);
+}
+.lim-entry.pickup-xmas {
+  background: linear-gradient(120deg, #101a33, #24366b 55%, #7a1626);
+  box-shadow: inset 0 0 0 1px rgba(200, 225, 255, 0.45);
+}
+.pickup-xmas .lim-emblem {
+  color: #e6f2ff;
+  filter: drop-shadow(0 0 10px rgba(170, 210, 255, 0.8));
+}
+.pickup-xmas .lim-kicker,
+.pickup-xmas .lim-entry-text small {
+  color: #bcd8ff;
+}
+.pickup-xmas .lim-title,
+.pickup-xmas .lim-entry-text b {
+  color: #fff;
+}
+.pickup-xmas .lim-period {
+  color: #c9d6ea;
+}
+
+.tag.tag-pu-snowman {
+  background: #f4f8ff;
+  color: #2b4c8c;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #b9cfe6;
+}
+.tag.tag-pu-kotatsu {
+  background: linear-gradient(135deg, #ffb46b, #e0662f);
+  color: #fff;
+  font-weight: 700;
+}
+.tag.tag-pu-white {
+  background: linear-gradient(135deg, #ffffff, #d6e9ff);
+  color: #3a5a99;
+  font-weight: 800;
+  box-shadow: 0 0 9px rgba(190, 220, 255, 0.8);
+}
+.tag.tag-pu-xmas {
+  background: repeating-linear-gradient(135deg, #d4243a 0 6px, #f6f6f6 6px 9px, #2f8a4a 9px 15px, #f6f6f6 15px 18px);
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 8px rgba(255, 90, 95, 0.5);
+}
+.tag.tag-pu-kiseki {
+  background: linear-gradient(110deg, #1d2b5c 0%, #3d4f9e 30%, #f3d98b 50%, #3d4f9e 70%, #1d2b5c 100%);
+  background-size: 240% 100%;
+  color: #fff8e0;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(243, 217, 139, 0.9);
+  box-shadow: 0 0 10px rgba(243, 217, 139, 0.6);
+  animation: gold-shine 2.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tag.tag-pu-kiseki {
+    animation: none;
+  }
 }

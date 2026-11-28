@@ -27,7 +27,7 @@ import { $, esc } from '../ui/dom';
 import { pickList } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { LOCK, coinHtml, paintPatterns, previewHtml, rarityTag } from './styleparts';
-import { limitedSeason } from './limited';
+import { limitedBanner } from './limited';
 import { md } from '../seasons';
 
 /** 一覧の絞り込み */
@@ -242,8 +242,8 @@ export async function offerExchange(item: StyleItem): Promise<boolean> {
   const price = exchangePrice(item);
   if (price === undefined) {
     if (item.limited) {
-      const s = limitedSeason();
-      toast(s?.id === item.limited ? `期間限定ガチャで出ます（${md(s.end)}まで）` : '期間限定でした（今は手に入りません）');
+      const s = limitedBanner(item.limited);
+      toast(s ? `${s.kind === 'pickup' ? 'ピックアップガチャ' : '期間限定ガチャ'}で出ます（${md(s.end)}まで）` : '期間限定でした（今は手に入りません）');
       return false;
     }
     toast(item.rarity === 'SECRET' ? 'シークレット。グミガチャでだけ出ます' : '豪運はグミガチャでだけ出ます（0.05%）');

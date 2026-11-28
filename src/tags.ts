@@ -86,6 +86,12 @@ export const TAGS: TagDef[] = [
   { id: 'kaijin', name: '灰燼', look: 'lim-ash' },
   { id: 'kokuu', name: '虚空の旅人', look: 'lim-void' },
   { id: 'prana', name: 'プラーナ', look: 'lim-prana' },
+  // 12月のピックアップ
+  { id: 'yukidaruma', name: 'ゆきだるま', look: 'pu-snowman' },
+  { id: 'kotatsu', name: 'こたつ勉', look: 'pu-kotatsu' },
+  { id: 'whitexmas', name: 'ホワイトクリスマス', look: 'pu-white' },
+  { id: 'kuribocchi', name: 'クリぼっち勉', look: 'pu-xmas' },
+  { id: 'kiseki', name: '聖夜の奇跡', look: 'pu-kiseki' },
 ];
 
 /** その実績の報酬のタグ */

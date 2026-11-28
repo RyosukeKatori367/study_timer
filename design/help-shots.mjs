@@ -84,7 +84,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-29b');
+    localStorage.setItem('studytimer:news', '2026-11-29c');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -398,7 +398,7 @@ const pager = (p, i) =>
   await shot(p, 'my', ['.my-prof', '.my-coin', '.my-grid']);
   await p.click('[data-open=shop]');
   await p.waitForTimeout(800);
-  await shot(p, 'shop', ['.view[data-view=my] .lim-entry', '.shop-gacha .gacha-buttons', '[data-rates]', '.exch']);
+  await shot(p, 'shop', ['.view[data-view=my] .lim-entry', '.shop-gacha .gacha-buttons', '[data-rates]']);
   await p.click('[data-draw="10"]');
   await p.waitForTimeout(2100);
   await p.click('#gacha');

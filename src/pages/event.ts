@@ -23,7 +23,7 @@ import type { RankEntry } from '../cloud/events';
 import { tagById, tagHtml } from '../tags';
 import { avatar } from './group/ui';
 import { bindLoginCard, loginCardHtml } from './login-card';
-import { limitedEntry, openLimitedGacha } from './limited';
+import { bindLimitedEntries, limitedEntry } from './limited';
 import { HOUR, fmtHM, fmtTimeOfDay } from '../time';
 import { esc } from '../ui/dom';
 import { toast } from '../ui/toast';
@@ -50,7 +50,7 @@ function widgetOrder(): WidgetId[] {
 /** 並べ替え中 */
 let editing = false;
 /** シーズンと今週の箱を開いているか */
-const boxOpen = { season: false, week: false };
+const boxOpen = { season: false, week: false, daily: false };
 
 const hours = (ms: number): string => Math.floor(ms / HOUR).toLocaleString('ja-JP');
 /** 目標の時間（「1時間」「30分」「1時間30分」。0分は書かない） */
@@ -286,15 +286,26 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       }`;
   };
 
-  /** 今日のクエストと、勉強ボーナスの次まで */
+  /** 今日のクエストの箱（開くと3つと全部達成、勉強ボーナスの次まで） */
   const questWidget = (): string => {
     const now = Date.now();
     const daily = dailyQuests(now);
     const all = dailyAllClear(now);
     const left = nextStudyBonusIn();
+    const open = boxOpen.daily;
+    const ready = daily.filter((q) => q.done && !q.claimed).length + (all.done && !all.claimed ? 1 : 0);
+    const done = daily.filter((q) => q.done).length;
     return `
-      <section class="sns-card ev-card home-quest">
-        <div class="ev-card-head"><span>今日のクエスト</span><span class="head-note">${fmtTimeOfDay(settings.dayBoundaryMin)}に入れ替わる</span></div>
+      <section class="sns-card ev-card ev-box home-quest${open ? ' open' : ''}">
+        <div class="ev-box-head" role="button" tabindex="0" aria-expanded="${open}" data-box="daily">
+          <span class="ev-box-title">今日のクエスト${ready ? '<i class="box-dot" aria-label="受け取れるものがあります"></i>' : ''}</span>
+          <span class="head-note">${done}/${daily.length} 達成${all.claimed ? '・全部クリア' : ''}</span>
+          <span class="sec-chev" aria-hidden="true">›</span>
+        </div>
+        ${
+          open
+            ? `<div class="ev-box-body">
+        <div class="box-note">${fmtTimeOfDay(settings.dayBoundaryMin)}に入れ替わる</div>
         ${daily.map(questRow).join('')}
         ${questRow({ key: all.key, title: '3つ全部 達成する', reward: all.reward, done: all.done, claimed: all.claimed })}
         <div class="q-row bonus-row">
@@ -306,6 +317,9 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
           </span>
           <span class="q-reward">+${STUDY_BONUS}</span>
         </div>
+               </div>`
+            : ''
+        }
       </section>`;
   };
 
@@ -439,6 +453,13 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
   };
 
   const render = () => {
+    // 描き直しても、見ている位置はそのまま
+    const y = view.scrollTop;
+    renderInner();
+    view.scrollTop = y;
+  };
+
+  const renderInner = () => {
     if (editing) {
       view.innerHTML = editHtml();
       view.querySelector<HTMLElement>('[data-home-done]')!.onclick = () => {
@@ -508,7 +529,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
         }
       };
     });
-    view.querySelector<HTMLElement>('[data-limited]')?.addEventListener('click', openLimitedGacha);
+    bindLimitedEntries(view);
     view.querySelector<HTMLElement>('[data-rkname]')?.addEventListener('click', () => {
       saveSettings({ eventName: !settings.eventName });
       render();

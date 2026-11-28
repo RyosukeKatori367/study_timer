@@ -23,7 +23,7 @@ import { profileScreen } from './group/account';
 import { avatar, createNav, type Nav, type Screen } from './group/ui';
 import { openGacha, openRates } from './gacha';
 import { offerExchange, setTag } from './style';
-import { limitedEntry, openLimitedGacha } from './limited';
+import { bindLimitedEntries, limitedEntry } from './limited';
 import { coinHtml, jarSvg, paintPatterns, previewHtml, rarityTag } from './styleparts';
 
 export interface MyPageHooks {
@@ -190,7 +190,7 @@ function shopScreen(): Screen {
       };
     });
     $('[data-rates]', el).onclick = openRates;
-    el.querySelector<HTMLElement>('[data-limited]')?.addEventListener('click', openLimitedGacha);
+    bindLimitedEntries(el);
     el.querySelectorAll<HTMLElement>('[data-r]').forEach((b) => {
       b.onclick = () => {
         shopRarity = b.dataset.r as Rarity;

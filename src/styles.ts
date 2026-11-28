@@ -120,6 +120,11 @@ const LIMITED_TAGS: [string, Rarity, string][] = [
   ['kaijin', 'R', 'c1s1'],
   ['kokuu', 'SR', 'c1s1'],
   ['prana', 'SSR', 'c1s1'],
+  ['yukidaruma', 'R', 'pu2612'],
+  ['kotatsu', 'R', 'pu2612'],
+  ['whitexmas', 'SR', 'pu2612'],
+  ['kuribocchi', 'SR', 'pu2612'],
+  ['kiseki', 'SSR', 'pu2612'],
 ];
 export const TAG_ITEMS: TagItem[] = [
   ...GACHA_TAGS.map(([tag, rarity]): TagItem => ({ kind: 'tag', id: `g:${tag}`, name: TAGS.find((x) => x.id === tag)?.name ?? tag, rarity, tag })),
@@ -240,6 +245,29 @@ export const THEMES: ThemeItem[] = [
     nav: lg(90, '#8a8a92', '#ff8a3d'),
     ring: '#ff7a2e',
     limited: 'c1s1',
+  }),
+  // 12月のピックアップ（雪とクリスマス）
+  t('yukiakari', '雪あかり', 'R', '#dfeaf5', '#f4f8fc', { start: lg(160, '#ffffff', '#b9cfe6'), limited: 'pu2612' }),
+  t('hiiragi', 'ひいらぎ', 'R', '#9fd3a8', '#d6efd9', { start: lg(135, '#6cbf7b', '#2f7d47'), ink: '#fff', limited: 'pu2612' }),
+  t('seiya', '聖夜', 'SR', '#f3d98b', '#fff1c7', {
+    start: lg(135, '#26366e', '#4a5fb5'),
+    ink: '#fff',
+    nav: lg(90, '#f3d98b', '#a9b9ff'),
+    ring: '#f3d98b',
+    limited: 'pu2612',
+  }),
+  t('xmasred', 'クリスマスレッド', 'SR', '#ff8f8f', '#ffd0d0', {
+    start: lg(135, '#ff5a5f', '#c81d32'),
+    ink: '#fff',
+    nav: lg(90, '#ff9a9a', '#8fd9a6'),
+    ring: '#ff6b6b',
+    limited: 'pu2612',
+  }),
+  t('ginsekai', '銀世界', 'SSR', '#cfe6ff', '#ffffff', {
+    start: lg(135, '#ffffff', '#cfe6ff 45%', '#8fb8ff'),
+    nav: lg(90, '#f2f8ff', '#bcd8ff', '#f2f8ff'),
+    ring: '#bfe0ff',
+    limited: 'pu2612',
   }),
 ];
 
