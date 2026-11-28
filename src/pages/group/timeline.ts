@@ -1,6 +1,7 @@
 // ⑦ グループのタイムライン・ランキング、投稿の返信、⑨ グループの設定・メンバー の画面。
 
 import { api } from '../../cloud/api';
+import { openManual } from '../manual';
 import { count, one, range as numRange, unitById, type Unit } from '../../units';
 import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
@@ -143,9 +144,15 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
         <button type="button" data-tab="chat">チャット<span class="tab-dot" data-chat-dot hidden></span></button>
       </div>
       <div data-body><div class="sns-loading">読み込んでいます…</div></div>
+      <button type="button" class="fab" data-manual-post aria-label="時間を入力して記録・投稿" hidden>
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </button>
     </div>`);
   const body = $('[data-body]', el);
   const title = $('.switch-title', el);
+  // 右下の丸いボタン：時間を入力して記録し、そのまま投稿する
+  const fab = $<HTMLButtonElement>('[data-manual-post]', el);
+  fab.onclick = () => openManual();
   const titleText = $('.t', title);
 
   // チャットは入力中の文字を消さないように、一度作ったものを出し入れする
@@ -157,6 +164,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
     el.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
     // チャットのときは画面の高さいっぱいに広げて、入力欄をいちばん下に置く
     el.classList.toggle('fill', tab === 'chat');
+    fab.hidden = tab !== 'timeline';
     body.classList.toggle('chat-on', tab === 'chat');
     if (tab === 'chat') {
       chatDot.hidden = true;

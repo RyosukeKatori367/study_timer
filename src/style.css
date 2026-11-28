@@ -7219,3 +7219,25 @@ button.ev-season {
     animation: none;
   }
 }
+
+/* タイムラインの右下の丸いボタン（時間を入力して記録・投稿）。スクロールしても右下に残る */
+.fab {
+  position: sticky;
+  bottom: 6px;
+  z-index: 3;
+  align-self: flex-end;
+  width: 46px;
+  height: 46px;
+  margin: -8px 2px 0 0;
+  border-radius: 50%;
+  background: var(--start-bg);
+  color: var(--start-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
