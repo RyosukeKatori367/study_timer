@@ -2,6 +2,7 @@
 // 人数の増減はルールで確かめているので、入る・抜けるは必ず1回のまとめ書き（batch）で行う。
 
 import type { Unsubscribe } from 'firebase/firestore';
+import { currentPattern, currentTheme } from '../styles';
 import { materialColor } from '../colors';
 import { getSessions, materialById, materialName, settings } from '../store';
 import { cloudUser } from './account';
@@ -354,8 +355,10 @@ export async function publishStudy(): Promise<void> {
   const sums = mySums();
   const last = getSessions().at(-1);
   const matImgs = myMatImgs(mats);
+  const style = { t: currentTheme().id, p: currentPattern().id };
   // ルールが古いと新しい項目は断られるので、そのときは項目を減らして送り直す
   const tries: Record<string, unknown>[] = [
+    { days, mats, matImgs, sums, style, lastStudyAt: last?.end ?? 0 },
     { days, mats, matImgs, sums, lastStudyAt: last?.end ?? 0 },
     { days, mats, sums, lastStudyAt: last?.end ?? 0 },
     { days, lastStudyAt: last?.end ?? 0 },

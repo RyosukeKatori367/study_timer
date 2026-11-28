@@ -219,6 +219,12 @@ async function run(): Promise<void> {
     await allow('教材の画像を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { matImgs: { m1: TINY_JPEG } }),
     );
+    await allow('使っているテーマと模様を書ける', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { style: { t: 't:sakura', p: 'p:none' } }),
+    );
+    await deny('テーマに知らない項目は入れられない', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { style: { t: 't:sakura', p: 'p:none', x: 1 } }),
+    );
     await allow('累計と月の合計を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { sums: { all: 7200000, months: { '2026-11': 7200000 } } }),
     );

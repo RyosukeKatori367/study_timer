@@ -81,7 +81,17 @@ function member(uid: string, todayMin: number, weekMin: number, joined: number):
   const sums = { all: month * 7, months: { [today.slice(0, 7)]: month } };
   const matImgs = uid === 'haru' ? { m0: fakeImg('#1e5bd8', 'α'), m1: fakeImg('#ef6c1a', '化') } : undefined;
   const tag = uid === 'haru' ? { tag: 'gouun' } : {};
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}), ...tag };
+  // 使っているテーマと模様（帯の見本）
+  const styles: Record<string, { t: string; p: string }> = {
+    me: { t: settings.theme, p: settings.pattern },
+    haru: { t: 't:sakura', p: 'p:sakura' },
+    dev: { t: 't:midnight', p: 'p:stars' },
+    yuu: { t: 't:ramune', p: 'p:none' },
+    rin: { t: 't:hojicha', p: 'p:none' },
+    kei: { t: 't:aurora', p: 'p:none' },
+  };
+  const style = styles[uid] ? { style: styles[uid] } : {};
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}), ...tag, ...style };
 }
 
 interface FakeGroup {

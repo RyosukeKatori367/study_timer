@@ -158,6 +158,8 @@ export interface MemberDoc {
   sums?: StudySums;
   /** 教材の画像 { 教材の id: data URL }（mats に出てくる教材のうち、画像があるものだけ） */
   matImgs?: Record<string, string>;
+  /** 使っているテーマと模様 { t: 't:sakura', p: 'p:none' }（ランキングやメンバー一覧の帯に使う） */
+  style?: { t: string; p: string };
   lastStudyAt: number;
 }
 

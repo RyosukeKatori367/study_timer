@@ -19,7 +19,8 @@ import {
 } from '../gumi';
 import { questName } from '../quests';
 import { drawGacha } from '../shop';
-import { EXCHANGE_PRICE, GACHA10_COST, GACHA_COST, GACHA_ITEMS, currentTheme, isOwned, itemById, type Rarity } from '../styles';
+import { EXCHANGE_PRICE, GACHA10_COST, GACHA_COST, GACHA_ITEMS, currentPattern, currentTheme, isOwned, itemById, type Rarity } from '../styles';
+import { bannerHtml, paintBanners } from './banner';
 import { shownTag, tagHtml } from '../tags';
 import { HOUR, MIN } from '../time';
 import { $, esc, html } from '../ui/dom';
@@ -92,7 +93,8 @@ function homeScreen(n: Nav, hooks: MyPageHooks): Screen {
     }).join('');
     el.innerHTML = `
       <h1>マイページ</h1>
-      <button type="button" class="sns-card my-prof" data-profile>
+      <button type="button" class="sns-card my-prof has-tb" data-profile>
+        ${bannerHtml({ t: currentTheme().id, p: currentPattern().id })}
         ${p ? avatar(p.icon, 56) : '<span class="av guest" style="--s:56px" aria-hidden="true"><span>？</span></span>'}
         <span class="my-prof-main">
           <span class="my-prof-name">${esc(p?.name ?? (u ? 'プロフィールを作る' : 'ゲスト'))}${tag ? tagHtml(tag) : ''}</span>
@@ -133,6 +135,7 @@ function homeScreen(n: Nav, hooks: MyPageHooks): Screen {
           <b>設定</b><span>アカウント・計測・データ</span>
         </button>
       </div>`;
+    paintBanners(el);
     $('[data-profile]', el).onclick = () => (api.user() ? n.push((m) => profileScreen(m)) : hooks.openLogin());
     el.querySelector<HTMLElement>('[data-bonus]')?.addEventListener('click', () => {
       const got = claimLogin();

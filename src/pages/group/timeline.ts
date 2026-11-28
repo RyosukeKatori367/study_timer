@@ -1,6 +1,7 @@
 // ⑦ グループのタイムライン・ランキング、投稿の返信、⑨ グループの設定・メンバー の画面。
 
 import { api } from '../../cloud/api';
+import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
 import { matBreakdown, ranking, sumDays, type Icon } from '../../cloud/model';
 import type { Post, Reply } from '../../cloud/posts';
@@ -212,7 +213,8 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
             // 教材ごとに色を分けて、間を 2px あける
             const bar = parts.map((m) => `<span style="flex:${m.ms} 1 0;background:${esc(m.c)}"></span>`).join('');
             return `
-          <button type="button" class="sns-row rank-row${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}" data-rank="${esc(r.item.uid)}" aria-label="${esc(r.item.name)} ${esc(fmtHM(r.ms))}・統計を見る">
+          <button type="button" class="sns-row rank-row has-tb${r.ms > 0 && r.rank <= 3 ? ' top' : ''}${r.item.uid === me() ? ' mine' : ''}${r.ms === 0 ? ' zero' : ''}" data-rank="${esc(r.item.uid)}" aria-label="${esc(r.item.name)} ${esc(fmtHM(r.ms))}・統計を見る">
+            ${bannerHtml(r.item.style)}
             <span class="rank">${r.ms > 0 ? r.rank : '–'}</span>
             ${avatar(r.item.icon, 36)}
             <span class="sns-row-main">
@@ -227,6 +229,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
           .join('')}
       </div>
       <p class="sns-note" style="margin-top:8px">${range === 'today' ? '今日' : '今週'}の勉強時間です。色はそれぞれの人の教材です。タップすると、その人の統計が見られます</p>`;
+    paintBanners(body);
     body.querySelectorAll<HTMLElement>('[data-range]').forEach((b) => {
       b.onclick = () => {
         range = b.dataset.range as typeof range;
@@ -423,7 +426,8 @@ export async function groupSettingsScreen(nav: Nav, gid: string): Promise<Screen
           <div class="sns-card">${members
             .map((m) => {
               const ms = sumDays(m.days, today);
-              return `<button type="button" class="sns-row" data-uid="${esc(m.uid)}">
+              return `<button type="button" class="sns-row has-tb" data-uid="${esc(m.uid)}">
+                ${bannerHtml(m.style)}
                 ${avatar(m.icon, 36)}
                 <span class="sns-row-main"><span class="sns-row-title">${nameHtml(m.uid, m.name, { owner: m.uid === group!.ownerId, tag: m.tag })}</span></span>
                 <span class="sns-row-end">${ms > 0 ? `今日 ${esc(fmtHM(ms))}` : '—'}<span class="chevron" aria-hidden="true">›</span></span>
@@ -438,6 +442,7 @@ export async function groupSettingsScreen(nav: Nav, gid: string): Promise<Screen
         </div>
       </div>`;
 
+    paintBanners(body);
     $('[data-code]', body).onclick = () => nav.push((n) => codeScreen(n, { id: gid, code: group!.code, name: group!.name }));
     body.querySelector<HTMLElement>('[data-regen]')?.addEventListener('click', async (e) => {
       if (!confirm('招待コードを作り直しますか？今のコードは使えなくなります')) return;

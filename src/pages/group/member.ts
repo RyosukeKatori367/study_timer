@@ -2,6 +2,7 @@
 // 見られるのは、メンバー文書にある直近2週間の日ごと・教材ごとの時間と、今月・先月・累計。
 
 import { api } from '../../cloud/api';
+import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Member } from '../../cloud/groups';
 import { matBreakdown, sumDays, weekKeys, type MatSlice } from '../../cloud/model';
 import { settings } from '../../store';
@@ -62,7 +63,8 @@ export async function memberScreen(_nav: Nav, gid: string, uid: string): Promise
 
     body.innerHTML = `
       <div class="sns">
-        <div class="sns-card sns-hero" style="padding:20px 16px">
+        <div class="sns-card sns-hero has-tb" style="padding:20px 16px">
+          ${bannerHtml(m.style, true)}
           ${avatar(m.icon, 64)}
           <div class="sns-row-title" style="font-size:18px;justify-content:center">${nameHtml(m.uid, m.name, { owner: m.uid === ownerId, tag: m.tag })}</div>
         </div>
@@ -96,6 +98,7 @@ export async function memberScreen(_nav: Nav, gid: string, uid: string): Promise
         </div>
         <p class="sns-note">グループで見られるのは、直近2週間の日ごとの時間と、今月・累計です。色はこの人の教材の色です</p>
       </div>`;
+    paintBanners(body);
     body.querySelectorAll<HTMLElement>('[data-week]').forEach((b) => {
       b.onclick = () => {
         week = Number(b.dataset.week);

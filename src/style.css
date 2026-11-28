@@ -5707,3 +5707,249 @@ button.ev-season {
 .ev-banner > .ev-emblem {
   position: absolute;
 }
+
+/* ---------- その人のテーマの帯（ランキング・メンバー・人の統計） ---------- */
+
+.has-tb {
+  position: relative;
+}
+
+.has-tb > :not(.tb) {
+  position: relative;
+  z-index: 2;
+}
+
+.sns-card:has(.tb) {
+  overflow: hidden;
+}
+
+.tb {
+  --h: 72px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tb.big {
+  --h: 200px;
+}
+
+/* ランキングの目盛り線は、帯の上・文字の下 */
+.rank-chart .rank-axis {
+  z-index: 1;
+}
+
+.tb-pat {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  -webkit-mask-image: linear-gradient(90deg, #000, rgba(0, 0, 0, 0.5) 55%, transparent 90%);
+  mask-image: linear-gradient(90deg, #000, rgba(0, 0, 0, 0.5) 55%, transparent 90%);
+}
+
+.tb.big .tb-pat {
+  -webkit-mask-image: linear-gradient(180deg, #000, rgba(0, 0, 0, 0.35));
+  mask-image: linear-gradient(180deg, #000, rgba(0, 0, 0, 0.35));
+}
+
+.tb-fx {
+  position: absolute;
+  inset: 0;
+}
+
+.tb-fx i {
+  position: absolute;
+  display: block;
+}
+
+/* 花びら（さくら・ふじ・わかば） */
+.fx-petals .tb-fx i,
+.fx-wisteria .tb-fx i,
+.fx-leaves .tb-fx i {
+  top: -14px !important;
+  width: calc(9px * var(--s));
+  height: calc(6px * var(--s));
+  border-radius: 80% 0 80% 0;
+  background: linear-gradient(135deg, #fff, #ffc6d6 60%, #ff9fbd);
+  opacity: 0;
+  animation: tb-fall var(--t) linear infinite;
+}
+
+.fx-wisteria .tb-fx i {
+  border-radius: 50% 50% 50% 0;
+  background: linear-gradient(135deg, #f4ecff, #c9b0ff 60%, #a487f0);
+}
+
+.fx-leaves .tb-fx i {
+  width: calc(10px * var(--s));
+  height: calc(5px * var(--s));
+  background: linear-gradient(135deg, #e6fbd2, #9fe3b4 60%, #5fbf77);
+}
+
+@keyframes tb-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  12% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(22px, calc(var(--h) * 0.55)) rotate(200deg);
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(10px, calc(var(--h) + 28px)) rotate(400deg);
+  }
+}
+
+/* 泡（ソーダ・ラムネ・オーシャン） */
+.fx-bubbles .tb-fx i {
+  top: auto !important;
+  bottom: -12px;
+  width: calc(8px * var(--s));
+  height: calc(8px * var(--s));
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), transparent 45%);
+  opacity: 0;
+  animation: tb-rise var(--t) ease-in infinite;
+}
+
+@keyframes tb-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  15% {
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(5px, calc(var(--h) * -0.5));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-4px, calc((var(--h) + 20px) * -1));
+  }
+}
+
+/* きらめき（ミッドナイト・パール・ゴールドなど） */
+.fx-sparkle .tb-fx i {
+  width: calc(10px * var(--s));
+  height: calc(10px * var(--s));
+  background: var(--tb-b);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  filter: drop-shadow(0 0 3px var(--tb-a));
+  opacity: 0;
+  animation: tb-twinkle var(--t) ease-in-out infinite;
+}
+
+@keyframes tb-twinkle {
+  0%,
+  60%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+/* 湯気（お茶のテーマ） */
+.fx-steam .tb-fx i {
+  top: auto !important;
+  bottom: -10px;
+  width: calc(16px * var(--s));
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.35), transparent);
+  filter: blur(2px);
+  opacity: 0;
+  animation: tb-steam var(--t) ease-out infinite;
+}
+
+@keyframes tb-steam {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scaleX(0.6);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(8px, calc(var(--h) * -0.8)) scaleX(1.4);
+  }
+}
+
+/* オーロラ・ネオン・にじいろ・ゆうやけは、帯全体がゆっくり動く */
+.fx-aurora .tb-fx {
+  background: linear-gradient(100deg, transparent 10%, rgba(127, 255, 212, 0.28), rgba(140, 160, 255, 0.24), rgba(255, 170, 230, 0.2), transparent 90%);
+  background-size: 250% 100%;
+  animation: tb-flow 7s ease-in-out infinite alternate;
+}
+
+.fx-rainbow .tb-fx {
+  background: linear-gradient(90deg, rgba(255, 120, 160, 0.3), rgba(255, 210, 110, 0.3), rgba(120, 230, 160, 0.3), rgba(110, 180, 255, 0.3), rgba(200, 140, 255, 0.3), rgba(255, 120, 160, 0.3));
+  background-size: 200% 100%;
+  -webkit-mask-image: linear-gradient(90deg, #000, transparent 90%);
+  mask-image: linear-gradient(90deg, #000, transparent 90%);
+  animation: tb-flow 4s linear infinite;
+}
+
+@keyframes tb-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.fx-neon .tb-fx {
+  box-shadow: inset 3px 0 0 var(--tb-b), inset 0 0 18px rgba(255, 120, 230, 0.35);
+  animation: tb-neon 2.6s steps(1, end) infinite;
+}
+
+@keyframes tb-neon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+  53% {
+    opacity: 0.5;
+  }
+  56% {
+    opacity: 1;
+  }
+}
+
+.fx-glow .tb-fx {
+  background: radial-gradient(60% 140% at 0% 100%, rgba(255, 170, 120, 0.4), transparent 70%);
+  animation: tb-glow 5s ease-in-out infinite;
+}
+
+@keyframes tb-glow {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-fx {
+    display: none;
+  }
+}
