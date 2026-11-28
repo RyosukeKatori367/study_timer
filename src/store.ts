@@ -83,6 +83,17 @@ export interface Settings {
   gumi: Record<string, number>;
   /** 計測中の時計の見た目（src/ui/faces.ts。はじめから全部使える） */
   face: string;
+  /**
+   * ポモドーロで、途中から教材を変える並び（2つ以上のときだけ使う）。
+   * n はそのまとまりのセット数（最後のまとまりは、そのあとずっと）。1つ目の教材は、いつも今の教材（materialId）
+   */
+  pomoPlan: PlanBlock[];
+}
+
+export interface PlanBlock {
+  /** 教材の id（教材なしは null） */
+  m: string | null;
+  n: number;
 }
 
 const DEFAULTS: Settings = {
@@ -121,6 +132,7 @@ const DEFAULTS: Settings = {
   gachaDay: '',
   gumi: {},
   face: 'ring',
+  pomoPlan: [],
 };
 
 function read<T>(key: string): T | null {
@@ -171,6 +183,7 @@ function emit(c: StoreChange): void {
 
 export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('settings') ?? {}) };
 if (!settings.gumi || typeof settings.gumi !== 'object') settings.gumi = {};
+if (!Array.isArray(settings.pomoPlan)) settings.pomoPlan = [];
 
 setDurationStyle(settings.durationStyle);
 
@@ -290,6 +303,19 @@ function applyPatch(m: Material, patch: MaterialPatch): void {
     if (v === undefined || v === '') delete m[key];
     else m[key] = v;
   }
+}
+
+/**
+ * 教材を並べ替える（ids の順に。ids にない教材＝削除したものなどは後ろに）。
+ * ジャンルの順番は、そのジャンルの教材がはじめに出てくる順なので、いっしょに変わる。
+ * 色を決めていない教材は並び順で色が決まるので、今の色を入れてから並べ替える（色が変わらないように）。
+ */
+export function reorderMaterials(ids: string[]): void {
+  for (const m of materials) if (!m.color) m.color = defaultColor(materialOrder(m.id));
+  const pos = new Map(ids.map((id, i) => [id, i]));
+  const listed = materials.filter((m) => pos.has(m.id)).sort((a, b) => pos.get(a.id)! - pos.get(b.id)!);
+  materials = [...listed, ...materials.filter((m) => !pos.has(m.id))];
+  saveMaterials();
 }
 
 /** 教材の名前・色・ジャンル・画像をまとめて変える */
@@ -437,6 +463,7 @@ function isSession(x: unknown): x is Session {
     Array.isArray(s.laps) &&
     s.laps.every((v) => typeof v === 'number') &&
     (s.material === undefined || typeof s.material === 'string') &&
+    (s.cont === undefined || typeof s.cont === 'boolean') &&
     (s.leaves === undefined ||
       (Array.isArray(s.leaves) &&
         s.leaves.every((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'number')))) &&

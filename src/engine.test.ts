@@ -1,19 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
+  changeMaterialFrom,
   clockToTimestamp,
+  countsAsRecord,
   cycleRemaining,
   cycleView,
   elapsed,
   finish,
+  finishAll,
   isOver,
   lapEndView,
   markBack,
   markLeft,
+  materialAt,
   lap,
   newRun,
   normalizeMode,
   pause,
   resume,
+  setsFromPlan,
   timerRemaining,
   totalElapsed,
 } from './engine';
@@ -475,5 +480,78 @@ describe('離脱の記録', () => {
     markLeft(r, T0 + 2 * MIN);
     expect(markBack(r, T0 + 20 * MIN)).toBeNull();
     expect(finish(r, T0 + 20 * MIN)?.leaves).toBeUndefined();
+  });
+});
+
+describe('ポモドーロのセットごとの教材', () => {
+  const base = { workMs: 25 * MIN, breakMs: 5 * MIN };
+
+  it('まとまりの並びから、変えるところを作る（同じ教材が続いたらまとめる）', () => {
+    const p = setsFromPlan([
+      { material: 'math', n: 2 },
+      { material: 'eng', n: 2 },
+      { n: 1 },
+      { material: 'read', n: 3 },
+    ]);
+    expect(p).toEqual({ material: 'math', sets: [{ from: 3, material: 'eng' }, { from: 5 }, { from: 6, material: 'read' }] });
+    expect(materialAt(p, 1)).toBe('math');
+    expect(materialAt(p, 4)).toBe('eng');
+    expect(materialAt(p, 5)).toBeUndefined();
+    expect(materialAt(p, 9)).toBe('read');
+    expect(setsFromPlan([{ material: 'a', n: 2 }, { material: 'a', n: 2 }])).toEqual({ material: 'a' });
+  });
+
+  it('途中で変える：そのセットから。先で決めた変更はそのまま、前と同じになる変更は消える', () => {
+    const r = newRun('pomoCycle', T0, { ...base, ...setsFromPlan([{ material: 'math', n: 2 }, { material: 'eng', n: 2 }, { material: 'read', n: 1 }]) });
+    changeMaterialFrom(r, 2, 'chem');
+    expect(r.sets).toEqual([{ from: 2, material: 'chem' }, { from: 3, material: 'eng' }, { from: 5, material: 'read' }]);
+    changeMaterialFrom(r, 3, 'chem'); // 2セット目と同じなので、3セット目の変更はなくなる
+    expect(materialAt(r, 4)).toBe('chem');
+    expect(r.sets).toEqual([{ from: 2, material: 'chem' }, { from: 5, material: 'read' }]);
+    changeMaterialFrom(r, 1, 'chem'); // 1セット目を変えると、2セット目の変更はいらない
+    expect(r.material).toBe('chem');
+    expect(r.sets).toEqual([{ from: 5, material: 'read' }]);
+  });
+
+  it('終えたら教材ごとに分けて記録する（休憩は前のセットのほう、一時停止は抜く）', () => {
+    const r = newRun('pomoCycle', T0, {
+      ...base,
+      end: { kind: 'count', n: 4 },
+      ...setsFromPlan([{ material: 'math', n: 2 }, { material: 'eng', n: 2 }]),
+    });
+    pause(r, T0 + 10 * MIN);
+    resume(r, T0 + 20 * MIN); // 10分止めた
+    const at = T0 + 125 * MIN; // 4セット目の作業が終わる（3×30＋25＋止めた10分）
+    expect(cycleView(r, at).done).toBe(true);
+    const parts = finishAll(r, at);
+    expect(parts.map((p) => [p.material, p.studyMs, p.start, p.end, !!p.cont])).toEqual([
+      ['math', 50 * MIN, T0, T0 + 70 * MIN, false],
+      ['eng', 50 * MIN, T0 + 70 * MIN, at, true],
+    ]);
+    expect(parts[0].spans).toEqual([
+      [T0, T0 + 10 * MIN],
+      [T0 + 20 * MIN, T0 + 70 * MIN],
+    ]);
+    expect(parts[1].spans).toEqual([[T0 + 70 * MIN, at]]);
+    expect(parts.filter(countsAsRecord).length).toBe(1);
+    expect(new Set(parts.map((p) => p.id)).size).toBe(2);
+  });
+
+  it('次のセットの教材を決めたが、そのセットを始める前に終えたら分けない', () => {
+    const r = newRun('pomoCycle', T0, base);
+    changeMaterialFrom(r, 2, 'eng');
+    const parts = finishAll(r, T0 + 27 * MIN); // 1セット目の休憩中
+    expect(parts.length).toBe(1);
+    expect(parts[0].studyMs).toBe(25 * MIN);
+    expect(parts[0].material).toBeUndefined();
+  });
+
+  it('変えていなければ、今までどおり1つの記録', () => {
+    const r = newRun('pomoCycle', T0, { ...base, material: 'math' });
+    const parts = finishAll(r, T0 + 40 * MIN);
+    expect(parts.length).toBe(1);
+    expect(parts[0].material).toBe('math');
+    expect(parts[0].cont).toBeUndefined();
+    expect(parts[0].studyMs).toBe(35 * MIN);
   });
 });

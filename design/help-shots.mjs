@@ -62,7 +62,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-28i');
+    localStorage.setItem('studytimer:news', '2026-11-28j');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -131,6 +131,7 @@ const pager = (p, i) =>
     '.page[data-mode=pomodoro] .card[data-field=break]',
     '.page[data-mode=pomodoro] .end',
     '.page[data-mode=pomodoro] .material-chip',
+    '.page[data-mode=pomodoro] .plan-chip',
   ], { wait: 600 });
   await pager(p, 1);
   await p.waitForTimeout(500);
@@ -151,11 +152,16 @@ const pager = (p, i) =>
   // 教材
   await p.click('.page[data-mode=timer] .material-chip');
   await p.waitForTimeout(700);
-  await shot(p, 'materials', ['.mrow:nth-of-type(1)', '.mrow [data-edit]', '[data-add]']);
+  await shot(p, 'materials', ['.mrow:nth-of-type(1)', '.mrow [data-edit]', '[data-add]', '[data-sort]']);
   await p.click('.mrow [data-edit]');
   await p.waitForTimeout(700);
   await shot(p, 'material_edit', ['.medit-top', '[name=name]', '[data-genres]', '[data-units]', '[data-colors]']);
   await p.click('[data-back]');
+  await p.waitForTimeout(400);
+  await p.click('[data-sort]');
+  await p.waitForTimeout(500);
+  await shot(p, 'material_sort', ['.sort-row .sort-handle', '.sort-genre-btns', '[data-done]']);
+  await p.click('[data-done]');
   await p.waitForTimeout(400);
   await p.click('[data-close]');
   await p.waitForTimeout(500);
@@ -163,6 +169,32 @@ const pager = (p, i) =>
   await p.click('.page[data-mode=timer] .pick-row > :last-child');
   await p.waitForTimeout(700);
   await shot(p, 'end', []);
+  await p.context().close();
+}
+
+// ---- ポモドーロのセットごとの教材 ----
+{
+  const p = await fresh('', {
+    materialId: 'm2',
+    endKind: 'count',
+    endCount: 4,
+    pomoPlan: [
+      { m: 'm2', n: 2 },
+      { m: 'm3', n: 1 },
+      { m: 'm1', n: 1 },
+    ],
+  });
+  await pager(p, 0);
+  await p.waitForTimeout(500);
+  await p.click('.page[data-mode=pomodoro] .plan-chip');
+  await p.waitForTimeout(600);
+  await shot(p, 'pomo_plan', ['#pomoplan .plan-mat', '#pomoplan .stepper', '#pomoplan .plan-rest', '#pomoplan [data-add]']);
+  await p.click('#pomoplan .btn.primary');
+  await p.waitForTimeout(400);
+  await p.click('.page[data-mode=pomodoro] .btn-start');
+  await p.clock.fastForward('57:00'); // 2セット目のあとの休憩
+  await p.waitForTimeout(800);
+  await shot(p, 'run_pomo', ['#run .pm-btn', '#run .pm-next']);
   await p.context().close();
 }
 
@@ -244,7 +276,7 @@ const pager = (p, i) =>
 
 // ---- イベント・マイページ ----
 {
-  const p = await fresh('?fake=in', { gumi: { b: 4200, 'l:2026-11-27': 120 } });
+  const p = await fresh('?fake=in', { gumi: { b: 4200, 'l:2026-11-27': 120 }, unlocked: ['g:asagata', 'g:shuchu', 'g:keisan', 'g:zone', 'g:kami'] });
   await p.click('nav [data-view=event]');
   await p.waitForTimeout(1500);
   await shot(p, 'event', ['.ev-banner', '.ev-card', '.ev-season']);
@@ -290,6 +322,13 @@ const pager = (p, i) =>
   await p.click('[data-open=style]');
   await p.waitForTimeout(900);
   await shot(p, 'style', ['.style-filter', '.style-section']);
+  await p.evaluate(() => {
+    const h = [...document.querySelectorAll('.view[data-view=style] .group-head')].find((x) => x.textContent.startsWith('タグ'));
+    const v = document.querySelector('.view[data-view=style]');
+    v.scrollTo(0, h.getBoundingClientRect().top + v.scrollTop - 70);
+  });
+  await shot(p, 'style_tags', [], { wait: 600 });
+  await p.evaluate(() => document.querySelector('.view[data-view=style]').scrollTo(0, 0));
   await p.click('.view[data-view=style] .view-back');
   await p.waitForTimeout(400);
   await p.click('[data-open=settings]');

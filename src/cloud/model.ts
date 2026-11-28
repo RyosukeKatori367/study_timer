@@ -443,6 +443,7 @@ export interface CloudSession {
   material?: string;
   spans?: number[];
   leaves?: number[];
+  cont?: boolean;
 }
 
 const flat = (pairs: [number, number][]): number[] => pairs.flat();
@@ -467,6 +468,7 @@ export function toCloud(s: Session): CloudSession {
   if (s.material) c.material = s.material;
   if (s.spans) c.spans = flat(s.spans);
   if (s.leaves) c.leaves = flat(s.leaves);
+  if (s.cont) c.cont = true;
   return c;
 }
 
@@ -485,6 +487,7 @@ export function fromCloud(c: CloudSession): Session {
   if (sp) s.spans = sp;
   const lv = pairs(c.leaves);
   if (lv) s.leaves = lv;
+  if (c.cont) s.cont = true;
   return s;
 }
 

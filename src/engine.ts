@@ -59,6 +59,16 @@ export interface Run {
   workMs: number;
   breakMs: number;
   end: EndCondition;
+  /**
+   * ポモドーロで、途中から教材を変えたところ（from セット目から material。教材なしなら material なし）。
+   * 1セット目の教材は material。from の小さい順
+   */
+  sets?: SetChange[];
+}
+
+export interface SetChange {
+  from: number;
+  material?: string;
 }
 
 export interface Session {
@@ -76,7 +86,15 @@ export interface Session {
   spans?: [number, number][];
   /** 計測中にアプリから離れていた時間帯 [離れた, 戻った]（30秒以上のもの、設定がオンのときだけ） */
   leaves?: [number, number][];
+  /**
+   * ポモドーロの途中で教材を変えたときの、2つ目からの記録（1回の計測を教材ごとに分けて残す）。
+   * 「何回記録したか」には数えない
+   */
+  cont?: boolean;
 }
+
+/** 「何回記録したか」に数える記録か（教材ごとに分けた続きは数えない） */
+export const countsAsRecord = (s: Session): boolean => !s.cont;
 
 /** finish のとき、最後のラップがこれより短ければ記録しない（lap 直後の finish 対策） */
 export const MIN_FINAL_LAP_MS = 5000;
@@ -298,6 +316,125 @@ export function finish(r: Run, now: number): Session | null {
   const studyMs = laps.reduce((a, b) => a + b, 0);
   if (studyMs < 1000) return null;
   return { ...base, studyMs, laps };
+}
+
+// ---- ポモドーロの教材を途中で変える ----
+
+/** ポモドーロの set セット目の教材 */
+export function materialAt(r: Pick<Run, 'material' | 'sets'>, set: number): string | undefined {
+  let m = r.material;
+  for (const c of r.sets ?? []) if (c.from <= set) m = c.material;
+  return m;
+}
+
+/** 並べ直して、前と同じ教材になる変更を消す */
+function tidySets(r: Pick<Run, 'material' | 'sets'>, list: SetChange[]): void {
+  const out: SetChange[] = [];
+  let prev = r.material;
+  for (const c of [...list].sort((a, b) => a.from - b.from)) {
+    if (c.from <= 1 || c.material === prev) continue;
+    out.push(c);
+    prev = c.material;
+  }
+  if (out.length) r.sets = out;
+  else delete r.sets;
+}
+
+/** set セット目から教材を変える（その先で決めてある変更はそのまま） */
+export function changeMaterialFrom(r: Pick<Run, 'material' | 'sets'>, set: number, material: string | undefined): void {
+  const list = (r.sets ?? []).filter((c) => c.from !== set);
+  if (set <= 1) {
+    if (material) r.material = material;
+    else delete r.material;
+  } else {
+    list.push(material ? { from: set, material } : { from: set });
+  }
+  tidySets(r, list);
+}
+
+/** 教材の並び（教材と、何セットか。最後のまとまりはそのあとずっと）を、計測の教材にする */
+export function setsFromPlan(plan: { material?: string; n: number }[]): Pick<Run, 'material' | 'sets'> {
+  const out: Pick<Run, 'material' | 'sets'> = plan[0]?.material ? { material: plan[0].material } : {};
+  const list: SetChange[] = [];
+  let from = 1;
+  for (let i = 1; i < plan.length; i++) {
+    from += Math.max(1, plan[i - 1].n);
+    list.push(plan[i].material ? { from, material: plan[i].material } : { from });
+  }
+  tidySets(out, list);
+  return out;
+}
+
+/**
+ * 計測を終えて、保存する記録を作る。ポモドーロで途中から教材を変えていたら、
+ * 教材ごとのまとまりに分けて記録する（休憩は、その前のセットの教材のほうに入れる）。
+ */
+export function finishAll(r: Run, now: number): Session[] {
+  const whole = finish(r, now);
+  if (!whole) return [];
+  if (r.mode !== 'pomoCycle' || !r.sets?.length || !whole.spans) return [whole];
+
+  const work = Math.max(1000, r.workMs);
+  const cycle = work + Math.max(0, r.breakMs);
+  const total = cycleView(r, now).elapsed;
+  const lastSet = Math.floor(total / cycle) + 1;
+  const groups: { a: number; b: number; material?: string }[] = [];
+  for (let k = 1; k <= lastSet; k++) {
+    const m = materialAt(r, k);
+    const g = groups[groups.length - 1];
+    if (g && g.material === m) g.b = k;
+    else groups.push({ a: k, b: k, material: m });
+  }
+  if (groups.length < 2) return [whole];
+
+  // 経過時間（作業＋休憩、一時停止は入らない）と、実際の時刻の対応
+  const spans = whole.spans;
+  const workUntil = (e: number) => Math.floor(e / cycle) * work + Math.min(e % cycle, work);
+  const timeAt = (e: number): number => {
+    let c = 0;
+    for (const [a, b] of spans) {
+      if (e <= c + (b - a)) return a + (e - c);
+      c += b - a;
+    }
+    return whole.end;
+  };
+  const slice = (x: number, y: number): [number, number][] => {
+    const out: [number, number][] = [];
+    let c = 0;
+    for (const [a, b] of spans) {
+      const lo = Math.max(x, c);
+      const hi = Math.min(y, c + (b - a));
+      if (hi > lo) out.push([a + (lo - c), a + (hi - c)]);
+      c += b - a;
+    }
+    return out;
+  };
+
+  const parts: Session[] = [];
+  groups.forEach((g, i) => {
+    const last = i === groups.length - 1;
+    const x = (g.a - 1) * cycle;
+    const y = last ? Infinity : g.b * cycle;
+    const studyMs = workUntil(Math.min(y, total)) - workUntil(Math.min(x, total));
+    if (studyMs < 1000) return;
+    const start = parts.length === 0 ? whole.start : timeAt(x);
+    const end = last ? whole.end : timeAt(y);
+    const leaves = whole.leaves?.filter(([a]) => a >= start && (last || a < end));
+    parts.push({
+      id: parts.length === 0 ? whole.id : `${whole.id}-${i + 1}`,
+      mode: whole.mode,
+      start,
+      end,
+      studyMs,
+      laps: [],
+      firstLap: whole.firstLap,
+      ...(g.material ? { material: g.material } : {}),
+      spans: slice(x, y),
+      ...(leaves?.length ? { leaves } : {}),
+      ...(parts.length ? { cont: true } : {}),
+    });
+  });
+  return parts;
 }
 
 export interface LapEndView {

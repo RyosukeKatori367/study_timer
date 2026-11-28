@@ -3,11 +3,13 @@
 
 import { play } from './audio';
 import {
+  changeMaterialFrom,
   cycleRemaining,
   cycleView,
   elapsed,
-  finish,
+  finishAll,
   isRunning,
+  materialAt,
   lap,
   pause,
   resume,
@@ -30,6 +32,7 @@ import { type Ring } from './ui/ring';
 import { bigHtml, createFace, faceById, type FaceId } from './ui/faces';
 import { toast } from './ui/toast';
 import { count, nth, unitFor } from './units';
+import { materialThumb, pickMaterial } from './pages/material';
 import { setAwake } from './wakelock';
 
 const HOLD_MS = 600; // finish を押し続ける時間（押し間違い防止）
@@ -46,6 +49,7 @@ let app: HTMLElement;
 let ring: Ring;
 let face: FaceId | '' = '';
 let lastBig = '';
+let lastMat = '';
 let el: {
   kicker: HTMLElement;
   titleA: HTMLElement;
@@ -64,6 +68,7 @@ let el: {
   lapPre: HTMLElement;
   lapSuf: HTMLElement;
   lapTotal: HTMLElement;
+  pomoMat: HTMLElement;
 };
 
 export const isActive = (): boolean => run !== null;
@@ -107,6 +112,16 @@ export function initRun(exit: () => void): void {
           <div class="lap-total"></div>
         </div>
       </div>`),
+    // ポモドーロ：今のセット（休憩中は次のセット）の教材。タップで変える
+    html(`
+      <div class="pomo-mat" hidden>
+        <button type="button" class="pm-btn">
+          <span class="pm-thumb"></span>
+          <span class="pm-text"><span class="pm-label"></span><span class="pm-name"></span></span>
+          <span class="pm-change">変える</span>
+        </button>
+        <div class="pm-next"></div>
+      </div>`),
   );
 
   applyFace();
@@ -129,7 +144,10 @@ export function initRun(exit: () => void): void {
     lapPre: $('.lap-now .pre', root),
     lapSuf: $('.lap-now .suf', root),
     lapTotal: $('.lap-total', root),
+    pomoMat: $('.pomo-mat', root),
   };
+
+  $('.pm-btn', root).onclick = () => void changePomoMaterial();
 
   $('.run-cancel', root).onclick = () => {
     if (!run) return;
@@ -241,6 +259,8 @@ function show(): void {
   el.info.hidden = !cycle && run.end.kind === 'none';
   el.laps.hidden = cycle;
   el.btnLap.hidden = cycle;
+  el.pomoMat.hidden = !cycle;
+  lastMat = '';
   lastPhase = '';
   renderedLaps = -1;
   root.classList.remove('break');
@@ -274,21 +294,60 @@ function end(at = Date.now()): void {
     run.leftAt = null;
   }
   const mode = run.mode;
-  const session = finish(run, at);
+  // ポモドーロで途中から教材を変えていたら、教材ごとに分けて記録する
+  const parts = finishAll(run, at);
+  const session = parts.length ? postView(parts) : null;
   if (session) {
-    addSession(session);
-    // ログインしていれば、投稿の確認画面が出る
+    for (const p of parts) addSession(p);
+    // ログインしていれば、投稿の確認画面が出る（分けたときも1回の計測として）
     queueMicrotask(() => document.dispatchEvent(new CustomEvent('session:saved', { detail: session })));
-    if (usesLapNumbers(mode)) setNextLap(nextLapAfter(run, session), run.material ?? null);
+    if (usesLapNumbers(mode)) setNextLap(nextLapAfter(run, parts[0]), run.material ?? null);
   }
   close();
   if (session) {
     const t = session.studyMs >= HOUR ? fmtHM(session.studyMs) : fmtLap(session.studyMs);
-    toast(`記録しました（${t}）`);
+    toast(parts.length > 1 ? `記録しました（${t}・教材${parts.length}つに分けて）` : `記録しました（${t}）`);
   } else {
     toast('記録せずに終了しました');
   }
   onExit();
+}
+
+/** 投稿に使う1回分の記録（教材ごとに分けたときは合わせて、教材はいちばん長かったもの） */
+function postView(parts: Session[]): Session {
+  if (parts.length === 1) return parts[0];
+  const main = [...parts].sort((a, b) => b.studyMs - a.studyMs)[0];
+  const leaves = parts.flatMap((p) => p.leaves ?? []);
+  const s: Session = {
+    ...parts[0],
+    end: parts[parts.length - 1].end,
+    studyMs: parts.reduce((t, p) => t + p.studyMs, 0),
+    spans: parts.flatMap((p) => p.spans ?? []),
+    ...(leaves.length ? { leaves } : {}),
+  };
+  if (main.material) s.material = main.material;
+  else delete s.material;
+  delete s.cont;
+  return s;
+}
+
+/** ポモドーロの教材を変える。作業中は今のセットから、休憩中は次のセットから */
+async function changePomoMaterial(): Promise<void> {
+  if (!run || run.mode !== 'pomoCycle') return;
+  const r = run;
+  const v = cycleView(r, Date.now());
+  const work = v.phase === 'work';
+  const target = work ? v.set : v.set + 1;
+  const picked = await pickMaterial(
+    materialAt(r, target) ?? null,
+    `${target}セット目の教材`,
+    work ? 'このセットの最初から、この教材にします' : '休憩のあと、このセットからこの教材にします',
+  );
+  if (picked === undefined || run !== r) return;
+  changeMaterialFrom(r, target, picked ?? undefined);
+  saveRun(r);
+  render();
+  toast(`${target}セット目から「${materialName(picked)}」にしました`);
 }
 
 /** 計測の画面を閉じる（記録するかどうかは呼ぶ側で決める） */
@@ -359,9 +418,9 @@ function bindHoldToFinish(): void {
 }
 
 /** 計測中の画面の一番上の小さい見出し。教材があれば並べる */
-const kicker = (r: Run, mode: string): string => {
+const kicker = (r: Run, mode: string, material = r.material): string => {
   const parts = [mode];
-  if (r.material) parts.push(materialName(r.material));
+  if (material) parts.push(materialName(material));
   if (settings.leaveTrack && r.leaves?.length) parts.push(`離脱${r.leaves.length}回`);
   return parts.join(' · ');
 };
@@ -479,7 +538,9 @@ function renderPomoCycle(r: Run, now: number): void {
   const v = cycleView(r, now);
   if (v.done) {
     play('done');
-    end();
+    // 終わった時刻で記録する（アプリを閉じていて、あとから開いたときも）
+    const over = isRunning(r) ? Math.max(0, elapsed(r, now) - v.elapsed) : 0;
+    end(now - over);
     return;
   }
 
@@ -491,7 +552,7 @@ function renderPomoCycle(r: Run, now: number): void {
 
   const work = v.phase === 'work';
   const lastSet = r.end.kind === 'count' && v.set >= r.end.n;
-  setText(el.kicker, kicker(r, 'ポモドーロ'));
+  setText(el.kicker, kicker(r, 'ポモドーロ', materialAt(r, v.set)));
   setText(el.titleA, work ? '作業' : '休憩');
   setText(el.titleB, `${v.set}セット目`);
   setBig(fmtRemain(v.phaseRemain));
@@ -500,6 +561,7 @@ function renderPomoCycle(r: Run, now: number): void {
   else setText(el.sub, `次は作業 ${fmtRemain(r.workMs)}`);
   ring.set(0, (v.phaseElapsed / v.phaseLen) * 360);
   root.classList.toggle('break', !work);
+  renderPomoMat(r, v.set, work);
 
   const rest = cycleRemaining(r, now, v);
   const info: [string, string][] = [];
@@ -524,6 +586,23 @@ function renderPomoCycle(r: Run, now: number): void {
     setText(el.infoValues[i], value);
   });
   el.btnStop.disabled = false;
+}
+
+/** ポモドーロの教材（作業中は今のセット、休憩中は次のセット）と、その先で変わるところ */
+function renderPomoMat(r: Run, set: number, work: boolean): void {
+  const target = work ? set : set + 1;
+  const m = materialAt(r, target) ?? null;
+  const next = r.sets?.find((c) => c.from > target && (r.end.kind !== 'count' || c.from <= r.end.n));
+  const key = `${target}|${work}|${m}|${next?.from}|${next?.material}`;
+  if (key === lastMat) return;
+  lastMat = key;
+  el.pomoMat.classList.toggle('soon', !work);
+  setText($('.pm-label', el.pomoMat), work ? '今のセットの教材' : `次のセット（${target}セット目）の教材`);
+  setText($('.pm-name', el.pomoMat), materialName(m));
+  $('.pm-thumb', el.pomoMat).innerHTML = materialThumb(m, 34);
+  const nx = $('.pm-next', el.pomoMat);
+  setText(nx, next ? `${next.from}セット目から「${materialName(next.material ?? null)}」` : '');
+  nx.hidden = !next;
 }
 
 /** タイマー・ストップウォッチの終了条件（残り時間・残りラップ） */

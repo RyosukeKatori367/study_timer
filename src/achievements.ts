@@ -157,7 +157,7 @@ export function achContext(): AchCtx {
   let pomo = 0;
   for (const s of getSessions()) {
     totalMs += s.studyMs;
-    if (s.mode === 'pomoCycle') pomo++;
+    if (s.mode === 'pomoCycle' && !s.cont) pomo++; // 教材ごとに分けた続きは数えない
     if (s.studyMs <= 0) continue;
     const k = dateKey(s.start, settings.dayBoundaryMin);
     days.set(k, (days.get(k) ?? 0) + s.studyMs);

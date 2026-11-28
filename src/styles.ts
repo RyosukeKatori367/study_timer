@@ -57,7 +57,37 @@ export interface TagItem {
 export type StyleItem = ThemeItem | PatternItem | TagItem;
 
 /** ガチャで出るタグ */
-export const TAG_ITEMS: TagItem[] = [{ kind: 'tag', id: 'g:gouun', name: '豪運', rarity: 'LEGEND', tag: 'gouun' }];
+const GACHA_TAGS: [string, Rarity][] = [
+  ['asagata', 'N'],
+  ['yorugata', 'N'],
+  ['kotsukotsu', 'N'],
+  ['mypace', 'N'],
+  ['nemui', 'N'],
+  ['jukensei', 'N'],
+  ['fukushu', 'N'],
+  ['ichiyazuke', 'N'],
+  ['shuchu', 'R'],
+  ['ankio', 'R'],
+  ['keisan', 'R'],
+  ['hayaoki', 'R'],
+  ['cafeben', 'R'],
+  ['toshokan', 'R'],
+  ['tensai', 'SR'],
+  ['fukutsu', 'SR'],
+  ['zone', 'SR'],
+  ['shinya', 'SR'],
+  ['kami', 'SSR'],
+  ['kakusei', 'SSR'],
+  ['sakurasaku', 'SSR'],
+  ['gouun', 'LEGEND'],
+];
+export const TAG_ITEMS: TagItem[] = GACHA_TAGS.map(([tag, rarity]) => ({
+  kind: 'tag',
+  id: `g:${tag}`,
+  name: TAGS.find((x) => x.id === tag)?.name ?? tag,
+  rarity,
+  tag,
+}));
 
 const t = (id: string, name: string, rarity: Rarity, light: string, strong: string, more: Partial<ThemeItem> = {}): ThemeItem => ({
   kind: 'theme',

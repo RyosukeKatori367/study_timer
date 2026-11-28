@@ -1,8 +1,9 @@
 import { unlockAudio } from '../audio';
 import { clockToTimestamp, newRun, type EndCondition } from '../engine';
 import { startRun } from '../run';
-import { currentMaterialId, saveSettings, settings, type EndKind } from '../store';
+import { saveSettings, settings, type EndKind } from '../store';
 import { createMaterialChip } from './material';
+import { createPlanChip, planForRun } from './pomoplan';
 import { HOUR, MIN, SEC, fmtHM, fmtRemain, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums } from '../ui/sheet';
@@ -39,8 +40,12 @@ export function initPomodoroPage(page: HTMLElement): () => void {
       </div>`),
     html(`<button type="button" class="btn-start wide">start</button>`),
   );
+  // 教材と「途中で変える」（セットごとの教材）を並べる
   const materialChip = createMaterialChip();
-  $('.btn-start', page).before(materialChip.el);
+  const planChip = createPlanChip();
+  const picks = html(`<div class="pick-row"></div>`);
+  picks.append(materialChip.el, planChip.el);
+  $('.btn-start', page).before(picks);
 
   const card = (field: string) => $(`.card[data-field="${field}"]`, page);
 
@@ -62,6 +67,7 @@ export function initPomodoroPage(page: HTMLElement): () => void {
           : [String(settings.endCount), 'セット'];
     setText($('.v', value), v);
     setText($('.u', value), u);
+    planChip.refresh(); // 回数で終わるときは、使わない教材があるかが変わる
   };
 
   card('work').onclick = async () => {
@@ -125,7 +131,7 @@ export function initPomodoroPage(page: HTMLElement): () => void {
         workMs: settings.workMs,
         breakMs: settings.breakMs,
         end,
-        material: currentMaterialId() ?? undefined,
+        ...planForRun(),
       }),
     );
   };

@@ -137,3 +137,20 @@ describe('教材の色', () => {
     expect(materialColor(null)).toBe('#d9d9d9');
   });
 });
+
+describe('教材の並べ替え', () => {
+  it('並べた順になり、色は変わらない', async () => {
+    const { addMaterial, activeMaterials, reorderMaterials, materialGenres } = await import('./store');
+    const { materialColor } = await import('./colors');
+    const a = addMaterial('並べA', { genre: '数学' });
+    const b = addMaterial('並べB', { genre: '英語' });
+    const c = addMaterial('並べC', { genre: '数学' });
+    const before = new Map(activeMaterials().map((m) => [m.id, materialColor(m.id)]));
+    const ids = activeMaterials().map((m) => m.id);
+    const rest = ids.filter((id) => ![a.id, b.id, c.id].includes(id));
+    reorderMaterials([b.id, c.id, a.id, ...rest]);
+    expect(activeMaterials().slice(0, 3).map((m) => m.name)).toEqual(['並べB', '並べC', '並べA']);
+    expect(materialGenres().slice(0, 2)).toEqual(['英語', '数学']);
+    for (const m of activeMaterials()) expect(materialColor(m.id)).toBe(before.get(m.id));
+  });
+});

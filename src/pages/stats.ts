@@ -3,7 +3,7 @@
 
 import { materialColor } from '../colors';
 import { commonUnit, count, nth, one, range, unitFor } from '../units';
-import { leaveTotal, type Mode, type Session } from '../engine';
+import { countsAsRecord, leaveTotal, type Mode, type Session } from '../engine';
 import { getSessions, materialById, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
 import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
@@ -200,7 +200,7 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
   const u = commonUnit(sessions.filter((x) => x.laps.length > 0).map((x) => x.material ?? null)) ?? (d.laps.length ? null : unitFor(null));
   const stats = `
     <div class="detail-stats">
-      <div><span class="label">記録</span><span class="value">${sessions.length}回</span></div>
+      <div><span class="label">記録</span><span class="value">${sessions.filter(countsAsRecord).length}回</span></div>
       <div><span class="label">${u ? u.countLabel : 'こなした数'}</span><span class="value">${u ? count(d.laps.length, u) : d.laps.length}</span></div>
       <div><span class="label">平均</span><span class="value">${d.lapAvgMs === null ? '—' : fmtLap(d.lapAvgMs)}</span></div>
       <div><span class="label">最長</span><span class="value">${d.lapMaxMs === null ? '—' : fmtLap(d.lapMaxMs)}</span></div>

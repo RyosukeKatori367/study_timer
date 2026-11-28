@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_ITEMS, GACHA_ITEMS, PATTERNS, REFUND, THEMES, currentRates, pickRarity, pickReward } from './styles';
+import { ALL_ITEMS, GACHA_ITEMS, REFUND, TAG_ITEMS, THEMES, currentRates, pickRarity, pickReward } from './styles';
+import { tagById } from './tags';
 
 const none = () => false;
 
@@ -44,15 +45,20 @@ describe('グミガチャ', () => {
     expect(noN.rarity.R).toBe(30); // ほかのレア度の確率は変わらない
     expect(sum(noN.item) + noN.dupe).toBeCloseTo(100, 6);
   });
-  it('全部で101種類（テーマと模様が100・豪運タグ1）、ベースカラー12・シークレット1', () => {
-    expect(ALL_ITEMS.length).toBe(101);
+  it('全部で122種類（テーマと模様が100・タグ22）、ベースカラー12・シークレット1', () => {
+    expect(ALL_ITEMS.length).toBe(122);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'LEGEND').map((x) => x.name)).toEqual(['豪運']);
     expect(THEMES.filter((x) => x.rarity === 'BASE').length).toBe(12);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'SECRET').length).toBe(1);
     expect(GACHA_ITEMS.every((x) => x.rarity !== 'BASE')).toBe(true);
   });
   it('id がかぶっていない', () => {
-    const ids = [...THEMES, ...PATTERNS].map((x) => x.id);
+    const ids = ALL_ITEMS.map((x) => x.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+  it('ガチャのタグは全部 tags.ts にあり、名前が同じ', () => {
+    for (const x of TAG_ITEMS) expect(tagById(x.tag)?.name).toBe(x.name);
+    expect(TAG_ITEMS.filter((x) => x.rarity === 'N').length).toBe(8);
+    expect(TAG_ITEMS.filter((x) => x.rarity === 'SSR').length).toBe(3);
   });
 });

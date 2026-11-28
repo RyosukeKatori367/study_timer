@@ -16,6 +16,7 @@ import {
   materialGenres,
   materialName,
   nextLapNumber,
+  reorderMaterials,
   saveSettings,
   setNextLap,
   untaggedLapSessions,
@@ -29,6 +30,12 @@ import { toast } from '../ui/toast';
 
 export const MATERIAL_CHANGE = 'material:change';
 const notifyChange = () => document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
+
+/** 今の教材を変える（教材のチップなども変わる） */
+export function setCurrentMaterial(id: string | null): void {
+  saveSettings({ materialId: id });
+  notifyChange();
+}
 
 /** 画像がない教材や、画像から色が取れないときの灰色 */
 const GRAY = '#b0b0b0';
@@ -49,8 +56,12 @@ function thumbHtml(m: { name: string; img?: string; color: string } | null, size
 
 // ---- 全画面のページ ----
 
-type Mode = 'select' | 'manage';
+/** select：今の教材を選ぶ（チップから）、manage：編集する（設定から）、pick：選んで返すだけ（pickMaterial） */
+type Mode = 'select' | 'manage' | 'pick';
 let host: HTMLElement | null = null;
+
+/** pickMaterial で選んでいるところ */
+let picking: { current: string | null; title: string; lead: string; done: (id: string | null | undefined) => void } | null = null;
 
 function openHost(): HTMLElement {
   host?.remove();
@@ -62,6 +73,22 @@ function openHost(): HTMLElement {
 function closeHost(): void {
   host?.remove();
   host = null;
+  const p = picking;
+  picking = null;
+  p?.done(undefined); // 選ばずに閉じた
+}
+
+/**
+ * 教材を選んでもらって返す（今の教材の設定は変えない）。選ばずに閉じたら undefined、教材なしなら null。
+ * ポモドーロの途中で教材を変えるときなどに使う。
+ */
+export function pickMaterial(current: string | null, title: string, lead = ''): Promise<string | null | undefined> {
+  return new Promise((done) => {
+    const root = openHost();
+    picking?.done(undefined);
+    picking = { current, title, lead, done };
+    listView(root, 'pick');
+  });
 }
 
 /** 教材のページを開く。select なら選ぶため（チップから）、manage なら編集のため（設定から） */
@@ -75,12 +102,13 @@ export function openMaterialEdit(id: string | null): void {
 }
 
 function listView(root: HTMLElement, mode: Mode): void {
-  const current = currentMaterialId();
+  const current = mode === 'pick' ? (picking?.current ?? null) : currentMaterialId();
+  const choosing = mode !== 'manage';
   const list = activeMaterials();
   const genres = materialGenres();
   const row = (m: Material | null) => {
     const id = m?.id ?? '';
-    const selected = mode === 'select' && (m?.id ?? null) === current;
+    const selected = choosing && (m?.id ?? null) === current;
     return `
       <div class="mrow${selected ? ' selected' : ''}" data-id="${esc(id)}">
         <button type="button" class="mrow-main" data-pick>
@@ -103,23 +131,29 @@ function listView(root: HTMLElement, mode: Mode): void {
   const noGenre = list.filter((m) => !m.genre);
   root.innerHTML = `
     <div class="sns">
-      <div class="sns-head">
+      <div class="sns-head wide">
         <button type="button" class="sns-back" data-close aria-label="閉じる">×</button>
-        <div class="sns-head-title">教材</div>
-        <span class="sns-head-side"></span>
+        <div class="sns-head-title">${esc(mode === 'pick' ? (picking?.title ?? '教材') : '教材')}</div>
+        ${list.length >= 2 && mode !== 'pick' ? '<button type="button" class="head-text-btn" data-sort>並べ替え</button>' : '<span class="sns-head-side"></span>'}
       </div>
-      ${mode === 'select' ? `<div class="sns-card">${row(null)}</div>` : ''}
+      ${mode === 'pick' && picking?.lead ? `<p class="sns-lead">${esc(picking.lead)}</p>` : ''}
+      ${choosing ? `<div class="sns-card">${row(null)}</div>` : ''}
       ${genres.map((g) => section(g, list.filter((m) => m.genre === g))).join('')}
       ${section(genres.length ? 'ジャンルなし' : null, noGenre)}
       <button type="button" class="btn dark" data-add>＋ 教材を追加</button>
-      <p class="sns-lead">${
-        mode === 'select'
-          ? 'タップで選びます。教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
-          : '教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
-      }</p>
+      ${
+        mode === 'pick'
+          ? ''
+          : `<p class="sns-lead">${
+              mode === 'select'
+                ? 'タップで選びます。教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
+                : '教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
+            }</p>`
+      }
     </div>`;
 
   $('[data-close]', root).onclick = closeHost;
+  root.querySelector<HTMLElement>('[data-sort]')?.addEventListener('click', () => sortView(root, mode));
   $('[data-add]', root).onclick = () => editView(root, null, mode);
   root.querySelectorAll<HTMLElement>('.mrow').forEach((r) => {
     const id = r.dataset.id || null;
@@ -128,11 +162,136 @@ function listView(root: HTMLElement, mode: Mode): void {
         if (id) editView(root, id, mode);
         return;
       }
+      if (mode === 'pick') {
+        const p = picking;
+        picking = null;
+        closeHost();
+        p?.done(id);
+        return;
+      }
       saveSettings({ materialId: id });
       notifyChange();
       closeHost();
     };
     r.querySelector<HTMLElement>('[data-edit]')?.addEventListener('click', () => editView(root, id, mode));
+  });
+}
+
+// ---- 並べ替え ----
+
+const HANDLE = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+/**
+ * 並べ替えの画面。教材は右の ≡ をつかんで上下に動かす（同じジャンルの中で）。
+ * ジャンルの順番は、見出しの ▲▼ で入れ替える。動かしたらすぐ保存する。
+ */
+function sortView(root: HTMLElement, back: Mode): void {
+  const list = activeMaterials();
+  const genres = materialGenres();
+  const noGenre = list.filter((m) => !m.genre);
+  const sections: [string | null, Material[]][] = [...genres.map((g): [string, Material[]] => [g, list.filter((m) => m.genre === g)])];
+  if (noGenre.length) sections.push([genres.length ? null : '', noGenre]);
+  const movable = genres.length >= 2;
+  root.innerHTML = `
+    <div class="sns">
+      <div class="sns-head wide">
+        <span class="sns-head-side"></span>
+        <div class="sns-head-title">並べ替え</div>
+        <button type="button" class="head-text-btn strong" data-done>完了</button>
+      </div>
+      <p class="sns-lead">右の ≡ をつかんで上下に動かします${movable ? '。ジャンルの順番は ▲▼ で入れ替えます' : ''}</p>
+      ${sections
+        .map(
+          ([g, items], i) => `
+        <section class="mgroup" data-genre="${esc(g ?? '')}">
+          ${
+            g === ''
+              ? ''
+              : `<div class="mgroup-head sort-head"><span>${esc(g ?? 'ジャンルなし')}</span>${
+                  movable && g !== null
+                    ? `<span class="sort-genre-btns">
+                        <button type="button" data-up="${i}" aria-label="${esc(g)}を上へ" ${i === 0 ? 'disabled' : ''}>▲</button>
+                        <button type="button" data-down="${i}" aria-label="${esc(g)}を下へ" ${i === genres.length - 1 ? 'disabled' : ''}>▼</button>
+                      </span>`
+                    : ''
+                }</div>`
+          }
+          <div class="sns-card sort-list">${items
+            .map(
+              (m) => `
+            <div class="mrow sort-row" data-id="${esc(m.id)}">
+              <span class="mrow-main">
+                ${materialThumb(m.id, 40)}
+                <span class="mrow-text"><span class="mrow-name">${esc(m.name)}</span></span>
+              </span>
+              <span class="sort-handle" role="button" aria-label="${esc(m.name)}を動かす">${HANDLE}</span>
+            </div>`,
+            )
+            .join('')}</div>
+        </section>`,
+        )
+        .join('')}
+    </div>`;
+
+  const save = () => {
+    const ids = [...root.querySelectorAll<HTMLElement>('.sort-row')].map((r) => r.dataset.id!);
+    reorderMaterials(ids);
+    notifyChange();
+  };
+  $('[data-done]', root).onclick = () => listView(root, back);
+  const moveGenre = (i: number, d: -1 | 1) => {
+    const secs = [...root.querySelectorAll<HTMLElement>('.mgroup')];
+    const a = secs[i];
+    const b = secs[i + d];
+    if (!a || !b) return;
+    if (d < 0) b.before(a);
+    else b.after(a);
+    save();
+    sortView(root, back);
+  };
+  root.querySelectorAll<HTMLElement>('[data-up]').forEach((b) => (b.onclick = () => moveGenre(Number(b.dataset.up), -1)));
+  root.querySelectorAll<HTMLElement>('[data-down]').forEach((b) => (b.onclick = () => moveGenre(Number(b.dataset.down), 1)));
+  root.querySelectorAll<HTMLElement>('.sort-handle').forEach((h) => bindDrag(h, save));
+}
+
+/** ≡ をつかんで、同じ一覧の中で上下に動かす。離したら onDrop */
+function bindDrag(handle: HTMLElement, onDrop: () => void): void {
+  handle.addEventListener('pointerdown', (e) => {
+    const row = handle.closest<HTMLElement>('.sort-row');
+    if (!row) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    row.classList.add('dragging');
+    let startY = e.clientY;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      let dy = ev.clientY - startY;
+      const prev = row.previousElementSibling as HTMLElement | null;
+      const next = row.nextElementSibling as HTMLElement | null;
+      if (next && dy > next.offsetHeight / 2) {
+        next.after(row);
+        startY += next.offsetHeight;
+        dy -= next.offsetHeight;
+        moved = true;
+      } else if (prev && dy < -prev.offsetHeight / 2) {
+        prev.before(row);
+        startY -= prev.offsetHeight;
+        dy += prev.offsetHeight;
+        moved = true;
+      }
+      row.style.transform = `translateY(${dy}px)`;
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      row.style.transform = '';
+      row.classList.remove('dragging');
+      if (moved) onDrop();
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
   });
 }
 
@@ -294,6 +453,13 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
         saveSettings({ materialId: made.id });
         notifyChange();
         return closeHost();
+      }
+      if (back === 'pick') {
+        const p = picking;
+        picking = null;
+        notifyChange();
+        closeHost();
+        return p?.done(made.id);
       }
     }
     notifyChange();

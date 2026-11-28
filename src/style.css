@@ -597,7 +597,8 @@ nav button:focus-visible {
   font-size: 18px;
 }
 
-.material-chip + .btn-start.wide {
+.material-chip + .btn-start.wide,
+.pick-row + .btn-start.wide {
   margin-top: -6px;
 }
 
@@ -4459,8 +4460,9 @@ html[data-anim='rainbow'] .ring-on {
   border-radius: 20px;
 }
 
+/* まだのタグ：名前が読めるように少しだけ暗くする（鍵は右上に小さく） */
 .style-tile.locked .tag-prev {
-  filter: saturate(0.4) brightness(0.5);
+  filter: saturate(0.55) brightness(0.7);
 }
 
 .chip-tag {
@@ -6597,4 +6599,411 @@ button.ev-season {
 .help-page-btn small {
   font-size: 11px;
   color: var(--muted);
+}
+
+/* ---------- グミガチャのタグ ---------- */
+
+/* N：1色 */
+.tag.tag-n-sky { background: #bfe6ff; color: #0d3a5c; }
+.tag.tag-n-night { background: #2b3566; color: #dfe5ff; }
+.tag.tag-n-mint { background: #bff2df; color: #0c4a37; }
+.tag.tag-n-lemon { background: #fff0a6; color: #5a4700; }
+.tag.tag-n-lilac { background: #e2d6ff; color: #3b2a6b; }
+.tag.tag-n-peach { background: #ffd2c2; color: #6b2a17; }
+.tag.tag-n-leaf { background: #cdeeb0; color: #2b4d12; }
+.tag.tag-n-ash { background: #555a61; color: #eceef1; }
+
+/* R：2色のグラデーション */
+.tag.tag-r-focus {
+  background: linear-gradient(135deg, #3fd6c6, #3a7bff);
+  color: #fff;
+  font-weight: 700;
+}
+.tag.tag-r-memo {
+  background: linear-gradient(135deg, #ff7eb3, #ffb36b);
+  color: #fff;
+  font-weight: 700;
+}
+/* 計算マシン：黒い画面に緑の文字 */
+.tag.tag-r-calc {
+  background: #0b1f12;
+  color: #5dff8f;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #2f8f52;
+}
+.tag.tag-r-dawn {
+  background: linear-gradient(135deg, #ffe27a, #ff8fa8);
+  color: #5a1f2c;
+  font-weight: 700;
+}
+.tag.tag-r-cafe {
+  background: linear-gradient(135deg, #f1dfc8, #b07d52);
+  color: #3a2112;
+  font-weight: 700;
+}
+.tag.tag-r-library {
+  background: linear-gradient(135deg, #0f3d2e, #1f6b4c);
+  color: #f0d78a;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(240, 215, 138, 0.35);
+}
+
+/* SR：光る */
+.tag.tag-sr-genius {
+  background: linear-gradient(135deg, #7b5cff, #3fa9ff);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 9px rgba(123, 92, 255, 0.6);
+}
+.tag.tag-sr-iron {
+  background: linear-gradient(135deg, #17181c 0%, #3a1016 55%, #c4122f 100%);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 8px rgba(196, 18, 47, 0.55), inset 0 0 0 1px rgba(255, 90, 110, 0.5);
+}
+.tag.tag-sr-zone {
+  background: #06141c;
+  color: #6ff6ff;
+  font-weight: 800;
+  text-shadow: 0 0 6px rgba(111, 246, 255, 0.9);
+  box-shadow: 0 0 8px rgba(111, 246, 255, 0.55), inset 0 0 0 1px #6ff6ff;
+}
+/* 深夜の覇者：紺に星 */
+.tag.tag-sr-midnight {
+  background:
+    radial-gradient(1px 1px at 18% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 72% 22%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 46% 78%, #ffe9a8, transparent),
+    radial-gradient(1px 1px at 88% 70%, #fff, transparent),
+    linear-gradient(135deg, #0b1240, #2a2f8f);
+  color: #ffe9a8;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(110, 120, 255, 0.5);
+}
+
+/* SSR：動く */
+.tag.tag-ssr-divine {
+  background: linear-gradient(110deg, #fff7d6 0%, #ffffff 30%, #ffe08a 50%, #ffffff 70%, #fff7d6 100%);
+  background-size: 220% 100%;
+  color: #6b4a00;
+  font-weight: 800;
+  animation: gold-shine 3s linear infinite, tag-halo 2.4s ease-in-out infinite;
+}
+.tag.tag-ssr-awaken {
+  background: linear-gradient(110deg, #2a0b5c 0%, #7a2bff 30%, #4fd8ff 50%, #7a2bff 70%, #2a0b5c 100%);
+  background-size: 220% 100%;
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 0 6px rgba(79, 216, 255, 0.9);
+  box-shadow: 0 0 10px rgba(122, 43, 255, 0.65);
+  animation: gold-shine 1.8s linear infinite;
+}
+.tag.tag-ssr-sakura {
+  background: linear-gradient(110deg, #ff8fb5 0%, #ffd6e5 30%, #ffffff 50%, #ffc1d6 70%, #ff8fb5 100%);
+  background-size: 220% 100%;
+  color: #8a1640;
+  font-weight: 800;
+  box-shadow: 0 0 9px rgba(255, 143, 181, 0.6);
+  animation: gold-shine 3.4s linear infinite;
+}
+.tag.tag-ssr-sakura::before {
+  content: '✿';
+  margin-right: 3px;
+  font-weight: 400;
+}
+
+@keyframes tag-halo {
+  50% {
+    box-shadow: 0 0 14px rgba(255, 224, 138, 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag.tag-ssr-divine,
+  .tag.tag-ssr-awaken,
+  .tag.tag-ssr-sakura {
+    animation: none;
+  }
+}
+
+/* ---------- 教材の並べ替え ---------- */
+
+.sns-head.wide {
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+}
+
+.head-text-btn {
+  justify-self: end;
+  padding: 8px 0 8px 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.head-text-btn.strong {
+  color: var(--light);
+  font-weight: 600;
+}
+
+.sort-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sort-genre-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.sort-genre-btns button {
+  width: 34px;
+  height: 28px;
+  border-radius: 8px;
+  background: #262626;
+  color: #cfcfcf;
+  font-size: 11px;
+}
+
+.sort-genre-btns button:disabled {
+  opacity: 0.3;
+}
+
+.sort-row {
+  position: relative;
+  background: var(--card);
+}
+
+.sort-row .mrow-main {
+  pointer-events: none;
+}
+
+.sort-handle {
+  flex: none;
+  width: 52px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a8a8a;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sort-row.dragging {
+  z-index: 2;
+  border-radius: 12px;
+  background: #2c2c2c;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+.sort-row.dragging + .mrow,
+.sort-row.dragging {
+  border-top-color: transparent;
+}
+
+/* ---------- ポモドーロのセットごとの教材 ---------- */
+
+/* 計測中：今の（休憩中は次の）セットの教材 */
+.pomo-mat {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pomo-mat[hidden] {
+  display: none;
+}
+
+.pm-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: left;
+}
+
+.pm-btn:active {
+  background: #1c1c1c;
+}
+
+.pm-thumb {
+  flex: none;
+  display: flex;
+}
+
+.pm-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pm-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pm-name {
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-change {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: #2a2a2a;
+  font-size: 12px;
+  color: #ddd;
+}
+
+/* 休憩中は「次のセット」を目立たせる */
+.pomo-mat.soon .pm-btn {
+  border-color: color-mix(in srgb, var(--light) 70%, transparent);
+  background: color-mix(in srgb, var(--light) 10%, transparent);
+}
+
+.pomo-mat.soon .pm-label {
+  color: var(--light);
+}
+
+.pomo-mat.soon .pm-change {
+  background: var(--light);
+  color: #000;
+  font-weight: 600;
+}
+
+.pm-next {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pm-next[hidden] {
+  display: none;
+}
+
+#run.land .pomo-mat {
+  grid-area: mid;
+  align-self: start;
+}
+
+/* ポモドーロのページ：「途中で変える」のチップ */
+.plan-chip .pick-value {
+  font-size: 13px;
+}
+
+/* セットごとの教材のページ */
+#pomoplan .sns {
+  gap: 14px;
+}
+
+.plan-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-row {
+  padding: 10px 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-row + .plan-row {
+  border-top: 1px solid #2e2e2e;
+}
+
+.plan-row.unused {
+  opacity: 0.45;
+}
+
+.plan-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+
+.plan-range {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plan-del {
+  width: 28px;
+  height: 28px;
+  margin: -4px -4px -4px 0;
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.plan-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-mat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 12px;
+  background: #242424;
+  text-align: left;
+}
+
+.plan-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-rest {
+  flex: none;
+  width: 108px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stepper {
+  flex: none;
+  width: 108px;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  text-align: center;
+}
+
+.stepper button {
+  height: 36px;
+  border-radius: 10px;
+  background: #2e2e2e;
+  font-size: 18px;
+}
+
+.stepper button:disabled {
+  opacity: 0.35;
+}
+
+.stepper b {
+  font-size: 18px;
+  font-weight: 600;
 }

@@ -1,7 +1,7 @@
 // 今日のクエスト（毎日3つ）と今週の目標（毎週3つ）。日付から自動で決まるので、毎週手で更新しなくてよい。
 // 進み具合はこの端末の記録から計算する。達成したら「受け取る」でグミをもらう。
 
-import type { Session } from './engine';
+import { countsAsRecord, type Session } from './engine';
 import { addDays, studyWeekStart } from './summary';
 import { dateKey } from './cloud/model';
 import { earn, hasEntry } from './gumi';
@@ -32,7 +32,8 @@ export interface Quest extends QuestDef {
 }
 
 const studyMs: Calc = (ss) => ss.reduce((t, s) => t + s.studyMs, 0);
-const count = (pred: (s: Session) => boolean): Calc => (ss) => ss.filter(pred).length;
+/** 記録の回数（ポモドーロを教材ごとに分けた続きは数えない） */
+const count = (pred: (s: Session) => boolean): Calc => (ss) => ss.filter((s) => countsAsRecord(s) && pred(s)).length;
 const materials: Calc = (ss) => new Set(ss.flatMap((s) => (s.material ? [s.material] : []))).size;
 const dayTotals = (ss: readonly Session[], dayKey: (ts: number) => string): Map<string, number> => {
   const m = new Map<string, number>();
@@ -64,7 +65,7 @@ const DAILY_MISC: Def[] = [
     reward: 20,
     calc: (ss) => ss.reduce((t, s) => t + (s.mode === 'pomoCycle' ? 0 : s.laps.length), 0),
   },
-  { id: 'rec2', title: '2回 記録する', target: 2, unit: 'count', reward: 20, calc: (ss) => ss.length },
+  { id: 'rec2', title: '2回 記録する', target: 2, unit: 'count', reward: 20, calc: count(() => true) },
 ];
 
 export const DAILY_ALL_BONUS = 30;

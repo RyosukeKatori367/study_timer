@@ -46,7 +46,9 @@ function tileHtml(item: StyleItem, selected: boolean): string {
   return `
     <button type="button" class="style-tile${owned ? '' : ' locked'}" data-id="${esc(item.id)}" aria-pressed="${selected}"
       aria-label="${esc(item.name)}${owned ? '' : '（まだ持っていません）'}">
-      <span class="style-prev">${previewHtml(item)}${owned ? '' : `<span class="lock-badge">${LOCK}</span>`}${selected ? '<span class="sel-badge">✓</span>' : ''}</span>
+      <span class="style-prev">${previewHtml(item)}${
+        owned ? '' : item.kind === 'tag' ? `<span class="lock-mini">${LOCK}</span>` : `<span class="lock-badge">${LOCK}</span>`
+      }${selected ? '<span class="sel-badge">✓</span>' : ''}</span>
       <span class="style-name">${esc(item.name)}</span>
       ${price ? `<span class="style-price">${fmtGumi(price)}</span>` : rarityTag(item.rarity)}
     </button>`;
@@ -194,10 +196,12 @@ function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], 
           })
           .join('');
   const gacha = grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === now)?.id ?? '');
-  const all = tiles + locked;
-  if (!all) return gacha;
-  // ガチャのタグの一覧（style-grid）の頭に足す
-  return gacha.includes('class="style-grid"') ? gacha.replace('<div class="style-grid">', `<div class="style-grid">${all}`) : `<div class="style-grid">${all}</div>`;
+  if (!tiles && !locked) return gacha;
+  if (!gacha.includes('class="style-grid"')) return `<div class="style-grid">${tiles}${locked}</div>`;
+  // 持っているほかのタグはガチャのタグの一覧（style-grid）の頭に、まだの実績のタグは最後に足す
+  const out = gacha.replace('<div class="style-grid">', `<div class="style-grid">${tiles}`);
+  const end = out.lastIndexOf('</div>');
+  return `${out.slice(0, end)}${locked}${out.slice(end)}`;
 }
 
 /** まだ持っていないものを押したとき：交換できるものなら、交換するか聞く。交換したら true */
