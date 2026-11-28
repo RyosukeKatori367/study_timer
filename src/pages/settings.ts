@@ -1,6 +1,7 @@
 // 設定画面。ジャンルごとのカードに分けて並べる。
 // 行の種類は3つ: オン／オフのスイッチ、選ぶもの（右に今の値、タップでシート）、操作（書き出しなど）。
 
+import { nth, unitFor } from '../units';
 import {
   activeMaterials,
   clearSessions,
@@ -74,7 +75,7 @@ async function choose<K extends keyof Settings>(
 }
 
 const ESTIMATE = [
-  { label: '平均ラップ', value: 'average' as const },
+  { label: '1つあたりの平均', value: 'average' as const },
   { label: 'タイマーの設定時間', value: 'timer' as const },
 ];
 const STYLES = [
@@ -108,20 +109,20 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    title: 'ラップ',
+    title: '番号（next）',
     icon: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     rows: [
       {
         kind: 'toggle',
         key: 'lapAdvance',
         label: 'finish後は次の番号から始める',
-        note: 'オフにすると、途中だったラップの番号から始めます（235番の途中で終えたら、次も235番から）',
+        note: 'オフにすると、途中だった番号から始めます（235問目の途中で終えたら、次も235問目から）'
       },
       {
         kind: 'choice',
         id: 'estimate',
         label: '残り時間の目安',
-        note: '終了条件がラップ数・ラップ番号のとき、タイマーで何を元に見積もるか。ストップウォッチはいつも平均ラップです',
+        note: '終了条件が「問題数」「何問目まで」のとき、タイマーで何を元に見積もるか。ストップウォッチはいつも1つあたりの平均です',
         value: () => ESTIMATE.find((o) => o.value === settings.lapEstimate)!.label,
         pick: () => choose('残り時間の目安（タイマー）', 'lapEstimate', ESTIMATE),
       },
@@ -332,12 +333,12 @@ export function initSettingsPage(view: HTMLElement, onDataChange: () => void): v
           <span class="row-label" style="display:flex;align-items:center;gap:12px;min-width:0">${materialThumb(m.id, 30)}<span class="sns-name">${esc(m.name)}</span>${
             m.genre ? `<span class="row-genre">${esc(m.genre)}</span>` : ''
           }</span>
-          <span class="row-value"><span>次は${nextLapNumber(m.id)}番</span><span class="chevron" aria-hidden="true">›</span></span>
+          <span class="row-value"><span>次は${nth(nextLapNumber(m.id), unitFor(m.id))}</span><span class="chevron" aria-hidden="true">›</span></span>
         </button>`,
         )
         .join('')}
       <button type="button" class="row add" data-material-add><span class="row-label">＋ 教材を追加</span></button>
-      <div class="row-note">教材ごとに、ラップ番号（次は何番から）・前回の範囲・前回平均を分けて記録します。タップで名前・ジャンル・画像・色・次の番号を変えられます。タイマーやストップウォッチの「教材」から切り替えます</div>`;
+      <div class="row-note">教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します。数え方（問・講・ページなど）も教材ごとに選べます。タップで名前・ジャンル・画像・色・数え方・次の番号を変えられます。タイマーやストップウォッチの「教材」から切り替えます</div>`;
 
     materialCard.querySelectorAll<HTMLElement>('[data-material]').forEach((b) => {
       b.onclick = () => openMaterialEdit(b.dataset.material!);

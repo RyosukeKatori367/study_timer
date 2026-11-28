@@ -15,9 +15,15 @@ import { HOUR, MIN, fmtHM, fmtTimeOfDay } from '../time';
 import { $, html, setText } from '../ui/dom';
 import { pickDrums, pickInteger, pickOption } from '../ui/sheet';
 import { toast } from '../ui/toast';
+import { count, nth, unitFor } from '../units';
 
 const KINDS: LapEndKind[] = ['none', 'clock', 'total', 'count', 'lapNo'];
-const LABELS = ['なし', '時刻', '合計時間', 'ラップ数', 'ラップ番号'];
+/** 選ぶときの名前（数と番号は、今の教材の数え方で：問題数・何問目まで） */
+const labels = (): string[] => {
+  const u = unit();
+  return ['なし', '時刻', '合計時間', u.countLabel, u.upTo];
+};
+const unit = () => unitFor(currentMaterialId());
 const CHANGE = 'lapend:change';
 
 /** 計測を始めるときの終了条件 */
@@ -42,7 +48,7 @@ export function lapEndError(): string | null {
   if (settings.lapEndKind === 'lapNo') {
     const to = endLapNo();
     if (to === null) return `${materialName(currentMaterialId())}の終了番号が決まっていません。終了条件から決めてください`;
-    if (to < nextLapNumber()) return `終了の${to}番が、開始の${nextLapNumber()}番より前です`;
+    if (to < nextLapNumber()) return `終わりの${nth(to, unit())}が、始める${nth(nextLapNumber(), unit())}より前です`;
   }
   return null;
 }
@@ -55,13 +61,13 @@ function describe(): string {
       return `合計${fmtHM(settings.lapEndTotalMs)}`;
     case 'count': {
       const from = nextLapNumber();
-      return `${settings.lapEndCount}ラップ（〜${from + settings.lapEndCount - 1}番）`;
+      return `${count(settings.lapEndCount, unit())}（〜${nth(from + settings.lapEndCount - 1, unit())}）`;
     }
     case 'lapNo': {
       const to = endLapNo();
-      if (to === null) return 'ラップ番号（未設定）';
+      if (to === null) return `${unit().upTo}（未設定）`;
       const n = to - nextLapNumber() + 1;
-      return n > 0 ? `${to}番まで（${n}ラップ）` : `${to}番まで（過ぎています）`;
+      return n > 0 ? `${nth(to, unit())}まで（${count(n, unit())}）` : `${nth(to, unit())}まで（過ぎています）`;
     }
     default:
       return 'なし';
@@ -90,17 +96,17 @@ async function pickValue(kind: LapEndKind): Promise<boolean> {
     }
     saveSettings({ lapEndTotalMs: ms });
   } else if (kind === 'count') {
-    const n = await pickInteger(`ラップ数（${nextLapNumber()}番から）`, settings.lapEndCount, 1, 999);
+    const n = await pickInteger(`${unit().countLabel}（${nth(nextLapNumber(), unit())}から）`, settings.lapEndCount, 1, 999);
     if (n === null) return false;
     saveSettings({ lapEndCount: n });
   } else if (kind === 'lapNo') {
     const from = nextLapNumber();
-    // 前に決めた番号が過ぎていたら、今の番号から10ラップ分を初めの値にする
+    // 前に決めた番号が過ぎていたら、今の番号から10個分を初めの値にする
     const saved = endLapNo();
     const value = saved !== null && saved >= from ? saved : from + 9;
     const id = currentMaterialId();
-    const title = `${id ? `${materialName(id)}：` : ''}何番まで（${from}番から）`;
-    const n = await pickInteger(title, value, from, 99999, `${from}番以上にしてください`);
+    const title = `${id ? `${materialName(id)}：` : ''}${unit().upTo}（${nth(from, unit())}から）`;
+    const n = await pickInteger(title, value, from, 99999, `${nth(from, unit())}以降にしてください`);
     if (n === null) return false;
     setEndLapNo(n); // 教材ごとに覚える
   }
@@ -119,7 +125,7 @@ export function createEndRow(): { el: HTMLElement; refresh: () => void } {
   };
 
   el.onclick = async () => {
-    const i = await pickOption('終了条件', LABELS, KINDS.indexOf(settings.lapEndKind));
+    const i = await pickOption('終了条件', labels(), KINDS.indexOf(settings.lapEndKind));
     if (i === null) return;
     const kind = KINDS[i];
     if (kind !== 'none' && !(await pickValue(kind))) return;

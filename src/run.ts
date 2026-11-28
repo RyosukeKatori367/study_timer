@@ -28,6 +28,7 @@ import { HOUR, fmtElapsed, fmtHM, fmtLap, fmtRemain, pad2 } from './time';
 import { $, html, setText } from './ui/dom';
 import { createRing, type Ring } from './ui/ring';
 import { toast } from './ui/toast';
+import { count, nth, unitFor } from './units';
 import { setAwake } from './wakelock';
 
 const HOLD_MS = 600; // finish を押し続ける時間（押し間違い防止）
@@ -57,6 +58,8 @@ let el: {
   laps: HTMLElement;
   lapList: HTMLElement;
   lapNumber: HTMLElement;
+  lapPre: HTMLElement;
+  lapSuf: HTMLElement;
   lapTotal: HTMLElement;
 };
 
@@ -91,13 +94,13 @@ export function initRun(exit: () => void): void {
       <div class="run-btns">
         <button type="button" class="btn-finish"><span>finish</span></button>
         <button type="button" class="btn-stop">stop</button>
-        <button type="button" class="btn-lap">lap</button>
+        <button type="button" class="btn-lap">next</button>
       </div>`),
     html(`
       <div class="run-laps">
         <div class="lap-list"></div>
         <div class="lap-box">
-          <div class="lap-now"><span>ラップ</span><span class="n"></span></div>
+          <div class="lap-now"><span class="pre"></span><span class="n"></span><span class="suf"></span></div>
           <div class="lap-total"></div>
         </div>
       </div>`),
@@ -121,12 +124,14 @@ export function initRun(exit: () => void): void {
     laps: $('.run-laps', root),
     lapList: $('.lap-list', root),
     lapNumber: $('.lap-now .n', root),
+    lapPre: $('.lap-now .pre', root),
+    lapSuf: $('.lap-now .suf', root),
     lapTotal: $('.lap-total', root),
   };
 
   $('.run-cancel', root).onclick = () => {
     if (!run) return;
-    if (!confirm('記録せずにやめますか？\nこの計測の時間とラップは残りません')) return;
+    if (!confirm('記録せずにやめますか？\nこの計測の時間と番号は残りません')) return;
     close();
     toast('記録せずにやめました');
     onExit();
@@ -513,18 +518,18 @@ function renderLapEnd(r: Run, now: number): void {
   switch (r.end.kind) {
     case 'clock': {
       const d = new Date(r.end.at);
-      info.push(['終了', `${d.getHours()}:${pad2(d.getMinutes())}`], ['残り時間', rest], ['完了', `${v.lapsDone}ラップ`]);
+      info.push(['終了', `${d.getHours()}:${pad2(d.getMinutes())}`], ['残り時間', rest], ['終わった', count(v.lapsDone, unitFor(r.material))]);
       break;
     }
     case 'total':
-      info.push(['合計', fmtHM(r.end.ms)], ['残り時間', rest], ['完了', `${v.lapsDone}ラップ`]);
+      info.push(['合計', fmtHM(r.end.ms)], ['残り時間', rest], ['終わった', count(v.lapsDone, unitFor(r.material))]);
       break;
     case 'count':
     case 'lapNo':
       info.push(
-        ['終了', `${r.end.kind === 'count' ? r.firstLap + r.end.n - 1 : r.end.to}番`],
+        ['終了', nth(r.end.kind === 'count' ? r.firstLap + r.end.n - 1 : r.end.to, unitFor(r.material))],
         ['残り時間（目安）', rest],
-        ['残り', `${v.remainLaps ?? 0}ラップ`],
+        ['残り', count(v.remainLaps ?? 0, unitFor(r.material))],
       );
       break;
   }
@@ -535,7 +540,10 @@ function renderLapEnd(r: Run, now: number): void {
 }
 
 function renderLaps(r: Run): void {
+  const unit = unitFor(r.material);
+  setText(el.lapPre, unit.pre);
   setText(el.lapNumber, String(r.firstLap + r.laps.length));
+  setText(el.lapSuf, unit.suf);
   if (renderedLaps === r.laps.length) return;
   renderedLaps = r.laps.length;
 
@@ -544,7 +552,7 @@ function renderLaps(r: Run): void {
   const rows = r.laps
     .map((ms, i) => {
       const cls = ms > limit ? ' class="over"' : '';
-      return `<div class="lap-row"><span>ラップ${r.firstLap + i}</span><span${cls}>${fmtLap(ms)}</span></div>`;
+      return `<div class="lap-row"><span>${nth(r.firstLap + i, unit)}</span><span${cls}>${fmtLap(ms)}</span></div>`;
     })
     .reverse(); // 新しいラップを上に
   while (rows.length < 4) rows.push('<div class="lap-row"></div>');

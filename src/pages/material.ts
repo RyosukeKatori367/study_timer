@@ -3,6 +3,7 @@
 // 教材を変えると、ラップ番号（次は何番から）・前回の範囲・前回平均がその教材のものに切り替わる。
 
 import { materialColor } from '../colors';
+import { DEFAULT_UNIT, UNITS, nth, unitById, unitFor } from '../units';
 import { colorFromPixels } from '../imagecolor';
 import { MATERIAL_COLORS } from '../palette';
 import {
@@ -86,7 +87,7 @@ function listView(root: HTMLElement, mode: Mode): void {
           ${materialThumb(m?.id ?? null, 44)}
           <span class="mrow-text">
             <span class="mrow-name">${esc(m ? m.name : '教材なし')}</span>
-            <span class="mrow-sub">次は${nextLapNumber(m?.id ?? null)}番</span>
+            <span class="mrow-sub">次は${nth(nextLapNumber(m?.id ?? null), unitFor(m?.id ?? null))}</span>
           </span>
           ${selected ? '<span class="mrow-check" aria-label="選んでいる">✓</span>' : ''}
         </button>
@@ -113,8 +114,8 @@ function listView(root: HTMLElement, mode: Mode): void {
       <button type="button" class="btn dark" data-add>＋ 教材を追加</button>
       <p class="sns-lead">${
         mode === 'select'
-          ? 'タップで選びます。教材ごとに、ラップ番号・前回の範囲・前回平均を分けて記録します'
-          : '教材ごとに、ラップ番号・前回の範囲・前回平均を分けて記録します'
+          ? 'タップで選びます。教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
+          : '教材ごとに、次の番号・前回の範囲・前回平均を分けて記録します'
       }</p>
     </div>`;
 
@@ -143,6 +144,7 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
     genre: m?.genre ?? '',
     img: m?.img,
     color: m ? materialColor(m.id) : undefined,
+    unit: unitFor(m?.id ?? null).id,
     auto: false, // 色を画像から自動で決めた
   };
 
@@ -164,8 +166,9 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
       <label class="field"><span class="field-label">名前</span>
         <input class="input" name="name" autocomplete="off" placeholder="例: リードα、名門の森" maxlength="40"></label>
       <div class="field"><span class="field-label">ジャンル（この端末の中での分け方）</span><div class="chip-row" data-genres></div></div>
+      <div class="field"><span class="field-label">数え方（next を押すたびに1つ進む）</span><div class="chip-row" data-units></div><span class="field-note" data-unit-note></span></div>
       <div class="field"><span class="field-label" data-color-label>色</span><div class="mcolors" data-colors></div></div>
-      ${m ? `<button type="button" class="sns-card sns-row" data-next><span class="sns-row-main">次のラップ番号</span><span class="sns-row-end">${nextLapNumber(m.id)}番<span class="chevron">›</span></span></button>` : ''}
+      ${m ? `<button type="button" class="sns-card sns-row" data-next><span class="sns-row-main">次の番号</span><span class="sns-row-end">${nth(nextLapNumber(m.id), unitFor(m.id))}から<span class="chevron">›</span></span></button>` : ''}
       <button type="submit" class="btn primary">${m ? '保存' : '追加'}</button>
       ${m ? '<button type="button" class="btn ghost" data-delete style="color:var(--red)">この教材を削除</button><p class="sns-lead">削除しても、これまでの記録は消えず、統計にも残ります</p>' : ''}
     </form>`;
@@ -182,6 +185,10 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
     $<HTMLButtonElement>('[data-noimage]', root).hidden = !draft.img;
     root.querySelectorAll<HTMLElement>('.medit-image-btns [data-image]').forEach((b) => (b.textContent = draft.img ? '画像を変える' : '画像を選ぶ'));
     setText($('[data-color-label]', root), draft.auto ? '色（画像から自動で選びました）' : '色');
+    $('[data-units]', root).innerHTML = UNITS.map(
+      (x) => `<button type="button" class="chip" data-unit="${esc(x.id)}" aria-pressed="${x.id === draft.unit}">${esc(x.name)}</button>`,
+    ).join('');
+    setText($('[data-unit-note]', root), `例：${unitById(draft.unit).example}`);
     $('[data-colors]', root).innerHTML = MATERIAL_COLORS.map(
       (c) => `<button type="button" class="sheet-color" style="background:${c}" data-color="${c}" aria-pressed="${c === draft.color}" aria-label="色"></button>`,
     ).join('');
@@ -201,7 +208,11 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
     const t = e.target as HTMLElement;
     const colorBtn = t.closest<HTMLElement>('[data-color]');
     const genreBtn = t.closest<HTMLElement>('[data-genre]');
-    if (colorBtn) {
+    const unitBtn = t.closest<HTMLElement>('[data-unit]');
+    if (unitBtn) {
+      draft.unit = unitBtn.dataset.unit ?? DEFAULT_UNIT.id;
+      render();
+    } else if (colorBtn) {
       draft.color = colorBtn.dataset.color;
       draft.auto = false;
       render();
@@ -237,11 +248,12 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
   };
   root.querySelector<HTMLElement>('[data-next]')?.addEventListener('click', async () => {
     if (!m) return;
-    const n = await pickInteger(`${m.name}の次のラップ番号`, nextLapNumber(m.id), 1, 99999, '1以上にしてください');
+    const u = unitById(draft.unit);
+    const n = await pickInteger(`${m.name}：${u.upTo.replace('まで', 'から始める？')}`, nextLapNumber(m.id), 1, 99999, '1以上にしてください');
     if (n === null) return;
     setNextLap(n, m.id);
     notifyChange();
-    $('[data-next] .sns-row-end', root).innerHTML = `${n}番<span class="chevron">›</span>`;
+    $('[data-next] .sns-row-end', root).innerHTML = `${esc(nth(n, u))}から<span class="chevron">›</span>`;
   });
   root.querySelector<HTMLElement>('[data-delete]')?.addEventListener('click', () => {
     if (!m || !confirm(`「${m.name}」を削除しますか？\nこれまでの記録は消えず、統計にも残ります。`)) return;
@@ -257,7 +269,13 @@ function editView(root: HTMLElement, id: string | null, back: Mode | null): void
     const n = name.value.trim();
     if (!n) return toast('名前を入れてください');
     if (activeMaterials().some((x) => x.name === n && x.id !== m?.id)) return toast('同じ名前の教材があります');
-    const patch = { name: n, genre: draft.genre || undefined, img: draft.img, ...(draft.color ? { color: draft.color } : {}) };
+    const patch = {
+      name: n,
+      genre: draft.genre || undefined,
+      img: draft.img,
+      unit: draft.unit === DEFAULT_UNIT.id ? undefined : draft.unit,
+      ...(draft.color ? { color: draft.color } : {}),
+    };
     if (m) {
       updateMaterial(m.id, patch);
     } else {

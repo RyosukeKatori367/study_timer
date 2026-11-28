@@ -340,7 +340,7 @@ export interface PostDoc {
   /** 教材名・色・画像（出さないときは付けない） */
   material?: PostMaterial;
   /** ラップ番号の範囲とラップ数（出さないときは付けない） */
-  laps?: { from: number; count: number };
+  laps?: { from: number; count: number; u?: string };
   /** ラップごとの時間（出さないときは付けない） */
   lapMs?: number[];
   /** 計測中にアプリから離れた回数と時間（出さないときは付けない） */
@@ -406,6 +406,8 @@ export function postFromSession(
   s: Session,
   opt: PostOptions,
   material: PostMaterial | null,
+  /** 数え方（'講' など。「問」なら入れない） */
+  unit?: string,
 ): Omit<PostDoc, 'uid' | 'name' | 'icon' | 'createdAt'> {
   const p: Omit<PostDoc, 'uid' | 'name' | 'icon' | 'createdAt'> = {
     sessionId: s.id,
@@ -421,7 +423,7 @@ export function postFromSession(
     p.away = { n: s.leaves.length, ms: s.leaves.reduce((t, [a, b]) => t + (b - a), 0) };
   }
   if (s.laps.length > 0 && s.mode !== 'pomoCycle') {
-    if (opt.laps) p.laps = { from: s.firstLap, count: s.laps.length };
+    if (opt.laps) p.laps = { from: s.firstLap, count: s.laps.length, ...(unit && unit !== '問' ? { u: unit } : {}) };
     if (opt.lapTimes) p.lapMs = s.laps.slice(0, 200);
   }
   return p;

@@ -58,7 +58,7 @@ const DAILY_MISC: Def[] = [
   { id: 'long', title: '1回で25分以上 つづける', target: 1, unit: 'count', reward: 20, calc: count((s) => s.studyMs >= 25 * MIN) },
   {
     id: 'lap5',
-    title: 'ラップを5つ 記録する',
+    title: 'next を5回 押す',
     target: 5,
     unit: 'count',
     reward: 20,

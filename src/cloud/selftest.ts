@@ -267,6 +267,12 @@ async function run(): Promise<void> {
     await deny('教材の画像に画像でないものは入れられない', () =>
       F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), material: { name: 'x', color: '#338ced', img: 'https://example.com/a.png' } }),
     );
+    await allow('数え方（講など）つきの投稿ができる', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), laps: { from: 3, count: 2, u: '講' } }),
+    );
+    await deny('数え方に長すぎる文字は入れられない', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), laps: { from: 3, count: 2, u: 'ながすぎるたんいのなまえ' } }),
+    );
     await allow('離れた回数つきで投稿できる', () =>
       F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), away: { n: 2, ms: 180000 } }),
     );

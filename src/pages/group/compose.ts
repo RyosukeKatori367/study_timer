@@ -3,6 +3,7 @@
 // 出すもの・投稿先は、前回の投稿の内容を初期値にする。
 
 import { api } from '../../cloud/api';
+import { count, one, range, unitFor } from '../../units';
 import type { Group } from '../../cloud/groups';
 import { COMMENT_MAX, DEFAULT_POST_PREFS, type PostOptions, type PostPrefs } from '../../cloud/model';
 import { materialColor } from '../../colors';
@@ -60,6 +61,7 @@ async function maybeShow(s: Session): Promise<void> {
 function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; hue: number }[]): void {
   const material = materialById(s.material);
   const hasLaps = s.mode !== 'pomoCycle' && s.laps.length > 0;
+  const unit = unitFor(s.material);
   const away = s.leaves ?? [];
   const awayMs = away.reduce((t, [a, b]) => t + (b - a), 0);
   const chosen = new Set(prefs.groups.filter((id) => groups.some((g) => g.id === id)));
@@ -73,13 +75,13 @@ function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; 
             : `<i style="background:${materialColor(material.id)}"></i>`
         }${esc(material.name)}</span>`
       : '',
-    hasLaps ? `<span class="pill">${s.firstLap}〜${s.firstLap + s.laps.length - 1}番・${s.laps.length}ラップ</span>` : '',
+    hasLaps ? `<span class="pill">${range(s.firstLap, s.firstLap + s.laps.length - 1, unit)}・${count(s.laps.length, unit)}</span>` : '',
   ].join('');
 
   const toggles: { key: keyof Omit<PostOptions, 'comment'>; label: string; sub?: string; show: boolean }[] = [
     { key: 'material', label: '教材名', show: !!material },
-    { key: 'laps', label: 'ラップ番号とラップ数', show: hasLaps },
-    { key: 'lapTimes', label: 'ラップごとの時間', show: hasLaps },
+    { key: 'laps', label: `番号と${unit.countLabel}`, show: hasLaps },
+    { key: 'lapTimes', label: `${one(unit)}ごとの時間`, show: hasLaps },
     { key: 'away', label: '離脱の回数と時間', sub: `${away.length}回・${fmtHM(awayMs)}`, show: away.length > 0 },
   ];
   const opt: Omit<PostOptions, 'comment'> = { material: prefs.material, laps: prefs.laps, lapTimes: prefs.lapTimes, away: prefs.away };

@@ -1,8 +1,9 @@
-// タイマーとストップウォッチの下段（前回のラップ情報＋start ボタン）。
+// タイマーとストップウォッチの下段（前回の範囲と平均・次の番号＋start ボタン）。
 
-import { lastLapSession, nextLapNumber, setNextLap } from '../store';
+import { currentMaterialId, lastLapSession, nextLapNumber, setNextLap } from '../store';
+import { range, unitFor } from '../units';
 import { MIN, SEC, fmtHM, fmtLap } from '../time';
-import { $, html, setText } from '../ui/dom';
+import { $, esc, html, setText } from '../ui/dom';
 import { pickInteger } from '../ui/sheet';
 
 export interface StartRow {
@@ -10,7 +11,7 @@ export interface StartRow {
   refresh(): void;
 }
 
-/** 前回の平均ラップ時間。記録がなければ null。 */
+/** 前回の1つあたりの平均時間。記録がなければ null。 */
 export function lastLapAverage(): number | null {
   const last = lastLapSession();
   if (!last) return null;
@@ -30,8 +31,8 @@ export function createStartRow(onStart: () => void): StartRow {
           <div class="prev-range"></div>
           <div class="prev-avg"></div>
         </div>
-        <button type="button" class="lap-pill" aria-label="開始ラップ番号を変える">
-          <span class="lap-pill-label">ラップ</span>
+        <button type="button" class="lap-pill" aria-label="始める番号を変える">
+          <span class="lap-pill-label">次は</span>
           <span class="lap-pill-value"></span>
         </button>
       </div>
@@ -40,19 +41,20 @@ export function createStartRow(onStart: () => void): StartRow {
 
   const refresh = () => {
     const last = lastLapSession();
+    const unit = unitFor(currentMaterialId());
     if (last) {
       const to = last.firstLap + last.laps.length - 1;
-      $('.prev-range', el).innerHTML = `${last.firstLap} ~ ${to}<small>ラップ</small>`;
+      setText($('.prev-range', el), range(last.firstLap, to, unit));
       setText($('.prev-avg', el), `平均${fmtAverage(lastLapAverage() ?? 0)}`);
     } else {
       setText($('.prev-range', el), 'なし');
       setText($('.prev-avg', el), '');
     }
-    setText($('.lap-pill-value', el), `${nextLapNumber()}~`);
+    $('.lap-pill-value', el).innerHTML = `${esc(unit.pre)}<b>${nextLapNumber()}</b>${esc(unit.suf)}から`;
   };
 
   $('.lap-pill', el).onclick = async () => {
-    const n = await pickInteger('開始ラップ番号', nextLapNumber(), 1, 99999);
+    const n = await pickInteger(unitFor(currentMaterialId()).upTo.replace('まで', 'から始める？'), nextLapNumber(), 1, 99999);
     if (n !== null) {
       setNextLap(n);
       // タイマーとストップウォッチの両方の表示を更新する

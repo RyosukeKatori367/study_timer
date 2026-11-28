@@ -239,9 +239,11 @@ service cloud.firestore {
                           && request.resource.data.material.img.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$')))))
           && (!('laps' in request.resource.data)
               || (request.resource.data.laps is map
-                  && request.resource.data.laps.keys().hasOnly(['from', 'count'])
+                  && request.resource.data.laps.keys().hasOnly(['from', 'count', 'u'])
                   && request.resource.data.laps.from is int
-                  && request.resource.data.laps.count is int))
+                  && request.resource.data.laps.count is int
+                  && (!('u' in request.resource.data.laps)
+                      || (request.resource.data.laps.u is string && request.resource.data.laps.u.size() <= 8))))
           && (!('lapMs' in request.resource.data)
               || (request.resource.data.lapMs is list && request.resource.data.lapMs.size() <= 200))
           && (!('away' in request.resource.data)

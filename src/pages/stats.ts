@@ -2,6 +2,7 @@
 // タップした日の詳細（ラップごとの棒グラフ・記録の一覧）。
 
 import { materialColor } from '../colors';
+import { commonUnit, count, nth, one, range, unitFor } from '../units';
 import { leaveTotal, type Mode, type Session } from '../engine';
 import { getSessions, materialById, materialName, materialOrder, settings } from '../store';
 import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, type DayDetail } from '../summary';
@@ -70,9 +71,10 @@ function sessionHtml(s: Session): string {
   const parts = s.material ? [materialName(s.material), MODE_NAMES[s.mode]] : [MODE_NAMES[s.mode]];
   if (s.laps.length > 0) {
     const last = s.firstLap + s.laps.length - 1;
-    parts.push(s.laps.length === 1 ? `${s.firstLap}番` : `${s.firstLap}〜${last}番`);
-    parts.push(`${s.laps.length}ラップ`);
-    if (s.laps.length > 1) parts.push(`平均${fmtLap(s.studyMs / s.laps.length)}`);
+    const u = unitFor(s.material);
+    parts.push(range(s.firstLap, last, u));
+    parts.push(count(s.laps.length, u));
+    if (s.laps.length > 1) parts.push(`${one(u)}の平均${fmtLap(s.studyMs / s.laps.length)}`);
   }
   if (s.leaves?.length) parts.push(`離脱${s.leaves.length}回（${fmtHM(leaveTotal(s.leaves))}）`);
   return `
@@ -138,8 +140,10 @@ function legendHtml(d: DayDetail): string {
 
 /** ラップごとのグラフ（同じ教材の同じ番号は、途中で分かれていても1本にまとめる） */
 function lapHtml(d: DayDetail): string {
+  const cu = commonUnit(d.laps.map((l) => l.material || null));
+  const per = cu ? one(cu) : '1つ';
   if (d.laps.length === 0 || !d.lapMaxMs || !d.lapAvgMs) {
-    return `<div class="empty">この日はラップの記録がありません</div>`;
+    return `<div class="empty">この日は next を押した記録がありません</div>`;
   }
   const max = d.lapMaxMs;
   const avg = d.lapAvgMs;
@@ -150,13 +154,13 @@ function lapHtml(d: DayDetail): string {
       const prev = d.laps[i - 1];
       const gap = prev && (prev.session !== l.session || prev.material !== l.material) ? ' gap' : '';
       return `<button type="button" class="lap-bar${long ? ' long' : ''}${gap}" style="height:${Math.max(2, (l.ms / max) * 100).toFixed(1)}%"
-        data-i="${i}" aria-label="${l.no}番 ${fmtLap(l.ms)}"></button>`;
+        data-i="${i}" aria-label="${nth(l.no, unitFor(l.material))} ${fmtLap(l.ms)}"></button>`;
     })
     .join('');
   // 番号の範囲は、1つの教材だけの日に出す（教材が混ざると番号が続かない）
   const range =
     new Set(d.laps.map((l) => l.material)).size === 1
-      ? `<div class="lap-range"><span>${d.laps[0].no}番</span><span>${d.laps[d.laps.length - 1].no}番</span></div>`
+      ? `<div class="lap-range"><span>${nth(d.laps[0].no, unitFor(d.laps[0].material))}</span><span>${nth(d.laps[d.laps.length - 1].no, unitFor(d.laps[0].material))}</span></div>`
       : '';
   return `
     <div class="lap-chart-wrap">
@@ -164,8 +168,8 @@ function lapHtml(d: DayDetail): string {
       <div class="lap-chart">${bars}</div>
     </div>
     ${range}
-    <div class="lap-caption">棒をタップすると、そのラップの時間が出ます</div>
-    <div class="lap-legend">1本が1ラップ（途中で終えて分かれたものも合計）。点線は平均、平均の1.5倍以上は赤</div>`;
+    <div class="lap-caption">棒をタップすると、その時間が出ます</div>
+    <div class="lap-legend">1本が${per}（途中で終えて分かれたものも合計）。点線は平均、平均の1.5倍以上は赤</div>`;
 }
 
 /** 離脱の回数と合計（設定がオンのとき、または記録があるとき） */
@@ -193,10 +197,11 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
     return `<section class="detail" aria-label="${fmtDate(start)}の詳細">${head}<div class="empty">この日の記録はありません</div></section>`;
   }
 
+  const u = commonUnit(sessions.filter((x) => x.laps.length > 0).map((x) => x.material ?? null)) ?? (d.laps.length ? null : unitFor(null));
   const stats = `
     <div class="detail-stats">
       <div><span class="label">記録</span><span class="value">${sessions.length}回</span></div>
-      <div><span class="label">ラップ</span><span class="value">${d.laps.length}</span></div>
+      <div><span class="label">${u ? u.countLabel : 'こなした数'}</span><span class="value">${u ? count(d.laps.length, u) : d.laps.length}</span></div>
       <div><span class="label">平均</span><span class="value">${d.lapAvgMs === null ? '—' : fmtLap(d.lapAvgMs)}</span></div>
       <div><span class="label">最長</span><span class="value">${d.lapMaxMs === null ? '—' : fmtLap(d.lapMaxMs)}</span></div>
     </div>
@@ -205,7 +210,7 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
   const tabs = `
     <div class="seg detail-tabs" role="group" aria-label="グラフの種類">
       <button type="button" data-tab="hour" aria-pressed="${detailTab === 'hour'}">時間帯</button>
-      <button type="button" data-tab="lap" aria-pressed="${detailTab === 'lap'}">ラップごと</button>
+      <button type="button" data-tab="lap" aria-pressed="${detailTab === 'lap'}">${u ? one(u) : '1つ'}ごと</button>
     </div>`;
 
   return `
@@ -234,7 +239,7 @@ function materialsHtml(sessions: Session[], weekLabel: string): string {
       ms: t.ms,
       color: colorOf(key),
       label: materialName(key || null),
-      sub: t.laps > 0 ? `${t.laps}ラップ` : undefined,
+      sub: t.laps > 0 ? count(t.laps, unitFor(key || null)) : undefined,
       img: key ? materialById(key)?.img : undefined,
     }));
   if (segs.length === 0) return '';
@@ -335,7 +340,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       <div class="list-row"><span>ポモドーロ</span><span>${fmtHM(s.byMode.pomodoro)}</span></div>
     </div>
     <div class="pair">
-      <div><span class="label">${weekLabel}のラップ</span><span class="value">${s.weekLaps}</span></div>
+      <div><span class="label">${weekLabel}こなした数</span><span class="value">${s.weekLaps}</span></div>
       <div><span class="label">平均</span><span class="value">${s.weekLapAvgMs === null ? '—' : fmtLap(s.weekLapAvgMs)}</span></div>
       ${(() => {
         const l = leaveStats(s.daySessions.flat());
@@ -400,7 +405,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       const diff = d.lapAvgMs === null ? 0 : l.ms - d.lapAvgMs;
       const vs = Math.abs(diff) < 1000 ? '平均くらい' : `平均より${diff > 0 ? '+' : '−'}${fmtLap(Math.abs(diff))}`;
       const split = l.parts > 1 ? `${l.parts}回に分けて・` : '';
-      if (caption) caption.textContent = `${l.no}番 ${fmtLap(l.ms)}（${split}${vs}）`;
+      if (caption) caption.textContent = `${nth(l.no, unitFor(l.material))} ${fmtLap(l.ms)}（${split}${vs}）`;
     };
   });
 }

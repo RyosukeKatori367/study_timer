@@ -579,7 +579,14 @@ nav button:focus-visible {
 }
 
 .lap-pill-value {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.lap-pill-value b {
   font-size: 28px;
+  font-weight: 400;
+  margin: 0 2px;
 }
 
 .btn-start {
@@ -5952,4 +5959,9 @@ button.ev-season {
   .tb-fx {
     display: none;
   }
+}
+
+.field-note {
+  font-size: 12px;
+  color: var(--muted);
 }

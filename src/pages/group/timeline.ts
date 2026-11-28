@@ -1,6 +1,7 @@
 // ⑦ グループのタイムライン・ランキング、投稿の返信、⑨ グループの設定・メンバー の画面。
 
 import { api } from '../../cloud/api';
+import { count, one, range as numRange, unitById, type Unit } from '../../units';
 import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
 import { matBreakdown, ranking, sumDays, type Icon } from '../../cloud/model';
@@ -44,12 +45,12 @@ function who(ctx: Ctx, uid: string, fallback: { name: string; icon: Icon }): { n
 
 // ---- 投稿1件 ----
 
-function lapChart(lapMs: number[]): string {
+function lapChart(lapMs: number[], unit: Unit): string {
   const max = Math.max(...lapMs);
   const avg = lapMs.reduce((a, b) => a + b, 0) / lapMs.length;
   const bars = lapMs.map((ms) => `<span style="height:${Math.max(6, (ms / max) * 100)}%"></span>`).join('');
   return `<div class="post-laps" aria-hidden="true">${bars}</div>
-    <div class="post-laps-cap">ラップ ${lapMs.length}回・平均 ${fmtLap(avg)}・最長 ${fmtLap(max)}</div>`;
+    <div class="post-laps-cap">${count(lapMs.length, unit)}・${one(unit)}の平均 ${fmtLap(avg)}・最長 ${fmtLap(max)}</div>`;
 }
 
 function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
@@ -65,7 +66,8 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
   }
   if (p.laps) {
     const to = p.laps.from + p.laps.count - 1;
-    pills.push(`<span class="pill">${p.laps.count > 1 ? `${p.laps.from}〜${to}番` : `${p.laps.from}番`}・${p.laps.count}ラップ</span>`);
+    const u = unitById(p.laps.u);
+    pills.push(`<span class="pill">${numRange(p.laps.from, to, u)}・${count(p.laps.count, u)}</span>`);
   }
   if (p.away) pills.push(`<span class="pill">離脱 ${p.away.n}回・${fmtHM(p.away.ms)}</span>`);
   const canMenu = p.uid === me() || ctx.group?.ownerId === me();
@@ -85,7 +87,7 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
         <span class="post-mode">${esc(MODE_LABEL[p.mode] ?? '')}・${esc(timeRange(p.start, p.end))}</span>
       </div>
       ${pills.length ? `<div class="pills">${pills.join('')}</div>` : ''}
-      ${p.lapMs?.length ? lapChart(p.lapMs) : ''}
+      ${p.lapMs?.length ? lapChart(p.lapMs, unitById(p.laps?.u)) : ''}
       ${p.comment ? `<div class="post-comment">${esc(p.comment)}</div>` : ''}
       <div class="post-actions">
         <button type="button" data-like class="${liked ? 'liked' : ''}" aria-pressed="${liked}" aria-label="いいね">

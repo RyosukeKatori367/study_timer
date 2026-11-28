@@ -224,11 +224,13 @@ export interface Material {
   genre?: string;
   /** 画像（96px 四方の JPEG の data URL） */
   img?: string;
+  /** 数え方（'問'・'講' など。src/units.ts。なければ「問」） */
+  unit?: string;
   archived?: boolean;
 }
 
 /** 教材を編集するときに変えられるもの（img・genre を undefined にすると消す） */
-export type MaterialPatch = Partial<Pick<Material, 'name' | 'color' | 'genre' | 'img'>>;
+export type MaterialPatch = Partial<Pick<Material, 'name' | 'color' | 'genre' | 'img' | 'unit'>>;
 
 let materials: Material[] = read<Material[]>('materials') ?? [];
 
@@ -279,7 +281,7 @@ export function renameMaterial(id: string, name: string): void {
 }
 
 function applyPatch(m: Material, patch: MaterialPatch): void {
-  for (const key of ['name', 'color', 'genre', 'img'] as const) {
+  for (const key of ['name', 'color', 'genre', 'img', 'unit'] as const) {
     if (!(key in patch)) continue;
     const v = patch[key];
     if (v === undefined || v === '') delete m[key];
@@ -457,6 +459,7 @@ export function importBackup(text: string): number {
         archived: !!m.archived,
         ...(m.color ? { color: m.color } : {}),
         ...(m.genre ? { genre: m.genre } : {}),
+        ...(typeof m.unit === 'string' ? { unit: m.unit } : {}),
         ...(typeof m.img === 'string' && m.img.startsWith('data:image/') ? { img: m.img } : {}),
       });
     }
