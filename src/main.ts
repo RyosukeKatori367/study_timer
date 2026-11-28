@@ -9,11 +9,13 @@ import { initCloud } from './cloud';
 import { api, setApi } from './cloud/api';
 import { SHOW_VIEW, initGroupPage } from './pages/group';
 import { initRun } from './run';
+import { initStylePage } from './pages/style';
+import { applyStyle } from './styles';
 import { requestPersistence } from './store';
 import { armTilt } from './tilt';
 import { $ } from './ui/dom';
 
-type ViewName = 'main' | 'stats' | 'group' | 'settings';
+type ViewName = 'main' | 'stats' | 'group' | 'style' | 'settings';
 
 // オフラインでも動くようにする。新しい版を公開したら自動で入れ替わる
 registerSW({ immediate: true });
@@ -34,6 +36,8 @@ const refreshStopwatch = initStopwatchPage($('.page[data-mode="stopwatch"]'));
 
 /** 記録が変わったとき（計測の終了・読み込み・全消去）に表示を更新する。 */
 function refreshAll(): void {
+  // バックアップから設定を取り込んだときなどに、テーマと模様も合わせる
+  void applyStyle();
   refreshPomodoro();
   refreshTimer();
   refreshStopwatch();
@@ -41,6 +45,8 @@ function refreshAll(): void {
 }
 
 initSettingsPage($('.view[data-view="settings"]'), refreshAll);
+initStylePage($('.view[data-view="style"]'));
+void applyStyle();
 document.addEventListener('material:change', refreshAll);
 initRun(refreshAll);
 
@@ -86,6 +92,7 @@ function showView(name: ViewName): void {
   if (name === 'stats') renderStats(statsView, true); // メニューから開いたら今週に戻す
   if (name === 'settings') document.dispatchEvent(new CustomEvent('settings:show'));
   if (name === 'group') document.dispatchEvent(new CustomEvent('group:show'));
+  if (name === 'style') document.dispatchEvent(new CustomEvent('style:show'));
 }
 document.addEventListener(SHOW_VIEW, (e) => showView((e as CustomEvent<ViewName>).detail));
 navButtons.forEach((b) => {

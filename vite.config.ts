@@ -21,7 +21,8 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['apple-touch-icon.png', 'favicon.png'],
+      // 模様の画像もオフラインで使えるように、最初にまとめて保存しておく
+      includeAssets: ['apple-touch-icon.png', 'favicon.png', 'patterns/*.svg'],
       manifest: {
         name: 'グミ勉',
         short_name: 'グミ勉',

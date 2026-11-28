@@ -68,6 +68,13 @@ export interface Settings {
 
   /** 今選んでいる教材の id。null なら教材なし */
   materialId: string | null;
+  /** 見た目のテーマと模様（スタイルタブ）。id は 't:soda' のような形 */
+  theme: string;
+  pattern: string;
+  /** ガチャで手に入れたテーマ・模様の id */
+  unlocked: string[];
+  /** 最後にガチャを引いた日（'2026-11-28'） */
+  gachaDay: string;
 }
 
 const DEFAULTS: Settings = {
@@ -100,6 +107,10 @@ const DEFAULTS: Settings = {
   weekStartsOn: 1,
   dailyGoalMs: 0,
   materialId: null,
+  theme: 't:default',
+  pattern: 'p:none',
+  unlocked: [],
+  gachaDay: '',
 };
 
 function read<T>(key: string): T | null {
@@ -481,6 +492,11 @@ export function mergeCloud(data: CloudData): boolean {
       for (const key of Object.keys(DEFAULTS) as (keyof Settings)[]) {
         if (key in data.settings) (patch as Record<string, unknown>)[key] = data.settings[key];
       }
+      // 手に入れたスタイルは、どちらの端末で手に入れたものも残す。ガチャを引いた日は新しいほう
+      const cloudUnlocked = Array.isArray(data.settings.unlocked) ? data.settings.unlocked : [];
+      patch.unlocked = [...new Set([...settings.unlocked, ...cloudUnlocked])];
+      const cloudDay = typeof data.settings.gachaDay === 'string' ? data.settings.gachaDay : '';
+      patch.gachaDay = cloudDay > settings.gachaDay ? cloudDay : settings.gachaDay;
       saveSettings(patch);
       changed = true;
     }

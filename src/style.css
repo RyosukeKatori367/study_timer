@@ -5,6 +5,11 @@
   --muted: #a8a8a8;
   --light: #e6e6e6;
   --red: #ff6259;
+  /* テーマ（スタイルタブ）で変わる色。--light もテーマで変わる */
+  --accent-strong: #fff;
+  --start-bg: #fff;
+  --nav-bg: #d9d9d9;
+  --nav-on: #bdbdbd;
   /* 大きさは画面ではなく #app の幅・高さ（cqw / cqh）を基準にする。
      iPhone のホーム画面アプリでは vh や dvh が実際の表示領域とずれることがあるため */
   /* 円の大きさ。小さい画面では縮む */
@@ -71,6 +76,8 @@ h1 {
 #app {
   position: fixed;
   inset: 0;
+  /* 模様（スタイルタブ）。計測中の画面は黒い背景で隠れる */
+  background-repeat: repeat;
   max-width: 480px;
   margin: 0 auto;
   container-type: size;
@@ -176,7 +183,7 @@ nav {
   gap: 4px;
   padding: 6px;
   width: 270px;
-  background: #d9d9d9;
+  background: var(--nav-bg);
   border-radius: 34px;
 }
 
@@ -190,7 +197,7 @@ nav button {
 }
 
 nav button[aria-current='page'] {
-  background: #bdbdbd;
+  background: var(--nav-on);
 }
 
 nav button:focus-visible {
@@ -226,7 +233,7 @@ nav button:focus-visible {
 }
 
 .ring-on {
-  stroke: #fff;
+  stroke: var(--accent-strong);
 }
 
 .ring.over .ring-on {
@@ -576,7 +583,7 @@ nav button:focus-visible {
 .btn-start {
   height: clamp(110px, 20cqh, 164px);
   border-radius: 20px;
-  background: #fff;
+  background: var(--start-bg);
   color: #000;
   font-size: 18px;
 }
@@ -1876,7 +1883,7 @@ button.list-row {
 }
 
 .sheet-actions .sheet-ok {
-  background: #fff;
+  background: var(--accent-strong);
   color: #000;
   font-weight: 600;
 }
@@ -2121,7 +2128,7 @@ textarea {
 }
 
 .btn.primary {
-  background: #fff;
+  background: var(--start-bg);
   color: #000;
   font-weight: 600;
 }
@@ -2809,8 +2816,8 @@ button.sns-row:active {
 
 /* 下のメニューが4つになったので広げる */
 nav {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  width: 320px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: min(360px, calc(100cqw - 24px));
 }
 
 /* ---------- グラフの部品（円グラフ・日ごとの積み上げ棒） ---------- */
@@ -3593,4 +3600,569 @@ nav {
   margin-left: -4px;
   border-radius: 4px;
   object-fit: cover;
+}
+
+/* ---------- スタイルタブ ---------- */
+
+.gacha-card {
+  flex: none;
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255, 139, 216, 0.35), transparent 60%),
+    radial-gradient(120% 90% at 100% 100%, rgba(106, 183, 255, 0.3), transparent 60%),
+    #1a1220;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.gacha-jar-mini {
+  flex: none;
+  width: 92px;
+  animation: g-float 3.2s ease-in-out infinite;
+}
+
+.gacha-jar-mini .jar {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.gacha-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gacha-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.gacha-sub {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d6c8e0;
+}
+
+.gacha-btn {
+  margin-top: 4px;
+  height: 44px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #ff8bd8, #ffb36b);
+  color: #1a0a14;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(255, 139, 216, 0.35);
+}
+
+.gacha-btn:disabled {
+  background: #3a2f40;
+  color: #b9a9c4;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.gacha-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.gacha-progress {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.gacha-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ff8bd8, #6ab7ff);
+}
+
+.gacha-count {
+  font-size: 11px;
+  color: #b9a9c4;
+}
+
+.style-section {
+  flex: none;
+  margin-top: 22px;
+}
+
+.style-section .group-head {
+  margin-bottom: 10px;
+}
+
+.style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+
+.style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.style-prev {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px #2e2e2e;
+}
+
+.style-tile[aria-pressed='true'] .style-prev {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px #fff;
+}
+
+.style-tile.locked .theme-prev,
+.style-tile.locked .pattern-prev {
+  filter: grayscale(1) brightness(0.45);
+}
+
+.lock-badge,
+.sel-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-badge {
+  inset: 0;
+  color: #d0d0d0;
+}
+
+.lock-badge .lock {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sel-badge {
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.style-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.style-tile.locked .style-name {
+  color: #6a6a6a;
+}
+
+.rarity {
+  margin-top: -4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #000;
+}
+
+.rarity.r-N {
+  background: #9a9a9a;
+}
+
+.rarity.r-R {
+  background: #6ab7ff;
+}
+
+.rarity.r-SR {
+  background: #ffd36a;
+}
+
+.rarity.r-SSR {
+  background: linear-gradient(90deg, #ff8bd8, #ffd36a, #7de3c3, #6ab7ff);
+}
+
+/* テーマの見本 */
+.theme-prev {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.tp-ring {
+  position: absolute;
+  top: 14%;
+  left: 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: conic-gradient(var(--accent-strong) 0 68%, #4a4a4a 68% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 56%, #000 57%);
+  mask: radial-gradient(circle, transparent 56%, #000 57%);
+}
+
+.tp-start {
+  position: absolute;
+  left: 50%;
+  bottom: 30%;
+  width: 46%;
+  height: 12%;
+  transform: translateX(-50%);
+  border-radius: 6px;
+  background: var(--start-bg);
+}
+
+.tp-nav {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 10%;
+  height: 12%;
+  border-radius: 99px;
+  background: var(--nav-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 6%;
+}
+
+.tp-nav i {
+  width: 22%;
+  height: 64%;
+  border-radius: 99px;
+}
+
+.tp-nav i:nth-child(2) {
+  background: var(--nav-on);
+}
+
+/* 模様の見本 */
+.pattern-prev {
+  position: absolute;
+  inset: 0;
+  background-color: #0a0a0a;
+  background-repeat: repeat;
+}
+
+.pattern-prev.big {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- グミガチャの演出 ---------- */
+
+#gacha {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, #2a1630 0%, #0d0710 60%, #000 100%);
+  --rc: #e6e6e6;
+}
+
+#gacha.r-R {
+  --rc: #6ab7ff;
+}
+
+#gacha.r-SR {
+  --rc: #ffd36a;
+}
+
+#gacha.r-SSR {
+  --rc: #ff8bd8;
+}
+
+.g-jar {
+  position: absolute;
+  width: 180px;
+  top: calc(50% - 150px);
+  left: calc(50% - 90px);
+  transition:
+    transform 0.6s ease,
+    opacity 0.6s ease;
+}
+
+.g-jar .jar {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+#gacha.g-shake .g-jar {
+  animation: g-shake 0.28s ease-in-out 3;
+}
+
+#gacha.g-drop .g-jar,
+#gacha.g-ready .g-jar,
+#gacha.g-open .g-jar {
+  transform: translateY(-70px) scale(0.7);
+  opacity: 0.35;
+}
+
+#gacha.g-open .g-jar {
+  opacity: 0;
+}
+
+.g-cube {
+  position: absolute;
+  top: calc(50% - 30px);
+  left: calc(50% - 60px);
+  opacity: 0;
+  filter: drop-shadow(0 0 18px var(--rc));
+}
+
+#gacha.g-drop .g-cube {
+  opacity: 1;
+  animation: g-drop 0.8s cubic-bezier(0.3, 0, 0.4, 1) both;
+}
+
+#gacha.g-ready .g-cube {
+  opacity: 1;
+  animation: g-wobble 1.2s ease-in-out infinite;
+}
+
+#gacha.g-open .g-cube {
+  opacity: 0;
+  transform: scale(1.8);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+
+.g-hint {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 80px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  color: #d6c8e0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#gacha.g-ready .g-hint {
+  opacity: 1;
+  animation: g-blink 1.4s ease-in-out infinite;
+}
+
+.g-rays {
+  position: absolute;
+  width: 160vmax;
+  height: 160vmax;
+  left: calc(50% - 80vmax);
+  top: calc(50% - 80vmax);
+  opacity: 0;
+  background: repeating-conic-gradient(from 0deg, var(--rc) 0deg 6deg, transparent 6deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%);
+  mask: radial-gradient(circle, #000 0%, transparent 55%);
+}
+
+#gacha.r-SSR .g-rays {
+  background: repeating-conic-gradient(from 0deg, #ff8bd8 0deg 6deg, transparent 6deg 12deg, #ffd36a 12deg 18deg, transparent 18deg 24deg, #6ab7ff 24deg 30deg, transparent 30deg 36deg);
+}
+
+#gacha.g-open .g-rays {
+  opacity: 0.35;
+  animation: g-spin 14s linear infinite;
+  transition: opacity 0.5s ease;
+}
+
+.g-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, #fff 0%, var(--rc) 30%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#gacha.g-open .g-flash {
+  animation: g-flash 0.6s ease-out;
+}
+
+.g-result {
+  position: relative;
+  width: min(300px, calc(100vw - 48px));
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+#gacha.g-open .g-result {
+  display: flex;
+  animation: g-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) 0.15s both;
+}
+
+.g-rarity {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--rc);
+  text-shadow: 0 0 24px var(--rc);
+}
+
+#gacha.r-SSR .g-rarity {
+  background: linear-gradient(90deg, #ff8bd8, #ffd36a, #7de3c3, #6ab7ff, #ff8bd8);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: g-rainbow 2.4s linear infinite;
+}
+
+.g-prev {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow:
+    0 0 0 2px var(--rc),
+    0 0 40px color-mix(in srgb, var(--rc) 50%, transparent);
+}
+
+.g-name {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.g-kind {
+  font-size: 13px;
+  color: #d6c8e0;
+}
+
+.g-buttons {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@keyframes g-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
+}
+
+@keyframes g-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-9deg) translateX(-6px);
+  }
+  75% {
+    transform: rotate(9deg) translateX(6px);
+  }
+}
+
+@keyframes g-drop {
+  0% {
+    transform: translateY(-150px) scale(0.4) rotate(-30deg);
+  }
+  60% {
+    transform: translateY(18px) scale(1.05) rotate(8deg);
+  }
+  80% {
+    transform: translateY(-10px) scale(0.98) rotate(-3deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes g-wobble {
+  0%,
+  100% {
+    transform: rotate(-4deg) scale(1);
+  }
+  50% {
+    transform: rotate(4deg) scale(1.04);
+  }
+}
+
+@keyframes g-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes g-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes g-flash {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes g-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes g-rainbow {
+  to {
+    background-position: 200% 0;
+  }
 }
