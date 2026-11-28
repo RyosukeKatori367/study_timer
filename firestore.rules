@@ -219,7 +219,7 @@ service cloud.firestore {
           && validIcon(request.resource.data.icon)
           && request.resource.data.createdAt == request.time
           && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 64
-          && request.resource.data.mode in ['timer', 'timerUp', 'stopwatch', 'pomoCycle']
+          && request.resource.data.mode in ['timer', 'timerUp', 'stopwatch', 'pomoCycle', 'manual']
           && request.resource.data.start is number
           && request.resource.data.end is number
           && request.resource.data.studyMs is number

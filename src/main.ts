@@ -16,6 +16,7 @@ import { tagById } from './tags';
 import { initEventPage } from './pages/event';
 import { initMyPage, myHome } from './pages/my';
 import { openHelp } from './pages/help';
+import { SESSIONS_CHANGE } from './pages/manual';
 import { claimableAchievements } from './achievements';
 import { claimableTiers } from './events';
 import { GUMI_CHANGE, fmtGumi, loginStatus, syncStudyBonus } from './gumi';
@@ -63,6 +64,9 @@ function refreshAll(): void {
 }
 
 $('.help-btn').onclick = () => openHelp();
+// 時間を入力して記録した・記録を消した
+document.addEventListener(SESSIONS_CHANGE, refreshAll);
+document.addEventListener('post:failed', (e) => toast((e as CustomEvent<string>).detail));
 
 const openLogin = () => openGroupScreen((n) => authScreen(n, 'login'));
 const settingsView = $('.view[data-view="settings"]');

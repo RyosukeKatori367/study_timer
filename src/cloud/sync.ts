@@ -209,6 +209,21 @@ async function pushState(): Promise<void> {
   await F.setDoc(F.doc(db, 'users', uid, 'backup', 'state'), { ...doc, updatedAt: F.serverTimestamp() });
 }
 
+/** 記録をクラウドの文書から消す */
+async function removeCloud(list: { id: string; start: number }[]): Promise<void> {
+  if (!uid || list.length === 0) return;
+  const { db, F } = await fb();
+  const batch = F.writeBatch(db);
+  for (const x of list) {
+    batch.set(
+      F.doc(db, 'users', uid, 'backup', chunkKey(x.start)),
+      { s: { [x.id]: F.deleteField() }, updatedAt: F.serverTimestamp() },
+      { merge: true },
+    );
+  }
+  await batch.commit();
+}
+
 /** 記録をクラウドからも全部消す（別の端末にも、clearedAt で伝わる） */
 async function clearCloud(): Promise<void> {
   if (!uid || !meta) return;
@@ -231,6 +246,12 @@ export function onLocalChange(c: StoreChange): void {
     saveMeta();
     clearTimeout(pushTimer);
     pushTimer = setTimeout(() => void pushSessions().then(markSynced, onFail), 1000);
+  } else if (c.kind === 'removed') {
+    // 消した記録は、クラウドの文書からも消す（ほかの端末へは、設定の removed で伝わる）
+    const ids = new Set(c.sessions.map((x) => x.id));
+    meta.dirty = meta.dirty.filter((id) => !ids.has(id));
+    saveMeta();
+    void removeCloud(c.sessions).then(markSynced, onFail);
   } else if (c.kind === 'state') {
     meta.stateAt = Date.now();
     saveMeta();

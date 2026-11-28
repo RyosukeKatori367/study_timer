@@ -61,6 +61,10 @@ export async function createPost(s: Session, opt: PostOptions, groups: string[],
       return;
     }
     console.warn('投稿できませんでした', e);
+    // 手入力の記録は、ルールを貼り直すまで投稿できない
+    if ((e as { code?: string }).code === 'permission-denied' && s.mode === 'manual') {
+      document.dispatchEvent(new CustomEvent('post:failed', { detail: '手入力の記録を投稿するには、ルールの更新が必要です' }));
+    }
   });
   void savePostPrefs({ material: opt.material, laps: opt.laps, lapTimes: opt.lapTimes, away: opt.away, groups }).catch(
     () => undefined,

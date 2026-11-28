@@ -51,13 +51,13 @@ export interface Summary {
   /** 今日の勉強時間（どの週を表示していても今日のもの） */
   todayMs: number;
   weekMs: number;
-  byMode: { stopwatch: number; timer: number; pomodoro: number };
+  byMode: { stopwatch: number; timer: number; pomodoro: number; manual: number };
   weekLaps: number;
   weekLapAvgMs: number | null;
 }
 
 const groupOf = (mode: Mode): keyof Summary['byMode'] =>
-  mode === 'stopwatch' ? 'stopwatch' : mode === 'pomoCycle' ? 'pomodoro' : 'timer';
+  mode === 'stopwatch' ? 'stopwatch' : mode === 'pomoCycle' ? 'pomodoro' : mode === 'manual' ? 'manual' : 'timer';
 
 /** 記録は開始した日のものとして数える。 */
 export function summarize(sessions: readonly Session[], now: number, opts: SummaryOptions = {}): Summary {
@@ -75,7 +75,7 @@ export function summarize(sessions: readonly Session[], now: number, opts: Summa
     todayIndex: dayStarts.indexOf(today),
     todayMs: 0,
     weekMs: 0,
-    byMode: { stopwatch: 0, timer: 0, pomodoro: 0 },
+    byMode: { stopwatch: 0, timer: 0, pomodoro: 0, manual: 0 },
     weekLaps: 0,
     weekLapAvgMs: null,
   };

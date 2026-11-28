@@ -12,6 +12,7 @@ export const MODE_LABEL: Record<Mode, string> = {
   timerUp: 'カウントアップ',
   stopwatch: 'ストップウォッチ',
   pomoCycle: 'ポモドーロ',
+  manual: '手入力',
 };
 
 const clock = (d: Date): string => `${d.getHours()}:${pad2(d.getMinutes())}`;

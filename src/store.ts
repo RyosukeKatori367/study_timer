@@ -88,6 +88,8 @@ export interface Settings {
    * n はそのまとまりのセット数（最後のまとまりは、そのあとずっと）。1つ目の教材は、いつも今の教材（materialId）
    */
   pomoPlan: PlanBlock[];
+  /** 消した記録の id（ほかの端末やバックアップから戻ってこないように覚えておく。端末どうしで足し合わせる） */
+  removed: string[];
 }
 
 export interface PlanBlock {
@@ -133,6 +135,7 @@ const DEFAULTS: Settings = {
   gumi: {},
   face: 'ring',
   pomoPlan: [],
+  removed: [],
 };
 
 function read<T>(key: string): T | null {
@@ -162,8 +165,14 @@ function remove(key: string): void {
 
 // ---- 変更の知らせ（ログインしている人のバックアップに使う） ----
 
-/** sessions = 記録が増えた・変わった（ids）、clear = 記録を全部消した、state = 設定か教材が変わった */
-export type StoreChange = { kind: 'sessions'; ids: string[] } | { kind: 'clear' } | { kind: 'state' };
+/**
+ * sessions = 記録が増えた・変わった（ids）、removed = 記録を消した、clear = 記録を全部消した、state = 設定か教材が変わった
+ */
+export type StoreChange =
+  | { kind: 'sessions'; ids: string[] }
+  | { kind: 'removed'; sessions: { id: string; start: number }[] }
+  | { kind: 'clear' }
+  | { kind: 'state' };
 
 const listeners = new Set<(c: StoreChange) => void>();
 /** クラウドから取り込んでいる間は知らせない（取り込んだものを送り返さないため） */
@@ -184,6 +193,7 @@ function emit(c: StoreChange): void {
 export const settings: Settings = { ...DEFAULTS, ...(read<Partial<Settings>>('settings') ?? {}) };
 if (!settings.gumi || typeof settings.gumi !== 'object') settings.gumi = {};
 if (!Array.isArray(settings.pomoPlan)) settings.pomoPlan = [];
+if (!Array.isArray(settings.removed)) settings.removed = [];
 
 setDurationStyle(settings.durationStyle);
 
@@ -212,6 +222,27 @@ export function addSession(s: Session): void {
   sessions.push(s);
   write('sessions', sessions);
   emit({ kind: 'sessions', ids: [s.id] });
+}
+
+/** 記録を1件消す（消したことは覚えておき、バックアップやほかの端末からも消える） */
+export function removeSession(id: string): void {
+  const s = sessions.find((x) => x.id === id);
+  if (!s) return;
+  sessions = sessions.filter((x) => x.id !== id);
+  write('sessions', sessions);
+  saveSettings({ removed: [...new Set([...settings.removed, id])] });
+  emit({ kind: 'removed', sessions: [{ id, start: s.start }] });
+}
+
+/** 消した記録を取り除く。変わったら true */
+function dropRemoved(): boolean {
+  if (settings.removed.length === 0) return false;
+  const gone = new Set(settings.removed);
+  const before = sessions.length;
+  sessions = sessions.filter((s) => !gone.has(s.id));
+  if (sessions.length === before) return false;
+  write('sessions', sessions);
+  return true;
 }
 
 export function clearSessions(): void {
@@ -550,8 +581,23 @@ export function mergeCloud(data: CloudData): boolean {
         else continue;
         changed = true;
       }
-      // 色は作った順で決まるので、どの端末でも同じ順になるように id（作った時刻）で並べる
-      materials = [...byId.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      // 色を決めていない教材は、作った順（id の順）の色を入れておく（並べ替えても、どの端末でも同じ色になるように）
+      [...byId.values()]
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        .forEach((m, i) => {
+          if (!m.color) m.color = defaultColor(i);
+        });
+      // 並び順は、クラウドのほうが新しければクラウドの順、そうでなければ端末の順（知らない教材は後ろに）
+      const order = data.replaceMaterials
+        ? [...data.materials.map((m) => m?.id), ...materials.map((m) => m.id)]
+        : [...materials.map((m) => m.id), ...data.materials.map((m) => m?.id)];
+      const seen = new Set<string>();
+      materials = order.flatMap((id) => {
+        const m = typeof id === 'string' && !seen.has(id) ? byId.get(id) : undefined;
+        if (!m) return [];
+        seen.add(id as string);
+        return [m];
+      });
       write('materials', materials);
     }
     if (data.clearedAt) {
@@ -559,10 +605,13 @@ export function mergeCloud(data: CloudData): boolean {
       sessions = sessions.filter((s) => s.end > data.clearedAt!);
       if (sessions.length !== before) changed = true;
     }
+    if (dropRemoved()) changed = true;
     if (data.sessions?.length) {
+      const gone = new Set(settings.removed);
       const index = new Map(sessions.map((s, i) => [s.id, i]));
       for (const s of migrate(data.sessions.filter(isSession))) {
         if (data.clearedAt && s.end <= data.clearedAt) continue;
+        if (gone.has(s.id)) continue;
         const i = index.get(s.id);
         if (i === undefined) {
           index.set(s.id, sessions.length);
@@ -595,11 +644,13 @@ export function mergeLedger(a: Record<string, number>, b: unknown): Record<strin
 }
 
 /** 手に入れたスタイルとグミの台帳を、端末のものとクラウドのもので合わせた値 */
-function collectibles(cloud: Partial<Settings>): Pick<Settings, 'unlocked' | 'gumi'> {
-  const cloudUnlocked = Array.isArray(cloud.unlocked) ? cloud.unlocked.filter((x) => typeof x === 'string') : [];
+function collectibles(cloud: Partial<Settings>): Pick<Settings, 'unlocked' | 'gumi' | 'removed'> {
+  const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
   return {
-    unlocked: [...new Set([...settings.unlocked, ...cloudUnlocked])],
+    unlocked: [...new Set([...settings.unlocked, ...strings(cloud.unlocked)])],
     gumi: mergeLedger(settings.gumi, cloud.gumi),
+    // 消した記録は、どちらの端末で消したものも覚えておく
+    removed: [...new Set([...settings.removed, ...strings(cloud.removed)])],
   };
 }
 
@@ -612,12 +663,14 @@ export function mergeCollectibles(cloud: Partial<Settings> | undefined): boolean
   const next = collectibles(cloud);
   const grew =
     next.unlocked.length !== settings.unlocked.length ||
+    next.removed.length !== settings.removed.length ||
     Object.keys(next.gumi).length !== Object.keys(settings.gumi).length ||
     Object.entries(next.gumi).some(([k, v]) => settings.gumi[k] !== v);
   if (!grew) return false;
   quiet = true;
   try {
     saveSettings(next);
+    dropRemoved();
   } finally {
     quiet = false;
   }

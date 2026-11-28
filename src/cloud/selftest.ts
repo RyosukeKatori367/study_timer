@@ -245,6 +245,7 @@ async function run(): Promise<void> {
     // ---- 投稿 ----
     const pid = F.doc(F.collection(b.db, 'groups', gid, 'posts')).id;
     await allow('メンバーは投稿できる', () => F.setDoc(F.doc(b.db, 'groups', gid, 'posts', pid), post(b.uid)));
+    await allow('時間を入力した記録も投稿できる', () => F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), mode: 'manual' }));
     await deny('人になりすまして投稿できない', () => F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), post(a.uid)));
     await deny('最初からいいねの入った投稿は作れない', () =>
       F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), likes: [a.uid] }),

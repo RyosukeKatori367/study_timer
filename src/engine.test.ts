@@ -156,7 +156,7 @@ describe('集計と表示', () => {
     expect(s.todayMs).toBe(80 * MIN);
     expect(s.weekMs).toBe(140 * MIN);
     expect(s.days).toEqual([60 * MIN, 0, 0, 0, 0, 80 * MIN, 0]);
-    expect(s.byMode).toEqual({ stopwatch: 60 * MIN, timer: 30 * MIN, pomodoro: 50 * MIN });
+    expect(s.byMode).toEqual({ stopwatch: 60 * MIN, timer: 30 * MIN, pomodoro: 50 * MIN, manual: 0 });
     expect(s.weekLaps).toBe(3);
     expect(s.weekLapAvgMs).toBe(30 * MIN);
   });
@@ -218,7 +218,7 @@ describe('タイマー（カウントアップ）', () => {
       [{ id: 'a', mode: 'timerUp', start: T0, end: T0 + 30 * MIN, studyMs: 30 * MIN, laps: [30 * MIN], firstLap: 1 }],
       T0,
     );
-    expect(s.byMode).toEqual({ stopwatch: 0, timer: 30 * MIN, pomodoro: 0 });
+    expect(s.byMode).toEqual({ stopwatch: 0, timer: 30 * MIN, pomodoro: 0, manual: 0 });
   });
 });
 
@@ -553,5 +553,24 @@ describe('ポモドーロのセットごとの教材', () => {
     expect(parts[0].material).toBe('math');
     expect(parts[0].cont).toBeUndefined();
     expect(parts[0].studyMs).toBe(35 * MIN);
+  });
+});
+
+describe('時間を入力した記録', () => {
+  it('入力した時間の記録になり、ラップ番号は使わない。重なる記録を見つける', async () => {
+    const { manualSession, overlapping, usesLapNumbers } = await import('./engine');
+    const s = manualSession(T0, 45 * MIN, 'm1');
+    expect([s.mode, s.start, s.end, s.studyMs, s.material, s.laps.length]).toEqual(['manual', T0, T0 + 45 * MIN, 45 * MIN, 'm1', 0]);
+    expect(s.spans).toEqual([[T0, T0 + 45 * MIN]]);
+    expect(usesLapNumbers('manual')).toBe(false);
+    expect(normalizeMode('manual')).toBe('manual');
+    const other = manualSession(T0 + 30 * MIN, 30 * MIN);
+    expect(overlapping([other], T0, T0 + 45 * MIN).length).toBe(1);
+    expect(overlapping([other], T0, T0 + 30 * MIN).length).toBe(0);
+  });
+  it('統計では「手入力」に入る', () => {
+    const s = summarize([{ id: 'x', mode: 'manual' as const, start: T0, end: T0 + HOUR, studyMs: HOUR, laps: [], firstLap: 1 }], T0 + 2 * HOUR);
+    expect(s.byMode.manual).toBe(HOUR);
+    expect(s.todayMs).toBe(HOUR);
   });
 });

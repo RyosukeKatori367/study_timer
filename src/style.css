@@ -7007,3 +7007,74 @@ button.ev-season {
   font-size: 18px;
   font-weight: 600;
 }
+
+/* ---------- 時間を入力して記録 ---------- */
+
+.sess-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sess-del {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.add-manual {
+  margin-top: 4px;
+  width: 100%;
+}
+
+#manual .sns-row-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-dur {
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.manual-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--light) 10%, #141414);
+  text-align: center;
+}
+
+.manual-when {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.manual-what {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.manual-preview.bad {
+  background: rgba(255, 80, 80, 0.12);
+}
+
+.manual-warn {
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #ffcf6b;
+}
+
+.manual-warn.bad {
+  color: var(--red);
+}

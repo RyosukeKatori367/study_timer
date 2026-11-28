@@ -32,8 +32,9 @@ export interface Quest extends QuestDef {
 }
 
 const studyMs: Calc = (ss) => ss.reduce((t, s) => t + s.studyMs, 0);
-/** 記録の回数（ポモドーロを教材ごとに分けた続きは数えない） */
-const count = (pred: (s: Session) => boolean): Calc => (ss) => ss.filter((s) => countsAsRecord(s) && pred(s)).length;
+/** 記録の回数（ポモドーロを教材ごとに分けた続きと、時間を入力した記録は数えない） */
+const count = (pred: (s: Session) => boolean): Calc => (ss) =>
+  ss.filter((s) => countsAsRecord(s) && s.mode !== 'manual' && pred(s)).length;
 const materials: Calc = (ss) => new Set(ss.flatMap((s) => (s.material ? [s.material] : []))).size;
 const dayTotals = (ss: readonly Session[], dayKey: (ts: number) => string): Map<string, number> => {
   const m = new Map<string, number>();

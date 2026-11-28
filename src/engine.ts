@@ -4,10 +4,11 @@
 
 // timer    … カウントダウン
 // timerUp  … カウントアップ（lap で 0 に戻り、設定時間を過ぎると赤くなる）
-export type Mode = 'timer' | 'timerUp' | 'stopwatch' | 'pomoCycle';
+// manual   … 時間を入力して記録したもの（計っていない）
+export type Mode = 'timer' | 'timerUp' | 'stopwatch' | 'pomoCycle' | 'manual';
 
 /** ラップ番号（問題番号など）を共有するモード。前回の続きの番号から始まる。 */
-export const usesLapNumbers = (mode: Mode): boolean => mode !== 'pomoCycle';
+export const usesLapNumbers = (mode: Mode): boolean => mode !== 'pomoCycle' && mode !== 'manual';
 
 /**
  * 保存されているモード名を今の名前に直す。知らない名前なら null。
@@ -15,7 +16,7 @@ export const usesLapNumbers = (mode: Mode): boolean => mode !== 'pomoCycle';
  */
 export function normalizeMode(mode: unknown): Mode | null {
   if (mode === 'pomoLap') return 'timerUp';
-  if (mode === 'timer' || mode === 'timerUp' || mode === 'stopwatch' || mode === 'pomoCycle') return mode;
+  if (mode === 'timer' || mode === 'timerUp' || mode === 'stopwatch' || mode === 'pomoCycle' || mode === 'manual') return mode;
   return null;
 }
 
@@ -317,6 +318,31 @@ export function finish(r: Run, now: number): Session | null {
   if (studyMs < 1000) return null;
   return { ...base, studyMs, laps };
 }
+
+// ---- 時間を入力して記録する ----
+
+/** 入力できるいちばん長い時間（1回の記録） */
+export const MANUAL_MAX_MS = 16 * 60 * 60 * 1000;
+
+/** 時間を入力した記録を作る（start から durMs のあいだ勉強した） */
+export function manualSession(start: number, durMs: number, material?: string | null): Session {
+  const end = start + durMs;
+  return {
+    id: `${start.toString(36)}-m${Math.random().toString(36).slice(2, 7)}`,
+    mode: 'manual',
+    start,
+    end,
+    studyMs: durMs,
+    laps: [],
+    firstLap: 1,
+    ...(material ? { material } : {}),
+    spans: [[start, end]],
+  };
+}
+
+/** その時間帯に重なる記録 */
+export const overlapping = (sessions: readonly Session[], start: number, end: number): Session[] =>
+  sessions.filter((s) => s.start < end && s.end > start);
 
 // ---- ポモドーロの教材を途中で変える ----
 

@@ -9,6 +9,7 @@ import { addDays, chartAxis, dayDetail, fmtAxis, fmtShort, hourly, summarize, ty
 import { HOUR, MIN, fmtHM, fmtLap, pad2 } from '../time';
 import { donutHtml } from '../ui/charts';
 import { esc } from '../ui/dom';
+import { confirmRemove, openManual } from './manual';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const PLOT_H = 120; // 棒の部分の高さ(px)
@@ -33,6 +34,7 @@ const MODE_NAMES: Record<Mode, string> = {
   timerUp: 'タイマー（カウントアップ）',
   stopwatch: 'ストップウォッチ',
   pomoCycle: 'ポモドーロ',
+  manual: '手入力',
 };
 
 const fmtDate = (ts: number): string => {
@@ -77,10 +79,12 @@ function sessionHtml(s: Session): string {
     if (s.laps.length > 1) parts.push(`${one(u)}の平均${fmtLap(s.studyMs / s.laps.length)}`);
   }
   if (s.leaves?.length) parts.push(`離脱${s.leaves.length}回（${fmtHM(leaveTotal(s.leaves))}）`);
+  // 手入力の記録は消せる
+  const del = s.mode === 'manual' ? `<button type="button" class="sess-del" data-del="${esc(s.id)}">消す</button>` : '';
   return `
     <div class="sess">
       <div class="sess-top"><span>${fmtClock(s.start)}〜${fmtClock(s.end)}</span><span>${fmtHM(s.studyMs)}</span></div>
-      <div class="sess-sub">${esc(parts.join(' · '))}</div>
+      <div class="sess-sub"><span>${esc(parts.join(' · '))}</span>${del}</div>
     </div>`;
 }
 
@@ -193,8 +197,10 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
       <span class="detail-total">${fmtHM(d.totalMs)}</span>
     </div>
     ${goalHtml(d.totalMs)}`;
+  // 時間を入力して記録する（まだ来ていない日は出さない）
+  const add = start <= Date.now() ? `<button type="button" class="btn dark small add-manual" data-manual="${start}">＋ 時間を入力して記録</button>` : '';
   if (sessions.length === 0) {
-    return `<section class="detail" aria-label="${fmtDate(start)}の詳細">${head}<div class="empty">この日の記録はありません</div></section>`;
+    return `<section class="detail" aria-label="${fmtDate(start)}の詳細">${head}<div class="empty">この日の記録はありません</div>${add}</section>`;
   }
 
   const u = commonUnit(sessions.filter((x) => x.laps.length > 0).map((x) => x.material ?? null)) ?? (d.laps.length ? null : unitFor(null));
@@ -218,6 +224,7 @@ function detailHtml(start: number, sessions: Session[], d: DayDetail): string {
       ${head}${stats}${tabs}
       ${detailTab === 'hour' ? hourHtml(start) + legendHtml(d) : lapHtml(d)}
       <div class="sess-list">${sessions.map(sessionHtml).join('')}</div>
+      ${add}
     </section>`;
 }
 
@@ -338,6 +345,7 @@ export function renderStats(view: HTMLElement, reset = false): void {
       <div class="list-row"><span>ストップウォッチ</span><span>${fmtHM(s.byMode.stopwatch)}</span></div>
       <div class="list-row"><span>タイマー</span><span>${fmtHM(s.byMode.timer)}</span></div>
       <div class="list-row"><span>ポモドーロ</span><span>${fmtHM(s.byMode.pomodoro)}</span></div>
+      ${s.byMode.manual > 0 ? `<div class="list-row"><span>手入力</span><span>${fmtHM(s.byMode.manual)}</span></div>` : ''}
     </div>
     <div class="pair">
       <div><span class="label">${weekLabel}こなした数</span><span class="value">${s.weekLaps}</span></div>
@@ -362,6 +370,16 @@ export function renderStats(view: HTMLElement, reset = false): void {
       weekOffset = Math.max(0, weekOffset + (b.dataset.week === 'prev' ? 1 : -1));
       selected = null;
       renderStats(view);
+    };
+  });
+
+  view.querySelector<HTMLElement>('[data-manual]')?.addEventListener('click', (e) => {
+    openManual(Number((e.currentTarget as HTMLElement).dataset.manual));
+  });
+  view.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => {
+    b.onclick = () => {
+      const x = getSessions().find((y) => y.id === b.dataset.del);
+      if (x) void confirmRemove(x);
     };
   });
 

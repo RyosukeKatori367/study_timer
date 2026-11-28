@@ -62,7 +62,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-28j');
+    localStorage.setItem('studytimer:news', '2026-11-28k');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -217,6 +217,25 @@ const pager = (p, i) =>
   });
   await scrollView(p, 'stats', y2);
   await shot(p, 'stats_share', []);
+  // 時間を入力して記録
+  await p.click('.detail-tabs [data-tab=hour]');
+  await p.waitForTimeout(400);
+  await p.click('[data-manual]');
+  await p.waitForTimeout(600);
+  await shot(p, 'manual', ['#manual [data-dur]', '#manual [data-material]', '#manual .sns-card:has([data-date])', '#manual [data-save]']);
+  await p.click('#manual [data-save]');
+  await p.waitForTimeout(400);
+  // お知らせ（記録しました・勉強ボーナス）が消えるまで
+  for (let i = 0; i < 3; i++) {
+    await p.clock.fastForward('00:04');
+    await p.waitForTimeout(300);
+  }
+  const y3 = await p.evaluate(() => {
+    const el = document.querySelector('[data-del]').closest('.sess');
+    return el.getBoundingClientRect().top + document.querySelector('.view[data-view=stats]').scrollTop - 260;
+  });
+  await scrollView(p, 'stats', y3);
+  await shot(p, 'manual_list', ['.sess:has([data-del])']);
   await p.context().close();
 }
 

@@ -106,12 +106,22 @@ describe('クラウドから取り込む', () => {
     mergeCloud({ clearedAt: last.end });
     expect(getSessions().length).toBe(0);
   });
-  it('教材は id の順に並べて、色がどの端末でも同じになる', async () => {
+  it('知らない教材は後ろに足し、並び順は端末のまま。色は作った順（id の順）の色で決まる', async () => {
     const { mergeCloud, allMaterials } = await import('./store');
+    const { defaultColor } = await import('./palette');
+    const before = allMaterials().map((m) => m.id);
     mergeCloud({ materials: [{ id: 'm0000aaa', name: '古い教材', nextLap: null }] });
     const ids = allMaterials().map((m) => m.id);
-    expect(ids[0]).toBe('m0000aaa');
-    expect([...ids].sort()).toEqual(ids);
+    expect(ids).toEqual([...before, 'm0000aaa']);
+    // いちばん古い（id が小さい）ので、1つ目の色
+    expect(allMaterials().find((m) => m.id === 'm0000aaa')?.color).toBe(defaultColor(0));
+  });
+  it('クラウドのほうが新しければ、クラウドの並び順にする', async () => {
+    const { mergeCloud, allMaterials } = await import('./store');
+    const ids = allMaterials().map((m) => m.id);
+    const reversed = [...ids].reverse().map((id) => ({ ...allMaterials().find((m) => m.id === id)! }));
+    mergeCloud({ materials: reversed, replaceMaterials: true });
+    expect(allMaterials().map((m) => m.id)).toEqual([...ids].reverse());
   });
   it('設定はクラウドのもので置き換え、知らない項目は入れない', async () => {
     const { mergeCloud, settings } = await import('./store');
@@ -152,5 +162,30 @@ describe('教材の並べ替え', () => {
     expect(activeMaterials().slice(0, 3).map((m) => m.name)).toEqual(['並べB', '並べC', '並べA']);
     expect(materialGenres().slice(0, 2)).toEqual(['英語', '数学']);
     for (const m of activeMaterials()) expect(materialColor(m.id)).toBe(before.get(m.id));
+  });
+});
+
+describe('時間を入力した記録と、記録を消す', () => {
+  it('入力した記録を足して消すと、ほかの端末から来ても戻らない', async () => {
+    const { addSession, getSessions, removeSession, mergeCloud, settings } = await import('./store');
+    const { manualSession } = await import('./engine');
+    const start = new Date(2026, 10, 28, 18, 0).getTime();
+    const s = manualSession(start, 90 * MIN, null);
+    expect([s.mode, s.studyMs, s.end - s.start]).toEqual(['manual', 90 * MIN, 90 * MIN]);
+    addSession(s);
+    expect(getSessions().some((x) => x.id === s.id)).toBe(true);
+    removeSession(s.id);
+    expect(getSessions().some((x) => x.id === s.id)).toBe(false);
+    expect(settings.removed).toContain(s.id);
+    mergeCloud({ sessions: [s] });
+    expect(getSessions().some((x) => x.id === s.id)).toBe(false);
+  });
+  it('ほかの端末で消した記録は、設定を取り込んだときに消える', async () => {
+    const { addSession, getSessions, mergeCollectibles } = await import('./store');
+    const { manualSession } = await import('./engine');
+    const s = manualSession(new Date(2026, 10, 27, 9, 0).getTime(), 30 * MIN, null);
+    addSession(s);
+    expect(mergeCollectibles({ removed: [s.id] })).toBe(true);
+    expect(getSessions().some((x) => x.id === s.id)).toBe(false);
   });
 });
