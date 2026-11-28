@@ -15,6 +15,7 @@ import { GRANTS_CHANGE } from './grants';
 import { tagById } from './tags';
 import { initEventPage } from './pages/event';
 import { initMyPage, myHome } from './pages/my';
+import { openHelp } from './pages/help';
 import { claimableAchievements } from './achievements';
 import { claimableTiers } from './events';
 import { GUMI_CHANGE, fmtGumi, loginStatus, syncStudyBonus } from './gumi';
@@ -60,6 +61,8 @@ function refreshAll(): void {
   if (got) window.setTimeout(() => toast(`勉強ボーナス +${fmtGumi(got)}グミ（累計3時間ごと）`), 2600);
   updateBadges();
 }
+
+$('.help-btn').onclick = () => openHelp();
 
 const openLogin = () => openGroupScreen((n) => authScreen(n, 'login'));
 const settingsView = $('.view[data-view="settings"]');

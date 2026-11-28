@@ -81,6 +81,8 @@ export interface Settings {
    * 端末どうしでは、キーを足し合わせて残す（同じキーは大きいほう）
    */
   gumi: Record<string, number>;
+  /** 計測中の時計の見た目（src/ui/faces.ts。はじめから全部使える） */
+  face: string;
 }
 
 const DEFAULTS: Settings = {
@@ -118,6 +120,7 @@ const DEFAULTS: Settings = {
   unlocked: [],
   gachaDay: '',
   gumi: {},
+  face: 'ring',
 };
 
 function read<T>(key: string): T | null {

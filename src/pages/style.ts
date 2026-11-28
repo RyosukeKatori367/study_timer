@@ -15,6 +15,8 @@ import {
   useStyle,
   type StyleItem,
 } from '../styles';
+import { FACES, faceById, facePreview, type FaceId } from '../ui/faces';
+import { saveSettings, settings } from '../store';
 import { api } from '../cloud/api';
 import { balance, fmtGumi } from '../gumi';
 import { exchange } from '../shop';
@@ -83,6 +85,21 @@ export function initStylePage(view: HTMLElement): void {
         <button type="button" data-filter="owned" aria-pressed="${filter === 'owned'}">持っている</button>
         <button type="button" data-filter="locked" aria-pressed="${filter === 'locked'}">まだ</button>
       </div>
+      ${
+        filter === 'locked'
+          ? ''
+          : `<section class="style-section">
+        <h2 class="group-head">ウォッチフェイス<span class="head-note">計測中の時計。全部使える</span></h2>
+        <div class="style-grid">${FACES.map(
+          (f) => `
+          <button type="button" class="style-tile" data-face="${f.id}" aria-pressed="${f.id === faceById(settings.face).id}" aria-label="${esc(f.name)}">
+            <span class="style-prev" data-faceprev="${f.id}">${f.id === faceById(settings.face).id ? '<span class="sel-badge">✓</span>' : ''}</span>
+            <span class="style-name">${esc(f.name)}</span>
+            <span class="style-ach face-note">${esc(f.note)}</span>
+          </button>`,
+        ).join('')}</div>
+      </section>`
+      }
       <section class="style-section">
         <h2 class="group-head">ベースカラー<span class="head-note">はじめから使える</span></h2>
         ${grid(base, theme.id)}
@@ -101,6 +118,15 @@ export function initStylePage(view: HTMLElement): void {
       </section>
       <p class="settings-foot">まだのものは、ショップのグミガチャで出るか、グミと交換できます（数字は交換に使うグミ）。テーマはボタン・計測の円・下のメニューの色が、模様は背景が変わります（計測中の画面には出しません）</p>`;
     paintPatterns(view, theme.light);
+    view.querySelectorAll<HTMLElement>('[data-faceprev]').forEach((el) => el.prepend(facePreview(el.dataset.faceprev as FaceId)));
+    view.querySelectorAll<HTMLElement>('.style-tile[data-face]').forEach((b) => {
+      b.onclick = () => {
+        const f = faceById(b.dataset.face);
+        saveSettings({ face: f.id });
+        toast(`計測中の時計を「${f.name}」にしました`);
+        render();
+      };
+    });
     $('.view-back', view).onclick = back;
 
     view.querySelectorAll<HTMLElement>('.style-tile[data-tag]').forEach((b) => {

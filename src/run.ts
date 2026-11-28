@@ -26,7 +26,8 @@ import { studyDayStart } from './summary';
 import { getTilt, onTiltChange } from './tilt';
 import { HOUR, fmtElapsed, fmtHM, fmtLap, fmtRemain, pad2 } from './time';
 import { $, html, setText } from './ui/dom';
-import { createRing, type Ring } from './ui/ring';
+import { type Ring } from './ui/ring';
+import { bigHtml, createFace, faceById, type FaceId } from './ui/faces';
 import { toast } from './ui/toast';
 import { count, nth, unitFor } from './units';
 import { setAwake } from './wakelock';
@@ -43,6 +44,8 @@ let renderedLaps = -1;
 let root: HTMLElement;
 let app: HTMLElement;
 let ring: Ring;
+let face: FaceId | '' = '';
+let lastBig = '';
 let el: {
   kicker: HTMLElement;
   titleA: HTMLElement;
@@ -106,8 +109,7 @@ export function initRun(exit: () => void): void {
       </div>`),
   );
 
-  ring = createRing();
-  $('.ring-wrap', root).prepend(ring.el);
+  applyFace();
 
   el = {
     kicker: $('.run-kicker', root),
@@ -217,8 +219,21 @@ export function startRun(r: Run): void {
   show();
 }
 
+/** ウォッチフェイスを設定に合わせる（変わっていたら作り直す） */
+function applyFace(): void {
+  const id = faceById(settings.face).id;
+  if (id === face) return;
+  ring?.el.remove();
+  ring = createFace(id);
+  $('.ring-wrap', root).prepend(ring.el);
+  root.dataset.face = id;
+  face = id;
+  lastBig = '';
+}
+
 function show(): void {
   if (!run) return;
+  applyFace();
   const cycle = run.mode === 'pomoCycle';
   root.dataset.mode = run.mode;
   root.hidden = false;
@@ -352,7 +367,13 @@ const kicker = (r: Run, mode: string): string => {
 };
 
 function setBig(text: string, over = false): void {
-  setText(el.big, text);
+  if (text !== lastBig) {
+    const html = bigHtml(face || 'ring', text, lastBig);
+    if (html) el.big.innerHTML = html;
+    else setText(el.big, text);
+    el.big.dataset.ghost = text.replace(/\d/g, '8'); // デジタルの、消えている部分
+    lastBig = text;
+  }
   el.big.classList.toggle('long', text.length >= 7);
   el.big.classList.toggle('over', over);
   el.sub.classList.toggle('over', over);

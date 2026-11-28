@@ -23,6 +23,16 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // 模様の画像もオフラインで使えるように、最初にまとめて保存しておく
       includeAssets: ['apple-touch-icon.png', 'favicon.png', 'patterns/*.svg'],
+      // 説明書の画像は大きいので、最初には保存しない。一度見たものだけ保存して、オフラインでも出す
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: /\/help\/.*\.webp$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'help-images', expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 60 } },
+          },
+        ],
+      },
       manifest: {
         name: 'グミ勉',
         short_name: 'グミ勉',
