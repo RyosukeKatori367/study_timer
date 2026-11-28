@@ -236,10 +236,10 @@ export function openManual(day?: number): void {
   render();
 }
 
-/** 手入力の記録を消す（確かめてから） */
+/** 記録を消す（確かめてから） */
 export async function confirmRemove(s: Session): Promise<void> {
   const i = await pickList(`${clock(s.start)}〜${clock(s.end)} の記録（${fmtHM(s.studyMs)}）`, [
-    { label: 'この記録を消す', danger: true },
+    { label: 'この記録を消す', danger: true, sub: '統計・グループのランキング・イベントからも消えます（投稿したものは残ります）' },
   ]);
   if (i !== 0) return;
   removeSession(s.id);

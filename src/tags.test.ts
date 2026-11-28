@@ -38,3 +38,15 @@ describe('実績のタグ', () => {
     expect(ownedTags('x')).toContain('doryoku');
   });
 });
+
+describe('後ろに文字を足せるタグ', () => {
+  it('保存の値と表示', async () => {
+    const { tagById, tagValue, splitTag } = await import('./tags');
+    expect(tagValue('hayaoki', ' 東京科学大<b> ')).toBe('hayaoki~東京科学大b');
+    expect(tagValue('hayaoki', '')).toBe('hayaoki');
+    expect(tagById('hayaoki~東京科学大')?.name.endsWith('東京科学大')).toBe(true);
+    expect(tagById('hayaoki~東京科学大')?.id).toBe('hayaoki');
+    expect(splitTag('hayaoki~abc')).toEqual(['hayaoki', 'abc']);
+    expect(tagValue('hayaoki', 'あいうえおかきくけこさし').length).toBeLessThanOrEqual(24);
+  });
+});

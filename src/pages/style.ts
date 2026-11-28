@@ -4,7 +4,8 @@
 import {
   ALL_ITEMS,
   GACHA_ITEMS,
-  PATTERNS,
+  isListed,
+  listedPatterns,
   TAG_ITEMS,
   THEMES,
   currentPattern,
@@ -20,7 +21,7 @@ import { saveSettings, settings } from '../store';
 import { api } from '../cloud/api';
 import { balance, fmtGumi } from '../gumi';
 import { exchange } from '../shop';
-import { TAGS, shownTag, tagById, tagHtml } from '../tags';
+import { TAGS, askTagText, shownTag, splitTag, tagById, tagHtml } from '../tags';
 import { ACHIEVEMENTS } from '../achievements';
 import { GRANTS_CHANGE } from '../grants';
 import { $, esc } from '../ui/dom';
@@ -141,8 +142,8 @@ export function initStylePage(view: HTMLElement): void {
       }
       ${section('base', 'ベースカラー', 'はじめから使える', () => grid(base, theme.id))}
       ${section('theme', 'テーマ', `${theme.rarity === 'BASE' ? '' : `${esc(theme.name)}・`}${ownedOf(gachaThemes)}`, () => grid(gachaThemes, theme.id))}
-      ${section('pattern', '模様', `${pattern.rarity === 'BASE' ? '' : `${esc(pattern.name)}・`}${ownedOf(PATTERNS.filter((x) => x.rarity !== 'BASE'))}`, () =>
-        grid(PATTERNS, pattern.id),
+      ${section('pattern', '模様', `${pattern.rarity === 'BASE' ? '' : `${esc(pattern.name)}・`}${ownedOf(listedPatterns().filter((x) => x.rarity !== 'BASE'))}`, () =>
+        grid(listedPatterns(), pattern.id),
       )}
       ${section('tag', 'タグ', `${ownedOf(TAG_ITEMS)}・名前の横に出ます`, () => tagGrid(filter, grid))}
       <p class="settings-foot">まだのものは、ショップのグミガチャで出るか、グミと交換できます（数字は交換に使うグミ）。テーマはボタン・計測の円・下のメニューの色が、模様は背景が変わります（計測中の画面には出しません）</p>`;
@@ -228,7 +229,7 @@ function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], 
         </button>`;
           })
           .join('');
-  const gacha = grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === now)?.id ?? '');
+  const gacha = grid(TAG_ITEMS.filter(isListed), TAG_ITEMS.find((x) => x.tag === now)?.id ?? '');
   if (!tiles && !locked) return gacha;
   if (!gacha.includes('class="style-grid"')) return `<div class="style-grid">${tiles}${locked}</div>`;
   // 持っているほかのタグはガチャのタグの一覧（style-grid）の頭に、まだの実績のタグは最後に足す
@@ -269,7 +270,18 @@ export async function setTag(tag: string): Promise<void> {
   try {
     const p = api.cachedProfile() ?? (await api.getProfile());
     if (!p) return toast('先にプロフィールを作ってください');
-    const next = p.tag === tag ? 'none' : tag;
+    const [curId, curText] = splitTag(p.tag);
+    let next = curId === tag ? 'none' : tag;
+    // 後ろに文字を足せるタグは、付けるとき・付けているときに押したら、文字を聞く
+    const def = tagById(tag);
+    if (def?.custom) {
+      if (curId === tag) {
+        const i = await pickList(def.name + curText, [{ label: '後ろの文字を変える' }, { label: 'タグを外す', danger: true }]);
+        if (i === null) return;
+        next = i === 1 ? 'none' : ((await askTagText(tag, curText)) ?? '');
+      } else next = (await askTagText(tag, '')) ?? '';
+      if (!next) return;
+    }
     await api.saveProfile({ name: p.name, bio: p.bio, icon: p.icon, tag: next });
     toast(next === 'none' ? 'タグを外しました' : `「${tagById(next)?.name}」を付けました`);
     document.dispatchEvent(new CustomEvent('style:show')); // 一覧の「付けている」を直す

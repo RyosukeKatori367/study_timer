@@ -8,7 +8,7 @@ import { JOIN_MS, cachedTotal, claimTiers, liveSeasons, loadTotal, mySeasonMs, t
 import { daysLeftIn, md, type Season } from '../seasons';
 import { emblemSvg, introUnseen, playSeasonIntro } from './season-intro';
 import { dateKey } from '../cloud/model';
-import { GUMI_CHANGE, STUDY_BLOCK, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
+import { GUMI_CHANGE, STUDY_BLOCK, balance, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
 import { NEWS, isNewNews, markNewsSeen } from '../news';
 import { claimQuest, dailyAllClear, dailyQuests, sundayBonus, weekInfo, weeklyQuests, type Quest } from '../quests';
 import { getSessions, saveSettings, settings } from '../store';
@@ -24,6 +24,8 @@ import { tagById, tagHtml } from '../tags';
 import { avatar } from './group/ui';
 import { bindLoginCard, loginCardHtml } from './login-card';
 import { bindLimitedEntries, limitedEntry } from './limited';
+import { openMyShop } from './my';
+import { jarSvg } from './styleparts';
 import { HOUR, fmtHM, fmtTimeOfDay } from '../time';
 import { esc } from '../ui/dom';
 import { toast } from '../ui/toast';
@@ -36,6 +38,7 @@ const WIDGETS = [
   { id: 'quest', name: '今日のクエスト' },
   { id: 'season', name: 'シーズン（みんなのイベント）' },
   { id: 'week', name: '今週の目標' },
+  { id: 'gacha', name: 'ガチャ' },
   { id: 'news', name: 'お知らせ' },
 ] as const;
 type WidgetId = (typeof WIDGETS)[number]['id'];
@@ -361,6 +364,18 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       </button>`;
   };
 
+  /** ガチャ（グミガチャと、今引ける期間限定・ピックアップ） */
+  const gachaWidget = (): string => `
+      <section class="sns-card ev-card home-gacha">
+        <div class="ev-card-head"><span>ガチャ</span><span class="head-note">${fmtGumi(balance())}グミ</span></div>
+        <button type="button" class="home-gacha-main" data-open-shop>
+          <span class="home-gacha-jar" aria-hidden="true">${jarSvg()}</span>
+          <span class="lim-entry-text"><b>グミガチャ</b><small>テーマ・模様・タグ・交換所</small></span>
+          <span class="chevron" aria-hidden="true">›</span>
+        </button>
+        <div class="home-gacha-lims">${limitedEntry()}</div>
+      </section>`;
+
   /** お知らせ（いちばん新しいもの） */
   const newsWidget = (): string => {
     const n = NEWS[0];
@@ -425,6 +440,8 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
         return weekBox(Date.now());
       case 'news':
         return newsWidget();
+      case 'gacha':
+        return gachaWidget();
     }
   };
 
@@ -513,6 +530,10 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'stats' }));
     });
     view.querySelectorAll<HTMLElement>('[data-open-news]').forEach((b) => (b.onclick = openNews));
+    view.querySelector<HTMLElement>('[data-open-shop]')?.addEventListener('click', () => {
+      openMyShop();
+      document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'my' }));
+    });
     view.querySelectorAll<HTMLElement>('[data-box]').forEach((b) => {
       const toggle = () => {
         const k = b.dataset.box as keyof typeof boxOpen;

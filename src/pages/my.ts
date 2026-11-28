@@ -331,5 +331,11 @@ export function initMyPage(view: HTMLElement, hooks: MyPageHooks): void {
   nav.home();
 }
 
+/** ショップを開いた状態にする（ホームのガチャから。このあとマイページを出す） */
+export function openMyShop(): void {
+  nav?.home();
+  nav?.push(shopScreen);
+}
+
 /** マイページのいちばん上に戻す（下のメニューで、マイページを開いているときにもう一度押したとき） */
 export const myHome = (): void => nav?.home();

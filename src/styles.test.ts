@@ -68,7 +68,8 @@ describe('期間限定ガチャ', () => {
   it('そのシーズンの限定だけが出て、いつものガチャや交換所には出ない', async () => {
     const { limitedItems, pickLimited, GACHA_ITEMS, exchangePrice } = await import('./styles');
     const items = limitedItems('c1s1');
-    expect(items.map((x) => x.rarity).sort()).toEqual(['R', 'R', 'R', 'SR', 'SR', 'SR', 'SSR', 'SSR', 'SSR']);
+    expect(items.map((x) => x.rarity).sort()).toEqual(['R', 'R', 'SR', 'SR', 'SSR', 'SSR']);
+    expect(items.some((x) => x.kind === 'pattern')).toBe(false);
     expect(GACHA_ITEMS.some((x) => x.limited)).toBe(false);
     for (const x of items) expect(exchangePrice(x)).toBeUndefined();
     const seq = [0.99, 0.1, 0.1, 0.5];

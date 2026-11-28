@@ -5,7 +5,7 @@ import { credentialError } from '../../cloud/account';
 import { BIO_MAX, GOAL_MAX, ICON_IMAGE_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
 import { cropImage } from '../../ui/cropper';
 import { ownedTags } from '../../styles';
-import { tagById, tagHtml } from '../../tags';
+import { askTagText, splitTag, tagById, tagHtml } from '../../tags';
 import { $, html } from '../../ui/dom';
 import { toast } from '../../ui/toast';
 import { avatar, busy, field, header, hueSlider, type Nav, type Screen } from './ui';
@@ -212,12 +212,19 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
       `<button type="button" class="chip" data-tag="none" aria-pressed="${tag === 'none'}">なし</button>`,
       ...owned.map((id) => {
         const t = tagById(id)!;
-        return `<button type="button" class="chip chip-tag" data-tag="${id}" aria-pressed="${tag === id}">${tagHtml(t)}</button>`;
+        const sel = splitTag(tag)[0] === id;
+        return `<button type="button" class="chip chip-tag" data-tag="${id}" aria-pressed="${sel}">${tagHtml(sel ? (tagById(tag) ?? t) : t)}</button>`;
       }),
     ].join('');
     box.querySelectorAll<HTMLElement>('[data-tag]').forEach((b) => {
-      b.onclick = () => {
-        tag = b.dataset.tag!;
+      b.onclick = async () => {
+        const id = b.dataset.tag!;
+        // 後ろに文字を足せるタグは、文字を聞く
+        if (tagById(id)?.custom) {
+          const v = await askTagText(id, splitTag(tag)[0] === id ? splitTag(tag)[1] : '');
+          if (v === null) return;
+          tag = v;
+        } else tag = id;
         renderTags();
       };
     });

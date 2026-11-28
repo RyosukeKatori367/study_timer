@@ -5,11 +5,25 @@ import { api } from '../../cloud/api';
 import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Member } from '../../cloud/groups';
 import { matBreakdown, sumDays, weekKeys, type MatSlice } from '../../cloud/model';
-import { settings } from '../../store';
+import { activeMaterials, addMaterial, settings } from '../../store';
+import { toast } from '../../ui/toast';
+import { MATERIAL_CHANGE } from '../material';
 import { fmtHM } from '../../time';
 import { columnsHtml, donutHtml } from '../../ui/charts';
 import { $, esc, html } from '../../ui/dom';
 import { avatar, header, nameHtml, type Nav, type Screen } from './ui';
+
+/** その人の直近2週間の教材（名前と色。教材なしは除く） */
+function theirMaterials(m: Member): { key: string; n: string; c: string }[] {
+  const out = new Map<string, { key: string; n: string; c: string }>();
+  for (const day of Object.values(m.mats ?? {})) {
+    for (const [key, v] of Object.entries(day)) {
+      if (key === '_' || !v?.n || v.n === '教材なし' || out.has(key)) continue;
+      out.set(key, { key, n: v.n, c: v.c });
+    }
+  }
+  return [...out.values()];
+}
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const DAY = 24 * 60 * 60 * 1000;
@@ -98,9 +112,51 @@ export async function memberScreen(_nav: Nav, gid: string, uid: string): Promise
               : `<div class="sns-lead">${weekName}の記録はまだありません</div>`
           }
         </div>
+        ${
+          m.uid === api.user()?.uid
+            ? ''
+            : (() => {
+                const list = theirMaterials(m);
+                if (!list.length) return '';
+                const have = new Set(activeMaterials().map((x) => x.name));
+                return `
+        <div class="sns-card sns-section">
+          <div class="sns-section-head"><span>この人の教材</span><span class="sns-row-sub">直近2週間</span></div>
+          ${list
+            .map(
+              (x) => `
+            <div class="mem-mat">
+              ${
+                m.matImgs?.[x.key]
+                  ? `<span class="mthumb" style="--s:32px"><img src="${esc(m.matImgs[x.key])}" alt=""></span>`
+                  : `<span class="mthumb" style="--s:32px;background:${esc(x.c)}"><span>${esc([...x.n][0] ?? '')}</span></span>`
+              }
+              <span class="mem-mat-name">${esc(x.n)}</span>
+              ${
+                have.has(x.n)
+                  ? '<span class="mem-mat-have">追加ずみ</span>'
+                  : `<button type="button" class="btn dark small mem-mat-add" data-add-mat="${esc(x.key)}">＋ 自分の教材に</button>`
+              }
+            </div>`,
+            )
+            .join('')}
+        </div>`;
+              })()
+        }
         <p class="sns-note">グループで見られるのは、直近2週間の日ごとの時間と、今月・累計です。色はこの人の教材の色です</p>
       </div>`;
     paintBanners(body);
+    body.querySelectorAll<HTMLElement>('[data-add-mat]').forEach((b) => {
+      b.onclick = () => {
+        const x = theirMaterials(m).find((y) => y.key === b.dataset.addMat);
+        if (!x) return;
+        const img = m.matImgs?.[x.key];
+        addMaterial(x.n, { ...(img ? { img } : {}) });
+        document.dispatchEvent(new CustomEvent(MATERIAL_CHANGE));
+        toast(`「${x.n}」を自分の教材に追加しました（番号は1から）`);
+        render();
+      };
+    });
     body.querySelectorAll<HTMLElement>('[data-week]').forEach((b) => {
       b.onclick = () => {
         week = Number(b.dataset.week);

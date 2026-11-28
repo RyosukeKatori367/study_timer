@@ -12,6 +12,8 @@ export interface TagDef {
   look: string;
   /** 実績の報酬のタグなら、その実績の id（src/achievements.ts） */
   ach?: string;
+  /** 後ろに自分で文字を足せるタグなら、足せる文字数（保存は 'id~文字'） */
+  custom?: number;
 }
 
 export const TAGS: TagDef[] = [
@@ -41,7 +43,7 @@ export const TAGS: TagDef[] = [
   { id: 'shuchu', name: '実力不足', look: 'r-focus' },
   { id: 'ankio', name: '一流', look: 'r-memo' },
   { id: 'keisan', name: '阪大', look: 'r-calc' },
-  { id: 'hayaoki', name: '受けたら受かる', look: 'r-dawn' },
+  { id: 'hayaoki', name: '受けたら受かる', look: 'r-dawn', custom: 10 },
   { id: 'cafeben', name: '傍若無人', look: 'r-cafe' },
   { id: 'toshokan', name: 'なっぴ', look: 'r-pink' },
   { id: 'tensai', name: 'しゃばい', look: 'sr-genius' },
@@ -97,7 +99,42 @@ export const TAGS: TagDef[] = [
 /** その実績の報酬のタグ */
 export const achTag = (achId: string): TagDef | undefined => TAGS.find((x) => x.ach === achId);
 
-export const tagById = (id: string | undefined): TagDef | undefined => TAGS.find((x) => x.id === id);
+/** 'hayaoki~東京科学大' → ['hayaoki', '東京科学大'] */
+export function splitTag(v: string | undefined): [string | undefined, string] {
+  if (!v) return [v, ''];
+  const i = v.indexOf('~');
+  return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 1)];
+}
+
+/** 足す文字をきれいにする（記号の ~ <> と前後の空白を取り、決まった文字数まで） */
+export function cleanSuffix(text: string, max: number): string {
+  return [...text.replace(/[~<>&"'\n\r]/g, '').trim()].slice(0, max).join('');
+}
+
+/** 保存する値（足す文字がなければ id だけ） */
+export const tagValue = (id: string, text: string): string => {
+  const def = TAGS.find((x) => x.id === id);
+  const t = def?.custom ? cleanSuffix(text, def.custom) : '';
+  return t ? `${id}~${t}` : id;
+};
+
+/** 後ろに足す文字を聞く（キャンセルなら null）。返すのは保存する値 */
+export async function askTagText(id: string, current: string): Promise<string | null> {
+  const def = TAGS.find((x) => x.id === id);
+  if (!def?.custom) return id;
+  const { pickText } = await import('./ui/sheet');
+  const t = await pickText(`「${def.name}」の後ろ（${def.custom}文字まで・なくてもいい）`, current, '例：東京科学大', def.custom, true);
+  return t === null ? null : tagValue(id, t);
+}
+
+/** タグの定義（自分で文字を足したものは、名前にその文字が入る） */
+export function tagById(v: string | undefined): TagDef | undefined {
+  const [id, text] = splitTag(v);
+  const def = TAGS.find((x) => x.id === id);
+  if (!def || !def.custom || !text) return def;
+  const t = cleanSuffix(text, def.custom);
+  return t ? { ...def, name: def.name + t } : def;
+}
 
 /**
  * その人の名前の横に出すタグ。tag は本人が選んだもの（'none' なら出さない）。
@@ -109,4 +146,5 @@ export function shownTag(uid: string, tag: string | undefined): TagDef | null {
   return tagById(tag) ?? null;
 }
 
-export const tagHtml = (t: TagDef): string => `<span class="tag tag-${t.look}">${t.name}</span>`;
+const escTag = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export const tagHtml = (t: TagDef): string => `<span class="tag tag-${t.look}">${escTag(t.name)}</span>`;

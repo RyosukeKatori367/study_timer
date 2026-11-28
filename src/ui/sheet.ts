@@ -136,7 +136,7 @@ export async function pickList(title: string, items: ListItem[], current = -1): 
 }
 
 /** 文字を入力する。キャンセルや空なら null。 */
-export async function pickText(title: string, value = '', placeholder = '', maxLength = 20): Promise<string | null> {
+export async function pickText(title: string, value = '', placeholder = '', maxLength = 20, allowEmpty = false): Promise<string | null> {
   const input = html<HTMLInputElement>(
     `<input class="sheet-text" type="text" maxlength="${maxLength}" placeholder="${esc(placeholder)}" aria-label="${esc(title)}">`,
   );
@@ -147,7 +147,7 @@ export async function pickText(title: string, value = '', placeholder = '', maxL
     input,
     () => {
       text = input.value.trim();
-      return text ? [1] : null;
+      return text || allowEmpty ? [1] : null;
     },
     { invalid: '名前を入れてください' },
   );

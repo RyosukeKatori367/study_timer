@@ -89,13 +89,10 @@ function sessionHtml(s: Session): string {
     if (s.laps.length > 1) parts.push(`${one(u)}の平均${fmtLap(s.studyMs / s.laps.length)}`);
   }
   if (s.leaves?.length) parts.push(`離脱${s.leaves.length}回（${fmtHM(leaveTotal(s.leaves))}）`);
-  // 手入力の記録は消せる
-  const del =
-    s.mode === 'manual'
-      ? `<span class="sess-btns">${
-          canPost() ? `<button type="button" class="sess-del" data-post-sess="${esc(s.id)}">投稿</button>` : ''
-        }<button type="button" class="sess-del" data-del="${esc(s.id)}">消す</button></span>`
-      : '';
+  // どの記録も消せる（手入力の記録は、あとから投稿もできる）
+  const del = `<span class="sess-btns">${
+    s.mode === 'manual' && canPost() ? `<button type="button" class="sess-del" data-post-sess="${esc(s.id)}">投稿</button>` : ''
+  }<button type="button" class="sess-del" data-del="${esc(s.id)}">消す</button></span>`;
   return `
     <div class="sess">
       <div class="sess-top"><span>${fmtClock(s.start)}〜${fmtClock(s.end)}</span><span>${fmtHM(s.studyMs)}</span></div>

@@ -84,7 +84,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-29c');
+    localStorage.setItem('studytimer:news', '2026-11-29d');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -253,11 +253,11 @@ const pager = (p, i) =>
     await p.waitForTimeout(300);
   }
   const y3 = await p.evaluate(() => {
-    const el = document.querySelector('[data-del]').closest('.sess');
+    const el = document.querySelector('[data-post-sess]').closest('.sess');
     return el.getBoundingClientRect().top + document.querySelector('.view[data-view=stats]').scrollTop - 260;
   });
   await scrollView(p, 'stats', y3);
-  await shot(p, 'manual_list', ['.sess:has([data-del])']);
+  await shot(p, 'manual_list', ['.sess:has([data-post-sess])']);
   // カレンダー
   await scrollView(p, 'stats', 0);
   await p.click('[data-stats-tab=cal]');

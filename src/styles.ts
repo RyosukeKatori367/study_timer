@@ -277,7 +277,12 @@ export const ALL_ITEMS: StyleItem[] = [...THEMES, ...PATTERNS, ...TAG_ITEMS];
 /** いつものガチャで出るもの（期間限定は入らない） */
 export const GACHA_ITEMS: StyleItem[] = ALL_ITEMS.filter((x) => x.rarity !== 'BASE' && !x.limited);
 /** そのシーズンの期間限定ガチャで出るもの */
-export const limitedItems = (season: string): StyleItem[] => ALL_ITEMS.filter((x) => x.limited === season);
+/** 期間限定ガチャで出るもの（模様は出さなくなった。2026-11-29、ユーザーの希望。持っている人はそのまま使える） */
+export const limitedItems = (season: string): StyleItem[] => ALL_ITEMS.filter((x) => x.limited === season && x.kind !== 'pattern');
+/** 一覧に出すか（もう出ないもの＝期間限定の模様と、終わった x- のものは、持っているときだけ） */
+export const isListed = (x: StyleItem): boolean =>
+  !(x.limited && (x.kind === 'pattern' || x.limited.startsWith('x-'))) || isOwned(x.id);
+export const listedPatterns = (): PatternItem[] => PATTERNS.filter(isListed);
 
 export const itemById = (id: string): StyleItem | undefined => ALL_ITEMS.find((x) => x.id === id);
 export const isOwned = (id: string): boolean => itemById(id)?.rarity === 'BASE' || settings.unlocked.includes(id);
