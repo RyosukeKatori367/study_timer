@@ -53,7 +53,7 @@ export const TAGS: TagDef[] = [
   { id: 'sakurasaku', name: 'サクラサク', look: 'ssr-sakura' },
   // 2026-11-28 に足したガチャのタグ
   { id: 'rikei', name: '理系', look: 'n-blue' },
-  { id: 'bunkei', name: '文系', look: 'n-rose' },
+  { id: 'bunkei', name: 'ゲイ', look: 'n-rose' },
   { id: 'sugakusuki', name: '数学好き', look: 'n-cyan' },
   { id: 'eigosuki', name: '英語好き', look: 'n-coral' },
   { id: 'tangocho', name: '単語帳', look: 'n-sand' },
