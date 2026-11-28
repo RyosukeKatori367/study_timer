@@ -62,7 +62,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-28m');
+    localStorage.setItem('studytimer:news', '2026-11-29a');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);
@@ -298,10 +298,22 @@ const pager = (p, i) =>
   const p = await fresh('?fake=in', { gumi: { b: 4200, 'l:2026-11-27': 120 }, unlocked: ['g:asagata', 'g:shuchu', 'g:keisan', 'g:zone', 'g:kami'] });
   await p.click('nav [data-view=event]');
   await p.waitForTimeout(1500);
-  await shot(p, 'event', ['.ev-banner', '.ev-card', '.ev-season']);
-  const y = await p.evaluate(() => [...document.querySelectorAll('.ev-card')].at(-1).getBoundingClientRect().top + document.querySelector('.view[data-view=event]').scrollTop - 80);
+  await shot(p, 'event', ['.login-card', '.season-box']);
+  // シーズンの箱を開く
+  await p.click('[data-box=season]');
+  await p.waitForTimeout(900);
+  const y0 = await p.evaluate(() => document.querySelector('.rk-list').closest('.ev-card').getBoundingClientRect().top + document.querySelector('.view[data-view=event]').scrollTop - 70);
+  await scrollView(p, 'event', y0);
+  await shot(p, 'event_open', ['.rk-list', '.rk-opt', '.season-body .lim-entry']);
+  await p.click('[data-box=season]');
+  await p.waitForTimeout(400);
+  // 今週の箱を開く
+  await p.click('[data-box=week]');
+  await p.waitForTimeout(500);
+  const y = await p.evaluate(() => document.querySelector('.week-box').getBoundingClientRect().top + document.querySelector('.view[data-view=event]').scrollTop - 80);
   await scrollView(p, 'event', y);
   await shot(p, 'event_week', []);
+  await p.click('[data-box=week]');
   await scrollView(p, 'event', 0);
   await p.click('[data-seg=quest]');
   await shot(p, 'quest', ['.ev-card', '.ev-card:nth-of-type(2)']);
@@ -310,6 +322,8 @@ const pager = (p, i) =>
   // はじまりの演出
   await p.click('[data-seg=event]');
   await p.waitForTimeout(300);
+  await p.click('[data-box=season]');
+  await p.waitForTimeout(500);
   await p.click('[data-intro]');
   await p.waitForTimeout(3300);
   await shot(p, 'intro', [], { wait: 0 });
@@ -318,12 +332,10 @@ const pager = (p, i) =>
 
   await p.click('nav [data-view=my]');
   await p.waitForTimeout(900);
-  await shot(p, 'my', ['.my-prof', '.login-card', '.my-coin', '.my-grid']);
-  await p.click('[data-bonus]');
-  await p.waitForTimeout(400);
+  await shot(p, 'my', ['.my-prof', '.my-coin', '.my-grid']);
   await p.click('[data-open=shop]');
   await p.waitForTimeout(800);
-  await shot(p, 'shop', ['.gacha-buttons', '[data-rates]', '.exch']);
+  await shot(p, 'shop', ['.view[data-view=my] .lim-entry', '.shop-gacha .gacha-buttons', '[data-rates]', '.exch']);
   await p.click('[data-draw="10"]');
   await p.waitForTimeout(2100);
   await p.click('#gacha');
@@ -340,13 +352,18 @@ const pager = (p, i) =>
   await p.waitForTimeout(400);
   await p.click('[data-open=style]');
   await p.waitForTimeout(900);
-  await shot(p, 'style', ['.style-filter', '.style-section']);
+  await p.evaluate(() => localStorage.removeItem('studytimer:styleopen'));
+  await p.waitForTimeout(300);
+  await shot(p, 'style', ['.style-filter', '.sec-toggle[data-sec=face]', '.sec-toggle[data-sec=theme]']);
+  await p.click('[data-sec=tag]');
+  await p.waitForTimeout(400);
   await p.evaluate(() => {
-    const h = [...document.querySelectorAll('.view[data-view=style] .group-head')].find((x) => x.textContent.startsWith('タグ'));
+    const h = document.querySelector('.sec-toggle[data-sec=tag]');
     const v = document.querySelector('.view[data-view=style]');
     v.scrollTo(0, h.getBoundingClientRect().top + v.scrollTop - 70);
   });
   await shot(p, 'style_tags', [], { wait: 600 });
+  await p.click('[data-sec=tag]');
   await p.evaluate(() => document.querySelector('.view[data-view=style]').scrollTo(0, 0));
   await p.click('.view[data-view=style] .view-back');
   await p.waitForTimeout(400);

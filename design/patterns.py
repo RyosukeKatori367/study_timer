@@ -73,11 +73,11 @@ def text(x, y, s, size, rot=0, family="Georgia, Times New Roman, serif", italic=
             f'{F}>{s}</text>')
 
 
-P = []  # (id, 名前, レア度, ファイル名, 濃さ, svg)
+P = []  # (id, 名前, レア度, ファイル名, 濃さ, svg, 期間限定のシーズン)
 
 
-def add(pid, name, rarity, alpha, content):
-    P.append((pid, name, rarity, f'{pid}.svg', alpha, content))
+def add(pid, name, rarity, alpha, content, limited=None):
+    P.append((pid, name, rarity, f'{pid}.svg', alpha, content, limited))
 
 
 # ---------------- N ----------------
@@ -232,12 +232,29 @@ add('kanji', '合格', 'SSR', .16, svg(120, 120, ''.join(text(x, y, t, 22, rot, 
 gr = [(10, 10, 5, 10), (30, 6, 3.5, -20), (46, 18, 6, 25), (16, 30, 3.5, 40), (34, 34, 7, -10), (54, 44, 4, 15), (8, 52, 6, -30), (28, 56, 3.5, 5), (48, 60, 4.5, -45)]
 add('gummyrain', 'グミの雨', 'SSR', .18, svg(64, 68, ''.join(cube(x, y, s, a) for x, y, s, a in gr)))
 
+# ---------------- 期間限定（シーズンのガチャだけで出る） ----------------
+# チャプター1 シーズン1「虚空劫灰のプラーナ」：灰と残り火
+import random as _r
+_g = _r.Random(11)
+ash = ''.join(f'<circle cx="{f(_g.uniform(1, 63))}" cy="{f(_g.uniform(1, 63))}" r="{f(_g.uniform(.6, 2.1))}" {F} fill-opacity="{f(_g.uniform(.35, 1))}"/>' for _ in range(22))
+ash += ''.join(f'<path d="M{f(x)} {f(y)}l3 -1.6" {NOF} stroke-width="1" stroke-opacity=".6"/>' for x, y in [(8, 50), (40, 12), (52, 40), (20, 26)])
+add('ash', '灰の粒', 'R', .2, svg(64, 64, ash), 'c1s1')
+spark = lambda x, y, s: poly([(x, y - 3 * s), (x + 1.2 * s, y), (x, y + 3 * s), (x - 1.2 * s, y)])
+ember = ''.join(spark(x, y, s) for x, y, s in [(10, 46, 1.3), (30, 22, 1), (50, 50, 1.5), (46, 10, .8), (18, 12, .7), (36, 40, .9)])
+ember += ''.join(f'<path d="M{x} {y}v-7" {NOF} stroke-width="1" stroke-linecap="round" stroke-opacity=".55"/>' for x, y in [(10, 38), (50, 41), (30, 15)])
+add('ember', '火の粉', 'SR', .22, svg(60, 60, ember), 'c1s1')
+ring = lambda cx, cy, rr, dash, w: f'<circle cx="{cx}" cy="{cy}" r="{rr}" {NOF} stroke-width="{w}" stroke-dasharray="{dash}"/>'
+void = ring(30, 30, 20, '22 7 6 7', 1.6) + ring(30, 30, 13, '4 5', 1.2) + f'<circle cx="30" cy="30" r="2.4" {F}/>'
+void += ring(90, 88, 15, '16 6 3 6', 1.4) + ring(90, 88, 8, '3 4', 1) + f'<circle cx="90" cy="88" r="1.6" {F}/>'
+void += ''.join(f'<circle cx="{x}" cy="{y}" r="1.1" {F} fill-opacity=".7"/>' for x, y in [(70, 24), (16, 84), (104, 40), (50, 104)])
+add('void', '虚空の環', 'SSR', .18, svg(120, 120, void), 'c1s1')
+
 # ---------------- 書き出し ----------------
 os.makedirs(OUT, exist_ok=True)
 for name in os.listdir(OUT):
     if name.endswith('.svg'):
         os.remove(os.path.join(OUT, name))
-for pid, _, _, fname, _, content in P:
+for pid, _, _, fname, _, content, _ in P:
     with open(os.path.join(OUT, fname), 'w') as fp:
         fp.write(content)
 
@@ -248,8 +265,9 @@ lines = [
     '',
     'export const GENERATED_PATTERNS: PatternItem[] = [',
 ]
-for pid, name, rarity, fname, alpha, _ in sorted(P, key=lambda p: order[p[2]]):
-    lines.append(f"  {{ kind: 'pattern', id: 'p:{pid}', name: '{name}', rarity: '{rarity}', file: '{fname}', alpha: {alpha} }},")
+for pid, name, rarity, fname, alpha, _, limited in sorted(P, key=lambda p: (p[6] is not None, order[p[2]])):
+    lim = f", limited: '{limited}'" if limited else ''
+    lines.append(f"  {{ kind: 'pattern', id: 'p:{pid}', name: '{name}', rarity: '{rarity}', file: '{fname}', alpha: {alpha}{lim} }},")
 lines.append('];')
 with open(TS, 'w') as fp:
     fp.write('\n'.join(lines) + '\n')

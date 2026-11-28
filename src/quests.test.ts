@@ -78,3 +78,17 @@ describe('シーズン', () => {
     expect(seasonsUntil('2027-06-01').map((x) => x.id).slice(0, 4)).toEqual(['c1s1', 'c1s2', 'c1s3', 'c1s4']);
   });
 });
+
+describe('日曜ボーナス', () => {
+  it('日曜日に1時間で受け取れる。ほかの日は次の日曜を出す', async () => {
+    const { sundayBonus } = await import('./quests');
+    const { addSession } = await import('./store');
+    const sun = new Date(2026, 10, 29, 20, 0).getTime(); // 2026-11-29 は日曜
+    const sat = new Date(2026, 10, 28, 20, 0).getTime();
+    expect(sundayBonus(sat)).toMatchObject({ today: false, day: '2026-11-29', done: false });
+    expect(sundayBonus(sun)).toMatchObject({ today: true, day: '2026-11-29', done: false, key: 'u:2026-11-29' });
+    const start = new Date(2026, 10, 29, 10, 0).getTime();
+    addSession({ id: 'sun1', mode: 'stopwatch', start, end: start + 61 * 60000, studyMs: 61 * 60000, laps: [], firstLap: 1 });
+    expect(sundayBonus(sun)).toMatchObject({ done: true, claimed: false });
+  });
+});

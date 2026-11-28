@@ -43,7 +43,7 @@ export const TAGS: TagDef[] = [
   { id: 'keisan', name: '阪大', look: 'r-calc' },
   { id: 'hayaoki', name: '受けたら受かる', look: 'r-dawn' },
   { id: 'cafeben', name: 'カフェ勉', look: 'r-cafe' },
-  { id: 'toshokan', name: 'なっぴ', look: 'r-library' },
+  { id: 'toshokan', name: 'なっぴ', look: 'r-pink' },
   { id: 'tensai', name: '天才肌', look: 'sr-genius' },
   { id: 'fukutsu', name: '不屈', look: 'sr-iron' },
   { id: 'zone', name: 'ゾーン突入', look: 'sr-zone' },
@@ -82,6 +82,10 @@ export const TAGS: TagDef[] = [
   { id: 'daiichi', name: 'どう見たって儚いだろ', look: 'ssr-dream' },
   { id: 'tenka', name: '本質厨', look: 'ssr-tenka' },
   { id: 'mugen', name: '鉄緑勢', look: 'ssr-infinite' },
+  // 期間限定ガチャのタグ（チャプター1 シーズン1「虚空劫灰のプラーナ」）
+  { id: 'kaijin', name: '灰燼', look: 'lim-ash' },
+  { id: 'kokuu', name: '虚空の旅人', look: 'lim-void' },
+  { id: 'prana', name: 'プラーナ', look: 'lim-prana' },
 ];
 
 /** その実績の報酬のタグ */

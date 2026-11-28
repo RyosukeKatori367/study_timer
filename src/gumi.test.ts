@@ -52,8 +52,8 @@ describe('勉強ボーナス', () => {
 });
 
 describe('ショップ', () => {
-  it('10回引くと1200使い、同じものは出ない', () => {
-    settings.gumi = { b: 2000 };
+  it('10回引くと1000使い、同じものは出ない', () => {
+    settings.gumi = { b: 1800 };
     settings.unlocked = [];
     const r = drawGacha(10, () => 0.1)!;
     expect(r).toHaveLength(10);

@@ -45,8 +45,8 @@ describe('グミガチャ', () => {
     expect(noN.rarity.R).toBe(30); // ほかのレア度の確率は変わらない
     expect(sum(noN.item) + noN.dupe).toBeCloseTo(100, 6);
   });
-  it('全部で152種類（テーマと模様が100・タグ52）、ベースカラー12・シークレット1', () => {
-    expect(ALL_ITEMS.length).toBe(152);
+  it('全部で161種類（テーマと模様が100・タグ52・期間限定9）、ベースカラー12・シークレット1', () => {
+    expect(ALL_ITEMS.length).toBe(161);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'LEGEND').map((x) => x.name)).toEqual(['豪運']);
     expect(THEMES.filter((x) => x.rarity === 'BASE').length).toBe(12);
     expect(ALL_ITEMS.filter((x) => x.rarity === 'SECRET').length).toBe(1);
@@ -59,7 +59,26 @@ describe('グミガチャ', () => {
   it('ガチャのタグは全部 tags.ts にあり、名前が同じ', () => {
     for (const x of TAG_ITEMS) expect(tagById(x.tag)?.name).toBe(x.name);
     expect(TAG_ITEMS.filter((x) => x.rarity === 'N').length).toBe(20);
-    expect(TAG_ITEMS.filter((x) => x.rarity === 'SSR').length).toBe(6);
+    expect(TAG_ITEMS.filter((x) => x.rarity === 'SSR' && !x.limited).length).toBe(6);
     expect(new Set(TAG_ITEMS.map((x) => x.name)).size).toBe(TAG_ITEMS.length);
+  });
+});
+
+describe('期間限定ガチャ', () => {
+  it('そのシーズンの限定だけが出て、いつものガチャや交換所には出ない', async () => {
+    const { limitedItems, pickLimited, GACHA_ITEMS, exchangePrice } = await import('./styles');
+    const items = limitedItems('c1s1');
+    expect(items.map((x) => x.rarity).sort()).toEqual(['R', 'R', 'R', 'SR', 'SR', 'SR', 'SSR', 'SSR', 'SSR']);
+    expect(GACHA_ITEMS.some((x) => x.limited)).toBe(false);
+    for (const x of items) expect(exchangePrice(x)).toBeUndefined();
+    const seq = [0.99, 0.1, 0.1, 0.5];
+    let i = 0;
+    const r = pickLimited('c1s1', () => false, () => seq[i++]);
+    expect(r.item.rarity).toBe('SSR');
+    expect(r.item.limited).toBe('c1s1');
+    // 全部持っていたら、かぶり
+    const d = pickLimited('c1s1', () => true, () => 0.1);
+    expect(d.dupe).toBe(true);
+    expect(d.refund).toBe(40);
   });
 });

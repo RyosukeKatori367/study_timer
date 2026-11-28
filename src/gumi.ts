@@ -186,6 +186,12 @@ export function entryLabel(key: string, names: (key: string) => string | undefin
       return item('グミガチャ 1回', idDate(a));
     case 'G':
       return item('グミガチャ 10回', idDate(a));
+    case 'k':
+      return item('期間限定ガチャ 1回', idDate(a));
+    case 'K':
+      return item('期間限定ガチャ 10回', idDate(a));
+    case 'u':
+      return item('日曜ボーナス', md(a));
     case 'r':
       return item('かぶりのお返し', idDate(a));
     case 'x':

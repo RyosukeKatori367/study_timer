@@ -155,8 +155,8 @@ function setBadge(view: ViewName, on: boolean): void {
 
 function updateBadges(): void {
   try {
-    setBadge('event', claimableQuests() + claimableTiers() + unseenNews() > 0);
-    setBadge('my', !loginStatus().claimed || claimableAchievements().length > 0);
+    setBadge('event', !loginStatus().claimed || claimableQuests() + claimableTiers() + unseenNews() > 0);
+    setBadge('my', claimableAchievements().length > 0);
   } catch (e) {
     console.warn(e);
   }

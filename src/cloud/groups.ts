@@ -356,8 +356,11 @@ export async function publishStudy(): Promise<void> {
   const last = getSessions().at(-1);
   const matImgs = myMatImgs(mats);
   const style = { t: currentTheme().id, p: currentPattern().id };
+  // ひとことと志望大学も写す（入ったばかりのグループにも届くように）
+  const prof = { bio: p.bio, goal: p.goal ?? '' };
   // ルールが古いと新しい項目は断られるので、そのときは項目を減らして送り直す
   const tries: Record<string, unknown>[] = [
+    { days, mats, matImgs, sums, style, ...prof, lastStudyAt: last?.end ?? 0 },
     { days, mats, matImgs, sums, style, lastStudyAt: last?.end ?? 0 },
     { days, mats, matImgs, sums, lastStudyAt: last?.end ?? 0 },
     { days, mats, sums, lastStudyAt: last?.end ?? 0 },

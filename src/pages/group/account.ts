@@ -2,7 +2,7 @@
 
 import { api } from '../../cloud/api';
 import { credentialError } from '../../cloud/account';
-import { BIO_MAX, ICON_IMAGE_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
+import { BIO_MAX, GOAL_MAX, ICON_IMAGE_MAX, NAME_MAX, PASSWORD_MIN, firstGrapheme, type Icon } from '../../cloud/model';
 import { cropImage } from '../../ui/cropper';
 import { ownedTags } from '../../styles';
 import { tagById, tagHtml } from '../../tags';
@@ -145,7 +145,8 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
       <input type="file" accept="image/*" hidden>
       ${field('アイコンの色', '<span data-hue></span>')}
       ${field(`表示名（グループの人に見える・${NAME_MAX}文字まで）`, `<input class="input" name="name" autocomplete="nickname" placeholder="そら">`)}
-      ${field(`ひとこと（なくてもいい・${BIO_MAX}文字まで）`, `<input class="input" name="bio" autocomplete="off" placeholder="物理がんばる">`)}
+      ${field(`ひとこと（グループの人に見える・なくてもいい・${BIO_MAX}文字まで）`, `<input class="input" name="bio" autocomplete="off" placeholder="物理がんばる">`)}
+      ${field(`志望大学（グループの人に見える・なくてもいい・${GOAL_MAX}文字まで）`, `<input class="input" name="goal" autocomplete="off" placeholder="東京科学大学">`)}
       <div class="field"><span class="field-label">タグ（名前の横に出る）</span><div class="chip-row" data-tags></div></div>
       <button type="submit" class="btn primary">${setup ? 'はじめる' : '保存'}</button>
       ${setup ? '<p class="sns-lead">あとから設定のアカウントで変えられます</p>' : ''}
@@ -154,6 +155,7 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
   const char = $<HTMLInputElement>('[name="char"]', el);
   const name = $<HTMLInputElement>('[name="name"]', el);
   const bio = $<HTMLInputElement>('[name="bio"]', el);
+  const goal = $<HTMLInputElement>('[name="goal"]', el);
   const imageBtn = $('[data-image]', el);
   const file = $<HTMLInputElement>('input[type="file"]', el);
   const hue = hueSlider(icon.h, 'アイコンの色');
@@ -161,6 +163,7 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
   char.value = icon.c;
   name.value = p?.name ?? '';
   bio.value = p?.bio ?? '';
+  goal.value = p?.goal ?? '';
 
   const render = () => {
     const c = firstGrapheme(char.value) || firstGrapheme(name.value) || '?';
@@ -225,7 +228,13 @@ export async function profileScreen(nav: Nav, setup = false): Promise<Screen> {
     e.preventDefault();
     render();
     const ok = await busy($('[type="submit"]', el), () =>
-      api.saveProfile({ name: name.value, bio: bio.value, icon: { ...icon, c: firstGrapheme(char.value) || firstGrapheme(name.value) }, tag }),
+      api.saveProfile({
+        name: name.value,
+        bio: bio.value,
+        goal: goal.value,
+        icon: { ...icon, c: firstGrapheme(char.value) || firstGrapheme(name.value) },
+        tag,
+      }),
     );
     if (!ok) return;
     if (setup) nav.home();

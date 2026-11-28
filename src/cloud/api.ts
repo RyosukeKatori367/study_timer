@@ -55,6 +55,7 @@ const real = {
 
   eventTotal: events.eventTotal,
   publishEvent: events.publishEvent,
+  eventRanking: events.eventRanking,
 
   syncInfo,
   syncNow,

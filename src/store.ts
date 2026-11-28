@@ -90,6 +90,8 @@ export interface Settings {
   pomoPlan: PlanBlock[];
   /** 消した記録の id（ほかの端末やバックアップから戻ってこないように覚えておく。端末どうしで足し合わせる） */
   removed: string[];
+  /** みんなのイベントの貢献度ランキングに名前を出す */
+  eventName: boolean;
 }
 
 export interface PlanBlock {
@@ -136,6 +138,7 @@ const DEFAULTS: Settings = {
   face: 'ring',
   pomoPlan: [],
   removed: [],
+  eventName: true,
 };
 
 function read<T>(key: string): T | null {

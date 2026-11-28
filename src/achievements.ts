@@ -163,7 +163,8 @@ export function achContext(): AchCtx {
     days.set(k, (days.get(k) ?? 0) + s.studyMs);
   }
   const keys = Object.keys(settings.gumi);
-  const gacha = keys.reduce((t, k) => t + (k.startsWith('g:') ? 1 : k.startsWith('G:') ? 10 : 0), 0);
+  // 期間限定ガチャ（k: 1回・K: 10回）も数える
+  const gacha = keys.reduce((t, k) => t + (k.startsWith('g:') || k.startsWith('k:') ? 1 : k.startsWith('G:') || k.startsWith('K:') ? 10 : 0), 0);
   const groups = api.user() ? (api.cachedProfile()?.groupIds.length ?? 0) : 0;
   return {
     totalMs,

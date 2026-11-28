@@ -163,6 +163,38 @@ export function weeklyQuests(now = Date.now()): Quest[] {
   return build(weeklyDefs(week), `w:${week}`, ss);
 }
 
+// ---- 日曜ボーナス ----
+// 日曜日（1日の区切りで数えた日）に1時間 勉強すると 30グミ。
+
+export const SUNDAY_BONUS = 30;
+export const SUNDAY_TARGET = HOUR;
+
+export interface SundayBonus {
+  key: string;
+  reward: number;
+  /** 今日が日曜日 */
+  today: boolean;
+  /** 次の（今日が日曜なら今日の）日曜日 '2026-11-29' */
+  day: string;
+  value: number;
+  target: number;
+  done: boolean;
+  claimed: boolean;
+}
+
+export function sundayBonus(now = Date.now()): SundayBonus {
+  const today = dateKey(now, settings.dayBoundaryMin);
+  const [y, m, d] = today.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  const sunday = new Date(y, m - 1, d + ((7 - dow) % 7));
+  const day = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+  const isSunday = dow === 0;
+  const k = dayKeyFn();
+  const value = isSunday ? getSessions().reduce((t, s) => t + (k(s.start) === today ? s.studyMs : 0), 0) : 0;
+  const key = `u:${day}`;
+  return { key, reward: SUNDAY_BONUS, today: isSunday, day, value, target: SUNDAY_TARGET, done: isSunday && value >= SUNDAY_TARGET, claimed: hasEntry(key) };
+}
+
 /** 受け取る。もらえたら true */
 export function claimQuest(q: { key: string; reward: number; done: boolean }): boolean {
   return q.done && earn(q.key, q.reward);
@@ -179,7 +211,10 @@ export function questName(key: string): string | undefined {
 /** 受け取れるクエストの数（今日・今週） */
 export function claimableQuests(now = Date.now()): number {
   const all = dailyAllClear(now);
+  const sun = sundayBonus(now);
   return (
-    [...dailyQuests(now), ...weeklyQuests(now)].filter((q) => q.done && !q.claimed).length + (all.done && !all.claimed ? 1 : 0)
+    [...dailyQuests(now), ...weeklyQuests(now)].filter((q) => q.done && !q.claimed).length +
+    (all.done && !all.claimed ? 1 : 0) +
+    (sun.done && !sun.claimed ? 1 : 0)
   );
 }

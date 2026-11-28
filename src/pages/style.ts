@@ -27,9 +27,35 @@ import { $, esc } from '../ui/dom';
 import { pickList } from '../ui/sheet';
 import { toast } from '../ui/toast';
 import { LOCK, coinHtml, paintPatterns, previewHtml, rarityTag } from './styleparts';
+import { limitedSeason } from './limited';
+import { md } from '../seasons';
 
 /** 一覧の絞り込み */
 let filter: 'all' | 'owned' | 'locked' = 'all';
+
+/** レア度の高い順に並べる（同じレア度は元の順） */
+const RANK: Record<string, number> = { BASE: 0, N: 1, R: 2, SR: 3, SSR: 4, SECRET: 5, LEGEND: 6 };
+const byRarity = <T extends { rarity: string }>(list: T[]): T[] => [...list].sort((a, b) => RANK[b.rarity] - RANK[a.rarity]);
+
+/** 種類ごとの開け閉め（端末で覚える。はじめは全部閉じる） */
+type Sec = 'face' | 'base' | 'theme' | 'pattern' | 'tag';
+const OPEN_KEY = 'studytimer:styleopen';
+function readOpen(): Partial<Record<Sec, boolean>> {
+  try {
+    return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Partial<Record<Sec, boolean>>;
+  } catch {
+    return {};
+  }
+}
+function toggleOpen(sec: Sec): void {
+  const o = readOpen();
+  o[sec] = !o[sec];
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(o));
+  } catch {
+    /* 覚えられなくても動く */
+  }
+}
 
 function tileHtml(item: StyleItem, selected: boolean): string {
   const owned = isOwned(item.id);
@@ -46,7 +72,7 @@ function tileHtml(item: StyleItem, selected: boolean): string {
   return `
     <button type="button" class="style-tile${owned ? '' : ' locked'}" data-id="${esc(item.id)}" aria-pressed="${selected}"
       aria-label="${esc(item.name)}${owned ? '' : '（まだ持っていません）'}">
-      <span class="style-prev">${previewHtml(item)}${
+      <span class="style-prev">${item.limited ? '<span class="lim-badge">限定</span>' : ''}${previewHtml(item)}${
         owned ? '' : item.kind === 'tag' ? `<span class="lock-mini">${LOCK}</span>` : `<span class="lock-badge">${LOCK}</span>`
       }${selected ? '<span class="sel-badge">✓</span>' : ''}</span>
       <span class="style-name">${esc(item.name)}</span>
@@ -67,7 +93,7 @@ export function initStylePage(view: HTMLElement): void {
     const owned = GACHA_ITEMS.filter((x) => isOwned(x.id)).length;
     const shown = (x: StyleItem) => filter === 'all' || (filter === 'owned') === isOwned(x.id);
     const grid = (items: StyleItem[], sel: string) => {
-      const list = items.filter(shown);
+      const list = byRarity(items.filter(shown));
       return list.length
         ? `<div class="style-grid">${list.map((x) => tileHtml(x, x.id === sel)).join('')}</div>`
         : '<p class="sns-lead">ありません</p>';
@@ -75,6 +101,15 @@ export function initStylePage(view: HTMLElement): void {
     const base = THEMES.filter((x) => x.rarity === 'BASE');
     const gachaThemes = THEMES.filter((x) => x.rarity !== 'BASE');
     const ownedOf = (items: StyleItem[]) => `${items.filter((x) => isOwned(x.id)).length}/${items.length}`;
+    const open = readOpen();
+    /** 開け閉めできる種類の見出しと中身 */
+    const section = (sec: Sec, title: string, note: string, body: () => string) => `
+      <section class="style-section${open[sec] ? ' open' : ''}">
+        <button type="button" class="sec-toggle" data-sec="${sec}" aria-expanded="${!!open[sec]}">
+          <span class="sec-title">${title}</span><span class="head-note">${note}</span><span class="sec-chev" aria-hidden="true">›</span>
+        </button>
+        ${open[sec] ? body() : ''}
+      </section>`;
     view.innerHTML = `
       <button type="button" class="view-back" aria-label="マイページに戻る">‹</button>
       <h1>スタイル</h1>
@@ -90,34 +125,26 @@ export function initStylePage(view: HTMLElement): void {
       ${
         filter === 'locked'
           ? ''
-          : `<section class="style-section">
-        <h2 class="group-head">ウォッチフェイス<span class="head-note">計測中の時計。全部使える</span></h2>
-        <div class="style-grid">${FACES.map(
-          (f) => `
+          : section(
+              'face',
+              'ウォッチフェイス',
+              `${faceById(settings.face).name}・全部使える`,
+              () => `<div class="style-grid">${FACES.map(
+                (f) => `
           <button type="button" class="style-tile" data-face="${f.id}" aria-pressed="${f.id === faceById(settings.face).id}" aria-label="${esc(f.name)}">
             <span class="style-prev" data-faceprev="${f.id}">${f.id === faceById(settings.face).id ? '<span class="sel-badge">✓</span>' : ''}</span>
             <span class="style-name">${esc(f.name)}</span>
             <span class="style-ach face-note">${esc(f.note)}</span>
           </button>`,
-        ).join('')}</div>
-      </section>`
+              ).join('')}</div>`,
+            )
       }
-      <section class="style-section">
-        <h2 class="group-head">ベースカラー<span class="head-note">はじめから使える</span></h2>
-        ${grid(base, theme.id)}
-      </section>
-      <section class="style-section">
-        <h2 class="group-head">テーマ<span class="head-note">${ownedOf(gachaThemes)}</span></h2>
-        ${grid(gachaThemes, theme.id)}
-      </section>
-      <section class="style-section">
-        <h2 class="group-head">模様<span class="head-note">${ownedOf(PATTERNS.filter((x) => x.rarity !== 'BASE'))}</span></h2>
-        ${grid(PATTERNS, pattern.id)}
-      </section>
-      <section class="style-section">
-        <h2 class="group-head">タグ<span class="head-note">名前の横に出ます</span></h2>
-        ${tagGrid(filter, grid)}
-      </section>
+      ${section('base', 'ベースカラー', 'はじめから使える', () => grid(base, theme.id))}
+      ${section('theme', 'テーマ', `${theme.rarity === 'BASE' ? '' : `${esc(theme.name)}・`}${ownedOf(gachaThemes)}`, () => grid(gachaThemes, theme.id))}
+      ${section('pattern', '模様', `${pattern.rarity === 'BASE' ? '' : `${esc(pattern.name)}・`}${ownedOf(PATTERNS.filter((x) => x.rarity !== 'BASE'))}`, () =>
+        grid(PATTERNS, pattern.id),
+      )}
+      ${section('tag', 'タグ', `${ownedOf(TAG_ITEMS)}・名前の横に出ます`, () => tagGrid(filter, grid))}
       <p class="settings-foot">まだのものは、ショップのグミガチャで出るか、グミと交換できます（数字は交換に使うグミ）。テーマはボタン・計測の円・下のメニューの色が、模様は背景が変わります（計測中の画面には出しません）</p>`;
     paintPatterns(view, theme.light);
     view.querySelectorAll<HTMLElement>('[data-faceprev]').forEach((el) => el.prepend(facePreview(el.dataset.faceprev as FaceId)));
@@ -130,6 +157,12 @@ export function initStylePage(view: HTMLElement): void {
       };
     });
     $('.view-back', view).onclick = back;
+    view.querySelectorAll<HTMLElement>('[data-sec]').forEach((b) => {
+      b.onclick = () => {
+        toggleOpen(b.dataset.sec as Sec);
+        render();
+      };
+    });
 
     view.querySelectorAll<HTMLElement>('.style-tile[data-tag]').forEach((b) => {
       b.onclick = () => void setTag(b.dataset.tag!).then(render);
@@ -208,6 +241,11 @@ function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], 
 export async function offerExchange(item: StyleItem): Promise<boolean> {
   const price = exchangePrice(item);
   if (price === undefined) {
+    if (item.limited) {
+      const s = limitedSeason();
+      toast(s?.id === item.limited ? `期間限定ガチャで出ます（${md(s.end)}まで）` : '期間限定でした（今は手に入りません）');
+      return false;
+    }
     toast(item.rarity === 'SECRET' ? 'シークレット。グミガチャでだけ出ます' : '豪運はグミガチャでだけ出ます（0.05%）');
     return false;
   }

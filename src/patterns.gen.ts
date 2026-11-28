@@ -62,4 +62,7 @@ export const GENERATED_PATTERNS: PatternItem[] = [
   { kind: 'pattern', id: 'p:circuit', name: '回路', rarity: 'SSR', file: 'circuit.svg', alpha: 0.16 },
   { kind: 'pattern', id: 'p:kanji', name: '合格', rarity: 'SSR', file: 'kanji.svg', alpha: 0.16 },
   { kind: 'pattern', id: 'p:gummyrain', name: 'グミの雨', rarity: 'SSR', file: 'gummyrain.svg', alpha: 0.18 },
+  { kind: 'pattern', id: 'p:ash', name: '灰の粒', rarity: 'R', file: 'ash.svg', alpha: 0.2, limited: 'c1s1' },
+  { kind: 'pattern', id: 'p:ember', name: '火の粉', rarity: 'SR', file: 'ember.svg', alpha: 0.22, limited: 'c1s1' },
+  { kind: 'pattern', id: 'p:void', name: '虚空の環', rarity: 'SSR', file: 'void.svg', alpha: 0.18, limited: 'c1s1' },
 ];

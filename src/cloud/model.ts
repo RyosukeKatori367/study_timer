@@ -18,6 +18,8 @@ import { addDays, studyDayStart, studyWeekStart, type DayOptions } from '../summ
 // ---- 上限 ----
 export const NAME_MAX = 20;
 export const BIO_MAX = 60;
+/** 志望大学（グループの人に見える） */
+export const GOAL_MAX = 30;
 export const GROUP_NAME_MAX = 24;
 export const COMMENT_MAX = 140;
 export const REPLY_MAX = 140;
@@ -107,6 +109,8 @@ export const DEFAULT_POST_PREFS: PostPrefs = { material: true, laps: true, lapTi
 export interface UserDoc {
   name: string;
   bio: string;
+  /** 志望大学（なくてもいい） */
+  goal?: string;
   icon: Icon;
   /** 名前の横に出すタグ（src/tags.ts の id。'none' なら出さない。なければ開発者だけ開発者タグ） */
   tag?: string;
@@ -116,11 +120,12 @@ export interface UserDoc {
 }
 
 /** 表示名などを確かめる。問題があれば理由、なければ null。 */
-export function profileError(p: { name: string; bio: string; icon: Icon }): string | null {
+export function profileError(p: { name: string; bio: string; goal?: string; icon: Icon }): string | null {
   const name = p.name.trim();
   if (!name) return '表示名を入れてください';
   if (Array.from(name).length > NAME_MAX) return `表示名は${NAME_MAX}文字までです`;
   if (Array.from(p.bio).length > BIO_MAX) return `ひとことは${BIO_MAX}文字までです`;
+  if (Array.from(p.goal ?? '').length > GOAL_MAX) return `志望大学は${GOAL_MAX}文字までです`;
   if (!validIcon(p.icon)) return 'アイコンを選び直してください';
   return null;
 }
@@ -160,6 +165,9 @@ export interface MemberDoc {
   matImgs?: Record<string, string>;
   /** 使っているテーマと模様 { t: 't:sakura', p: 'p:none' }（ランキングやメンバー一覧の帯に使う） */
   style?: { t: string; p: string };
+  /** ひとことと志望大学（プロフィールの写し。グループの人が見る） */
+  bio?: string;
+  goal?: string;
   lastStudyAt: number;
 }
 

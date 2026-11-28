@@ -1,4 +1,4 @@
-// マイページ。プロフィール・グミ・ログインボーナスと、ショップ・スタイル・実績・設定への入り口。
+// マイページ。プロフィール・グミと、ショップ・スタイル・実績・設定への入り口。
 // ショップ・実績・グミの履歴・プロフィールはこのタブの中で重ねて開く（戻るで戻る）。
 // スタイルと設定は、それぞれのページ（下のメニューはマイページのまま）。
 
@@ -6,15 +6,9 @@ import { achName, achievements, claimAchievements, claimableAchievements, curren
 import { api } from '../cloud/api';
 import {
   GUMI_CHANGE,
-  LOGIN_BONUS,
-  OPEN_BONUS,
-  STREAK_BONUS,
-  STREAK_DAYS,
   balance,
-  claimLogin,
   fmtGumi,
   history,
-  loginStatus,
   totalStudyMs,
 } from '../gumi';
 import { questName } from '../quests';
@@ -29,6 +23,7 @@ import { profileScreen } from './group/account';
 import { avatar, createNav, type Nav, type Screen } from './group/ui';
 import { openGacha, openRates } from './gacha';
 import { offerExchange, setTag } from './style';
+import { limitedEntry, openLimitedGacha } from './limited';
 import { coinHtml, jarSvg, paintPatterns, previewHtml, rarityTag } from './styleparts';
 
 export interface MyPageHooks {
@@ -81,16 +76,9 @@ function homeScreen(n: Nav, hooks: MyPageHooks): Screen {
     const tag = u ? shownTag(u.uid, p?.tag) : null;
     const total = totalStudyMs();
     const streak = currentStreak();
-    const st = loginStatus();
     const ach = achievements();
     const ready = claimableAchievements(ach).length;
     const owned = GACHA_ITEMS.filter((x) => isOwned(x.id)).length;
-    const days = Array.from({ length: STREAK_DAYS }, (_, i) => {
-      const d = i + 1;
-      const cls = d < st.day || (d === st.day && st.claimed) ? 'got' : d === st.day ? 'today' : '';
-      const amt = LOGIN_BONUS + (d === STREAK_DAYS ? STREAK_BONUS : 0);
-      return `<span class="ld ${cls}${d === STREAK_DAYS ? ' big' : ''}"><small>${d}日目</small><b>${amt}</b></span>`;
-    }).join('');
     el.innerHTML = `
       <h1>マイページ</h1>
       <button type="button" class="sns-card my-prof has-tb" data-profile>
@@ -103,18 +91,6 @@ function homeScreen(n: Nav, hooks: MyPageHooks): Screen {
         </span>
         <span class="chevron" aria-hidden="true">›</span>
       </button>
-      <section class="login-card${st.claimed ? ' done' : ''}">
-        <div class="login-head"><b>ログインボーナス</b><span>${
-          st.streak > 1 ? `${st.claimed ? '' : '今日で'}${st.streak}日 連続` : '毎日もらえる'
-        }</span></div>
-        <div class="login-days">${days}</div>
-        ${
-          st.claimed
-            ? '<div class="login-note">今日の分は受け取りました。また明日</div>'
-            : `<button type="button" class="btn primary" data-bonus>+${fmtGumi(st.amount + (st.open ? OPEN_BONUS : 0))} 受け取る</button>
-               ${st.open ? `<div class="login-note">開店記念の ${OPEN_BONUS}グミも いっしょに</div>` : ''}`
-        }
-      </section>
       <div class="my-coin">${coinHtml(balance())}<button type="button" class="link" data-history>グミの履歴 ›</button></div>
       <div class="my-grid">
         <button type="button" class="my-tile shop" data-open="shop">
@@ -137,10 +113,6 @@ function homeScreen(n: Nav, hooks: MyPageHooks): Screen {
       </div>`;
     paintBanners(el);
     $('[data-profile]', el).onclick = () => (api.user() ? n.push((m) => profileScreen(m)) : hooks.openLogin());
-    el.querySelector<HTMLElement>('[data-bonus]')?.addEventListener('click', () => {
-      const got = claimLogin();
-      if (got) toast(`+${fmtGumi(got)}グミ`);
-    });
     $('[data-history]', el).onclick = () => n.push(historyScreen);
     el.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => {
       b.onclick = () => {
@@ -169,6 +141,7 @@ function shopScreen(): Screen {
       ${back}
       <h1>ショップ</h1>
       <div class="shop-coin">${coinHtml(have)}</div>
+      ${limitedEntry()}
       <section class="gacha-card shop-gacha">
         <div class="gacha-jar-mini">${jarSvg()}</div>
         <div class="gacha-info">
@@ -217,6 +190,7 @@ function shopScreen(): Screen {
       };
     });
     $('[data-rates]', el).onclick = openRates;
+    el.querySelector<HTMLElement>('[data-limited]')?.addEventListener('click', openLimitedGacha);
     el.querySelectorAll<HTMLElement>('[data-r]').forEach((b) => {
       b.onclick = () => {
         shopRarity = b.dataset.r as Rarity;

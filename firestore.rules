@@ -80,7 +80,8 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if isMe(uid);
       allow create, update: if isMe(uid)
-        && request.resource.data.keys().hasOnly(['name', 'bio', 'icon', 'tag', 'groupIds', 'postPrefs', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'goal', 'icon', 'tag', 'groupIds', 'postPrefs', 'updatedAt'])
+        && (!('goal' in request.resource.data) || (request.resource.data.goal is string && request.resource.data.goal.size() <= 30))
         && validTag(request.resource.data, uid)
         && validName(request.resource.data.name)
         && request.resource.data.bio is string && request.resource.data.bio.size() <= 120
@@ -174,7 +175,10 @@ service cloud.firestore {
           && getAfter(userPath(uid)).data.groupIds.size() <= 10;
 
         allow update: if isMe(uid)
-          && changed().hasOnly(['name', 'icon', 'tag', 'days', 'mats', 'matImgs', 'sums', 'style', 'lastStudyAt'])
+          && changed().hasOnly(['name', 'icon', 'tag', 'days', 'mats', 'matImgs', 'sums', 'style', 'bio', 'goal', 'lastStudyAt'])
+          // ひとことと志望大学（プロフィールの写し。グループの人が見る）
+          && (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 120))
+          && (!('goal' in request.resource.data) || (request.resource.data.goal is string && request.resource.data.goal.size() <= 30))
           && validTag(request.resource.data, uid)
           && validStyle(request.resource.data)
           && validName(request.resource.data.name)
@@ -366,7 +370,11 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if isMe(uid)
         && season.matches('^c[0-9]+s[0-9]+$')
-        && request.resource.data.keys().hasOnly(['ms', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['ms', 'updatedAt', 'name', 'icon', 'tag'])
+        // 貢献度ランキングに出す名前とアイコン（出さない人は入れない）
+        && (!('name' in request.resource.data) || validName(request.resource.data.name))
+        && (!('icon' in request.resource.data) || validIcon(request.resource.data.icon))
+        && (!('tag' in request.resource.data) || validTag(request.resource.data, uid))
         && request.resource.data.ms is number
         && request.resource.data.ms >= 0
         && request.resource.data.ms <= 8640000000

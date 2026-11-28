@@ -91,7 +91,12 @@ function member(uid: string, todayMin: number, weekMin: number, joined: number):
     kei: { t: 't:aurora', p: 'p:none' },
   };
   const style = styles[uid] ? { style: styles[uid] } : {};
-  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}), ...tag, ...style };
+  // ひとことと志望大学（見本）
+  const prof: Record<string, { bio: string; goal: string }> = {
+    haru: { bio: '朝型。毎日5時起き', goal: '大阪大学 工学部' },
+    dev: { bio: 'グミ勉つくってます', goal: '東京科学大学' },
+  };
+  return { uid, name: p.name, icon: p.icon, joinedAt: joined, joinCode: '', days, mats: split(uid, days), sums, lastStudyAt: now, ...(matImgs ? { matImgs } : {}), ...tag, ...style, ...(prof[uid] ?? {}) };
 }
 
 interface FakeGroup {
@@ -214,7 +219,7 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
   DEVELOPER_UIDS.push('dev');
   if (loggedIn) {
     user = { uid: 'me', email: 'sora@example.com' };
-    profile = { name: 'そら', bio: '東工大志望。物理がんばる', icon: { c: 'そ', h: 170 }, groupIds: ['g1', 'g2'], postPrefs: { ...DEFAULT_POST_PREFS, groups: ['g1'] } };
+    profile = { name: 'そら', bio: '物理がんばる', goal: '東京科学大学', icon: { c: 'そ', h: 170 }, groupIds: ['g1', 'g2'], postPrefs: { ...DEFAULT_POST_PREFS, groups: ['g1'] } };
     people.me = { name: profile.name, icon: profile.icon };
     seed();
   }
@@ -250,7 +255,9 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       await wait();
       profile = { ...(profile ?? { groupIds: [], postPrefs: DEFAULT_POST_PREFS }), ...p, name: p.name.trim(), bio: p.bio.trim() };
       people.me = { name: profile.name, icon: profile.icon };
-      for (const x of groups.values()) for (const m of x.members) if (m.uid === 'me') Object.assign(m, people.me, profile.tag ? { tag: profile.tag } : {});
+      for (const x of groups.values())
+        for (const m of x.members)
+          if (m.uid === 'me') Object.assign(m, people.me, profile.tag ? { tag: profile.tag } : {}, { bio: profile.bio, goal: profile.goal ?? '' });
       changed();
     },
     savePostPrefs: async (prefs) => {
@@ -401,6 +408,19 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       return { total: 342 * 3600000, people: 6 };
     },
     publishEvent: async () => false,
+    eventRanking: async () => {
+      await wait(300);
+      const H = 3600000;
+      const top = [
+        { uid: 'dev', ms: 68.5 * H, ...people.dev, tag: 'dev' },
+        { uid: 'haru', ms: 61.2 * H, ...people.haru },
+        { uid: 'x1', ms: 55 * H },
+        { uid: 'me', ms: 48.3 * H, ...people.me },
+        { uid: 'yuu', ms: 40.1 * H, ...people.yuu },
+        { uid: 'x2', ms: 31.7 * H },
+      ];
+      return { top, me: { rank: 4, ms: 48.3 * H } };
+    },
 
     syncInfo: () => ({ status: 'idle', syncedAt: synced, pending: 0 }),
     syncNow: async () => {

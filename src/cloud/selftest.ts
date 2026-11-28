@@ -219,6 +219,12 @@ async function run(): Promise<void> {
     await allow('教材の画像を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { matImgs: { m1: TINY_JPEG } }),
     );
+    await allow('ひとことと志望大学を書ける', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { bio: '物理がんばる', goal: '東京科学大学' }),
+    );
+    await deny('志望大学は30文字まで', () =>
+      F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { goal: 'あ'.repeat(31) }),
+    );
     await allow('使っているテーマと模様を書ける', () =>
       F.updateDoc(F.doc(b.db, 'groups', gid, 'members', b.uid), { style: { t: 't:sakura', p: 'p:none' } }),
     );
@@ -439,7 +445,16 @@ async function run(): Promise<void> {
       F.setDoc(F.doc(a.db, 'events', '2026-11', 'users', a.uid), { ms: 1, updatedAt: F.serverTimestamp() }),
     );
     await deny('イベント：ほかの項目は書けない', () =>
-      F.setDoc(ev(a, a.uid), { ms: 1, name: 'A', updatedAt: F.serverTimestamp() }),
+      F.setDoc(ev(a, a.uid), { ms: 1, secret: 'A', updatedAt: F.serverTimestamp() }),
+    );
+    await allow('イベント：ランキング用に名前とアイコンを入れられる', () =>
+      F.setDoc(ev(a, a.uid), { ms: 5400000, name: 'テストA', icon: { c: 'A', h: 10 }, updatedAt: F.serverTimestamp() }),
+    );
+    await deny('イベント：開発者のタグは付けられない', () =>
+      F.setDoc(ev(a, a.uid), { ms: 5400000, name: 'テストA', icon: { c: 'A', h: 10 }, tag: 'dev', updatedAt: F.serverTimestamp() }),
+    );
+    await allow('イベント：ランキング（多い順）を読める', () =>
+      F.getDocs(F.query(F.collection(c.db, 'events', month, 'users'), F.orderBy('ms', 'desc'), F.limit(30))),
     );
     await allow('イベント：全員の合計を集計で読める（1.5時間＋2時間）', async () => {
       const snap = await F.getAggregateFromServer(F.collection(c.db, 'events', month, 'users'), {

@@ -12,6 +12,7 @@ import { toast } from '../ui/toast';
 import { materialThumb, pickMaterial } from './material';
 import { api } from '../cloud/api';
 import { openCompose } from './group/compose';
+import { preparePhoto, type PhotoData } from '../ui/photo';
 
 /** 記録が増えた・消えた（統計などを描き直す） */
 export const SESSIONS_CHANGE = 'sessions:change';
@@ -44,7 +45,10 @@ export function openManual(day?: number): void {
   document.getElementById('manual')?.remove();
   const root = html('<div id="manual" class="fullpage" role="dialog" aria-modal="true" aria-label="時間を入力して記録"></div>');
   document.getElementById('app')!.append(root);
-  const close = () => root.remove();
+  const close = () => {
+    root.remove();
+    file.remove();
+  };
 
   let dur = HOUR;
   let material = currentMaterialId();
@@ -60,8 +64,26 @@ export function openManual(day?: number): void {
     return { start: end - dur, end };
   };
 
-  // ログインしていてグループに入っていれば、記録して投稿できる
+  // ログインしていてグループに入っていれば、記録して投稿できる（写真も添えられる）
   const canPost = !!api.user() && (api.cachedProfile()?.groupIds.length ?? 0) > 0;
+  let photo: PhotoData | null = null;
+  let busyPhoto = false;
+  const file = html('<input type="file" accept="image/*" hidden>') as HTMLInputElement;
+  root.after(file);
+  file.onchange = async () => {
+    const f = file.files?.[0];
+    file.value = '';
+    if (!f) return;
+    busyPhoto = true;
+    render();
+    try {
+      photo = await preparePhoto(f);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '写真を読み込めませんでした');
+    }
+    busyPhoto = false;
+    render();
+  };
 
   const render = () => {
     const { start, end } = range();
@@ -100,6 +122,20 @@ export function openManual(day?: number): void {
           </button>
         </div>
         ${fixed !== null ? '<button type="button" class="btn ghost small" data-auto>今から逆算にもどす</button>' : ''}
+        ${
+          canPost
+            ? `<div class="field">
+                 <span class="field-label">写真（投稿するとき・1枚・なくてもいい）</span>
+                 <div class="compose-photo">${
+                   photo
+                     ? `<div class="compose-photo-prev"><img src="${photo.thumb}" alt="添える写真"><button type="button" class="photo-del" data-photo-del aria-label="写真をやめる">×</button></div>`
+                     : busyPhoto
+                       ? '<span class="sns-lead">写真を小さくしています…</span>'
+                       : '<button type="button" class="btn dark small" data-photo-add>＋ 写真を添える</button>'
+                 }</div>
+               </div>`
+            : ''
+        }
         <div class="manual-preview${future ? ' bad' : ''}">
           <span class="manual-when">${esc(when)}</span>
           <span class="manual-what">${fmtHM(dur)}・${esc(materialName(material))}</span>
@@ -169,6 +205,11 @@ export function openManual(day?: number): void {
       fixed = midnight(start) + r[0] * HOUR + r[1] * MIN;
       render();
     };
+    root.querySelector<HTMLElement>('[data-photo-add]')?.addEventListener('click', () => file.click());
+    root.querySelector<HTMLElement>('[data-photo-del]')?.addEventListener('click', () => {
+      photo = null;
+      render();
+    });
     root.querySelector<HTMLElement>('[data-auto]')?.addEventListener('click', () => {
       fixed = null;
       render();
@@ -184,7 +225,7 @@ export function openManual(day?: number): void {
         toast(`記録しました（${fmtHM(dur)}・${clock(r.start)}〜${clock(r.end)}）`);
         // 「記録して投稿」なら、投稿の画面を出す（ひとこと・投稿先を選んで投稿）
         if (b.dataset.save === 'post') {
-          void openCompose(s).then((ok) => {
+          void openCompose(s, true, photo).then((ok) => {
             if (!ok) toast('投稿するには、ログインしてグループに入ってください');
           });
         }

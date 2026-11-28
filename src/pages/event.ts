@@ -1,4 +1,5 @@
-// イベントタブ。「イベント」（毎月のみんなのイベントと今週の目標）・「クエスト」（今日のクエスト）・「お知らせ」。
+// イベントタブ。「イベント」（ログインボーナス・シーズンの箱・今週の箱）・「クエスト」（今日のクエスト）・「お知らせ」。
+// シーズンの箱を押すと、報酬・貢献度ランキング・期間限定ガチャ・シーズンの説明が開く。今週の箱を押すと、今週の目標と日曜ボーナスが開く。
 
 import { api } from '../cloud/api';
 import { JOIN_MS, cachedTotal, claimTiers, liveSeasons, loadTotal, mySeasonMs, tiers, type TierState } from '../events';
@@ -7,14 +8,21 @@ import { emblemSvg, introUnseen, playSeasonIntro } from './season-intro';
 import { dateKey } from '../cloud/model';
 import { GUMI_CHANGE, STUDY_BLOCK, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
 import { NEWS, isNewNews, markNewsSeen } from '../news';
-import { claimQuest, dailyAllClear, dailyQuests, weekInfo, weeklyQuests, type Quest } from '../quests';
-import { settings } from '../store';
+import { claimQuest, dailyAllClear, dailyQuests, sundayBonus, weekInfo, weeklyQuests, type Quest } from '../quests';
+import { saveSettings, settings } from '../store';
+import type { RankEntry } from '../cloud/events';
+import { tagById, tagHtml } from '../tags';
+import { avatar } from './group/ui';
+import { bindLoginCard, loginCardHtml } from './login-card';
+import { limitedEntry, openLimitedGacha } from './limited';
 import { HOUR, fmtHM, fmtTimeOfDay } from '../time';
 import { esc } from '../ui/dom';
 import { toast } from '../ui/toast';
 
 type Seg = 'event' | 'quest' | 'news';
 let seg: Seg = 'event';
+/** シーズンと今週の箱を開いているか */
+const boxOpen = { season: false, week: false };
 
 const hours = (ms: number): string => Math.floor(ms / HOUR).toLocaleString('ja-JP');
 /** 目標の時間（「1時間」「30分」「1時間30分」。0分は書かない） */
@@ -100,20 +108,97 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       .map((t) => `<i class="ev-tick${total !== null && total >= t.h * HOUR ? ' on' : ''}" style="left:${(t.h / s.goalH) * 100}%"></i>`)
       .join('');
 
+  /** 貢献度ランキング（シーズンごと。2分以内に読んだものはそのまま使う） */
+  const ranks = new Map<string, { at: number; data: Awaited<ReturnType<typeof api.eventRanking>> | null }>();
+  const loadRanking = (id: string, force = false) => {
+    if (!api.user()) return;
+    const c = ranks.get(id);
+    if (c && !force && (c.data === null || Date.now() - c.at < 120_000)) return;
+    ranks.set(id, { at: Date.now(), data: c?.data ?? null });
+    void api
+      .eventRanking(id)
+      .then((data) => {
+        ranks.set(id, { at: Date.now(), data });
+        if (view.classList.contains('active') && seg === 'event') render();
+      })
+      .catch((e) => console.warn('ランキングを読めませんでした', e));
+  };
+
+  const rankRow = (rank: number, e: RankEntry | null, ms: number, mine: boolean) => {
+    const t = e?.tag ? tagById(e.tag) : undefined;
+    return `
+      <div class="rk-row${mine ? ' me' : ''}">
+        <span class="rk-no${rank <= 3 ? ` top${rank}` : ''}">${rank}</span>
+        ${e?.name && e.icon ? avatar(e.icon, 30) : '<span class="av anon" style="--s:30px" aria-hidden="true"><span>？</span></span>'}
+        <span class="rk-name">${e?.name ? esc(e.name) : 'ひみつの参加者'}${t ? tagHtml(t) : ''}${mine ? '<small>あなた</small>' : ''}</span>
+        <span class="rk-ms">${esc(fmtHM(ms))}</span>
+      </div>`;
+  };
+
+  const rankingCard = (s: Season): string => {
+    const c = ranks.get(s.id);
+    const uid = api.user()?.uid;
+    const d = c?.data;
+    const body = !d
+      ? '<p class="sns-lead">読み込んでいます…</p>'
+      : d.top.length === 0
+        ? '<p class="sns-lead">まだだれもいません。1時間 勉強して参加しよう</p>'
+        : d.top.map((e, i) => rankRow(i + 1, e, e.ms, e.uid === uid)).join('') +
+          (d.me && d.me.rank > d.top.length
+            ? `<div class="rk-gap">…</div>${rankRow(d.me.rank, null, d.me.ms, true).replace('ひみつの参加者', 'あなた').replace('<small>あなた</small>', '')}`
+            : '');
+    return `
+      <section class="sns-card ev-card">
+        <div class="ev-card-head"><span>貢献度ランキング</span><span class="head-note">シーズン中の勉強時間</span></div>
+        <div class="rk-list">${body}</div>
+        <button type="button" class="row rk-opt" role="switch" aria-checked="${settings.eventName}" data-rkname>
+          <span class="row-label">ランキングに名前を出す<small class="rk-sub">出さないと「ひみつの参加者」と出ます</small></span>
+          <span class="switch" aria-hidden="true"></span>
+        </button>
+      </section>`;
+  };
+
+  /** 今週の目標の箱（日曜ボーナスもここ） */
+  const weekBox = (now: number): string => {
+    const wk = weekInfo(now);
+    const nextWeek = new Date(wk.next);
+    const weekly = weeklyQuests(now);
+    const sun = sundayBonus(now);
+    const ready = weekly.filter((q) => q.done && !q.claimed).length + (sun.done && !sun.claimed ? 1 : 0);
+    const done = weekly.filter((q) => q.done).length;
+    const open = boxOpen.week;
+    const sunRow = sun.today
+      ? questRow({ key: sun.key, title: '日曜ボーナス：1時間 勉強する', reward: sun.reward, done: sun.done, claimed: sun.claimed, value: sun.value, target: sun.target, unit: 'ms' })
+      : `<div class="q-row later">
+           <span class="q-check" aria-hidden="true"></span>
+           <span class="q-main"><span class="q-title">日曜ボーナス（${md(sun.day)}）</span><span class="q-prog">日曜日に1時間 勉強すると もらえる</span></span>
+           <span class="q-reward">+${sun.reward}</span>
+         </div>`;
+    return `
+      <section class="sns-card ev-card ev-box week-box${open ? ' open' : ''}">
+        <div class="ev-box-head" role="button" tabindex="0" aria-expanded="${open}" data-box="week">
+          <span class="ev-box-title">今週の目標${ready ? '<i class="box-dot" aria-label="受け取れるものがあります"></i>' : ''}</span>
+          <span class="head-note">${done}/${weekly.length} 達成${sun.today && !sun.claimed ? '・日曜ボーナス' : ''}</span>
+          <span class="sec-chev" aria-hidden="true">›</span>
+        </div>
+        ${
+          open
+            ? `<div class="ev-box-body">
+                 <div class="box-note">${nextWeek.getMonth() + 1}/${nextWeek.getDate()}（${'日月火水木金土'[nextWeek.getDay()]}）に入れ替わる</div>
+                 ${weekly.map(questRow).join('')}
+                 ${sunRow}
+               </div>`
+            : ''
+        }
+      </section>`;
+  };
+
   const eventHtml = (): string => {
     const now = Date.now();
     const { cur, prev } = liveSeasons(now);
     const signed = !!api.user();
-    const wk = weekInfo(now);
-    const nextWeek = new Date(wk.next);
-    const weekly = weeklyQuests(now);
-    const weekCard = `
-      <section class="sns-card ev-card">
-        <div class="ev-card-head"><span>今週の目標</span><span class="head-note">${nextWeek.getMonth() + 1}/${nextWeek.getDate()}（${'日月火水木金土'[nextWeek.getDay()]}）に入れ替わる</span></div>
-        ${weekly.map(questRow).join('')}
-      </section>`;
     if (!cur) {
-      return `<section class="ev-banner"><div class="ev-title">次のシーズンをお楽しみに</div></section>${weekCard}`;
+      return `${loginCardHtml()}<section class="ev-banner"><div class="ev-title">次のシーズンをお楽しみに</div></section>${weekBox(now)}`;
     }
     const c = cachedTotal(cur.id);
     const total = signed ? (c?.total ?? null) : null;
@@ -122,30 +207,49 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     const prevList = signed && prev ? tiers(prev, cachedTotal(prev.id)?.total ?? null, mySeasonMs(prev)) : [];
     const today = dateKey(now, settings.dayBoundaryMin);
     const goal = cur.goalH.toLocaleString('ja-JP');
+    const open = boxOpen.season;
+    const ready = list.some((t) => t.ready);
     return `
-      <section class="ev-banner${cur.look ? ` season-${esc(cur.look)}` : ''}">
-        ${cur.title ? `<span class="ev-emblem">${emblemSvg(96, cur.look)}</span>` : ''}
-        <div class="ev-month"><button type="button" class="ev-season" data-intro aria-label="シーズンのはじまりをもう一度見る">${esc(cur.name)}</button><span>${md(cur.start)}〜${md(cur.end)}</span></div>
-        ${
-          cur.title
-            ? `<div class="ev-season-title">${esc(cur.title)}</div><div class="ev-goal">みんなで${goal}時間</div>`
-            : `<div class="ev-title">みんなで${goal}時間</div>`
-        }
-        ${
-          signed
-            ? `<div class="ev-bar"><i class="ev-fill" style="width:${total === null ? 0 : pctOf(total, cur.goalH * HOUR)}%"></i>${ticks(cur, total)}</div>
-               <div class="ev-nums"><span><b>${total === null ? (failed.has(cur.id) ? '—' : '…') : hours(total)}</b> / ${goal}時間</span><span>あと${daysLeftIn(cur, today)}日</span></div>
-               <div class="ev-sub">${
-                 failed.has(cur.id) && !c ? '合計を読み込めませんでした（オフラインかも）・' : c ? `参加 ${c.people}人・` : ''
-               }あなたのシーズン ${fmtHM(mine)}</div>`
-            : `<p class="ev-sub">ログインしている人みんなの、シーズン中の勉強時間を合わせます。ログインすると参加できます</p>
-               <button type="button" class="btn primary small" data-login>ログイン・登録</button>`
-        }
+      ${loginCardHtml()}
+      <section class="ev-banner ev-box season-box${cur.look ? ` season-${esc(cur.look)}` : ''}${open ? ' open' : ''}">
+        <div class="ev-box-head" role="button" tabindex="0" aria-expanded="${open}" data-box="season">
+          ${cur.title ? `<span class="ev-emblem">${emblemSvg(96, cur.look)}</span>` : ''}
+          <div class="ev-month"><span class="ev-season">${esc(cur.name)}</span><span>${md(cur.start)}〜${md(cur.end)}</span></div>
+          ${
+            cur.title
+              ? `<div class="ev-season-title">${esc(cur.title)}</div><div class="ev-goal">みんなで${goal}時間</div>`
+              : `<div class="ev-title">みんなで${goal}時間</div>`
+          }
+          ${
+            signed
+              ? `<div class="ev-bar"><i class="ev-fill" style="width:${total === null ? 0 : pctOf(total, cur.goalH * HOUR)}%"></i>${ticks(cur, total)}</div>
+                 <div class="ev-nums"><span><b>${total === null ? (failed.has(cur.id) ? '—' : '…') : hours(total)}</b> / ${goal}時間</span><span>あと${daysLeftIn(cur, today)}日</span></div>
+                 <div class="ev-sub">${
+                   failed.has(cur.id) && !c ? '合計を読み込めませんでした（オフラインかも）・' : c ? `参加 ${c.people}人・` : ''
+                 }あなたのシーズン ${fmtHM(mine)}</div>`
+              : `<p class="ev-sub">ログインしている人みんなの、シーズン中の勉強時間を合わせます。ログインすると参加できます</p>
+                 <button type="button" class="btn primary small" data-login>ログイン・登録</button>`
+          }
+          <div class="ev-more">${ready ? '<i class="box-dot"></i>' : ''}${open ? 'とじる' : '報酬・ランキング・限定ガチャ'}<span class="sec-chev" aria-hidden="true">›</span></div>
+        </div>
       </section>
-      <section class="sns-card ev-card">
-        <div class="ev-card-head"><span>報酬</span><span class="head-note">シーズン中に1時間以上 勉強した人がもらえる</span></div>
-        ${tierRows(list, mine)}
-      </section>
+      ${
+        open
+          ? `<div class="ev-box-body season-body">
+               <section class="sns-card ev-card">
+                 <div class="ev-card-head"><span>報酬</span><span class="head-note">シーズン中に1時間以上 勉強した人がもらえる</span></div>
+                 ${tierRows(list, mine)}
+               </section>
+               ${signed ? rankingCard(cur) : ''}
+               ${limitedEntry()}
+               <section class="sns-card ev-card season-about">
+                 <div class="ev-card-head"><span>シーズンについて</span></div>
+                 <p class="sns-lead">ログインしている人みんなの、${md(cur.start)}〜${md(cur.end)}の勉強時間を合わせて、目標をめざします。報酬は、シーズン中に1時間以上 勉強した人が受け取れます。受け取り忘れは、次のシーズンのあいだなら受け取れます</p>
+                 <button type="button" class="btn dark small" data-intro>シーズンのはじまりをもう一度見る</button>
+               </section>
+             </div>`
+          : ''
+      }
       ${
         prev && prevList.some((t) => t.ready)
           ? `<section class="sns-card ev-card">
@@ -154,7 +258,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
              </section>`
           : ''
       }
-      ${weekCard}`;
+      ${weekBox(now)}`;
   };
 
   const questHtml = (): string => {
@@ -208,7 +312,38 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
         show();
       };
     });
-    view.querySelector<HTMLElement>('[data-login]')?.addEventListener('click', openLogin);
+    view.querySelector<HTMLElement>('[data-login]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openLogin();
+    });
+    bindLoginCard(view);
+    view.querySelectorAll<HTMLElement>('[data-box]').forEach((b) => {
+      const toggle = () => {
+        const k = b.dataset.box as keyof typeof boxOpen;
+        boxOpen[k] = !boxOpen[k];
+        const { cur } = liveSeasons();
+        if (k === 'season' && boxOpen.season && cur) loadRanking(cur.id);
+        render();
+      };
+      b.onclick = toggle;
+      b.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
+      };
+    });
+    view.querySelector<HTMLElement>('[data-limited]')?.addEventListener('click', openLimitedGacha);
+    view.querySelector<HTMLElement>('[data-rkname]')?.addEventListener('click', () => {
+      saveSettings({ eventName: !settings.eventName });
+      render();
+      // 名前を出す・出さないを送り直してから、ランキングを読み直す
+      const { cur } = liveSeasons();
+      void api
+        .publishEvent()
+        .catch(() => false)
+        .then(() => cur && loadRanking(cur.id, true));
+    });
     view.querySelector<HTMLElement>('[data-intro]')?.addEventListener('click', () => {
       const { cur } = liveSeasons();
       if (cur) playSeasonIntro(cur);
@@ -217,7 +352,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       b.onclick = () => {
         const now = Date.now();
         const all = dailyAllClear(now);
-        const list: (Quest | typeof all)[] = [...dailyQuests(now), ...weeklyQuests(now), all];
+        const list: (Quest | typeof all)[] = [...dailyQuests(now), ...weeklyQuests(now), all, sundayBonus(now)];
         const q = list.find((x) => x.key === b.dataset.claim);
         if (q && claimQuest(q)) toast(`+${q.reward}グミ`);
         render();
@@ -249,6 +384,7 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
         .then((sent) => {
           if (cur) refreshTotal(cur.id, sent);
           if (prev) refreshTotal(prev.id, sent);
+          if (cur && boxOpen.season) loadRanking(cur.id, sent);
         });
     }
     if (seg === 'news') {

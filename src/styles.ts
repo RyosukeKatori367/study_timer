@@ -31,6 +31,8 @@ export interface ThemeItem {
   ring?: string;
   /** 動くテーマ（シークレット） */
   anim?: 'rainbow';
+  /** 期間限定（そのシーズンの期間限定ガチャだけで出る。交換所には出ない） */
+  limited?: string;
 }
 
 export interface PatternItem {
@@ -42,6 +44,7 @@ export interface PatternItem {
   file?: string;
   /** 模様の濃さ */
   alpha: number;
+  limited?: string;
 }
 
 /** 名前の横に出すタグ（グループで見える） */
@@ -52,6 +55,7 @@ export interface TagItem {
   rarity: Rarity;
   /** src/tags.ts の id */
   tag: string;
+  limited?: string;
 }
 
 export type StyleItem = ThemeItem | PatternItem | TagItem;
@@ -111,13 +115,23 @@ const GACHA_TAGS: [string, Rarity][] = [
   ['mugen', 'SSR'],
   ['gouun', 'LEGEND'],
 ];
-export const TAG_ITEMS: TagItem[] = GACHA_TAGS.map(([tag, rarity]) => ({
-  kind: 'tag',
-  id: `g:${tag}`,
-  name: TAGS.find((x) => x.id === tag)?.name ?? tag,
-  rarity,
-  tag,
-}));
+/** 期間限定ガチャで出るタグ [タグ, レア度, シーズン] */
+const LIMITED_TAGS: [string, Rarity, string][] = [
+  ['kaijin', 'R', 'c1s1'],
+  ['kokuu', 'SR', 'c1s1'],
+  ['prana', 'SSR', 'c1s1'],
+];
+export const TAG_ITEMS: TagItem[] = [
+  ...GACHA_TAGS.map(([tag, rarity]): TagItem => ({ kind: 'tag', id: `g:${tag}`, name: TAGS.find((x) => x.id === tag)?.name ?? tag, rarity, tag })),
+  ...LIMITED_TAGS.map(([tag, rarity, limited]): TagItem => ({
+    kind: 'tag',
+    id: `g:${tag}`,
+    name: TAGS.find((x) => x.id === tag)?.name ?? tag,
+    rarity,
+    tag,
+    limited,
+  })),
+];
 
 const t = (id: string, name: string, rarity: Rarity, light: string, strong: string, more: Partial<ThemeItem> = {}): ThemeItem => ({
   kind: 'theme',
@@ -211,13 +225,31 @@ export const THEMES: ThemeItem[] = [
     nav: lg(90, ...RAINBOW, ...RAINBOW, RAINBOW[0]),
     anim: 'rainbow',
   }),
+  // 期間限定：チャプター1 シーズン1「虚空劫灰のプラーナ」（灰と残り火）
+  t('haiiro', '灰の空', 'R', '#c4c9d1', '#e3e6ea', { start: lg(160, '#e6e8ec', '#9aa3ae'), limited: 'c1s1' }),
+  t('zanka', '残火', 'SR', '#ffb27a', '#ffd7b8', {
+    start: lg(135, '#ffcf7a', '#ff7a3d', '#c2410c'),
+    ink: '#fff',
+    nav: lg(90, '#ffc08a', '#ff8a5c'),
+    ring: '#ff9a4d',
+    limited: 'c1s1',
+  }),
+  t('kougai', '劫灰', 'SSR', '#ff9a4d', '#ffd2b0', {
+    start: lg(135, '#2b2b2e 0%', '#5a5a60 45%', '#ff7a2e 100%'),
+    ink: '#fff',
+    nav: lg(90, '#8a8a92', '#ff8a3d'),
+    ring: '#ff7a2e',
+    limited: 'c1s1',
+  }),
 ];
 
 export const PATTERNS: PatternItem[] = [{ kind: 'pattern', id: 'p:none', name: 'なし', rarity: 'BASE', alpha: 0 }, ...GENERATED_PATTERNS];
 
 export const ALL_ITEMS: StyleItem[] = [...THEMES, ...PATTERNS, ...TAG_ITEMS];
-/** ガチャで出るもの */
-export const GACHA_ITEMS: StyleItem[] = ALL_ITEMS.filter((x) => x.rarity !== 'BASE');
+/** いつものガチャで出るもの（期間限定は入らない） */
+export const GACHA_ITEMS: StyleItem[] = ALL_ITEMS.filter((x) => x.rarity !== 'BASE' && !x.limited);
+/** そのシーズンの期間限定ガチャで出るもの */
+export const limitedItems = (season: string): StyleItem[] => ALL_ITEMS.filter((x) => x.limited === season);
 
 export const itemById = (id: string): StyleItem | undefined => ALL_ITEMS.find((x) => x.id === id);
 export const isOwned = (id: string): boolean => itemById(id)?.rarity === 'BASE' || settings.unlocked.includes(id);
@@ -233,13 +265,15 @@ export type GachaRarity = (typeof GACHA_RARITIES)[number];
 /** レア度ごとの確率（%） */
 export const RARITY_RATE: Record<GachaRarity, number> = { N: 50, R: 30, SR: 14, SSR: 4.95, SECRET: 1, LEGEND: 0.05 };
 export const GACHA_COST = 120;
-export const GACHA10_COST = 1200;
+/** 10回はまとめて引くと安い（2026-11-28 に 1200 から 1000 に） */
+export const GACHA10_COST = 1000;
 /** かぶったときに返ってくるグミ */
 export const REFUND: Record<GachaRarity, number> = { N: 20, R: 40, SR: 80, SSR: 200, SECRET: 400, LEGEND: 1000 };
 /** 交換所の値段（シークレットと豪運は交換できない） */
 export const EXCHANGE_PRICE: Partial<Record<Rarity, number>> = { N: 300, R: 600, SR: 1200, SSR: 3000 };
 
-export const exchangePrice = (item: StyleItem): number | undefined => EXCHANGE_PRICE[item.rarity];
+/** 交換の値段（期間限定は交換できない） */
+export const exchangePrice = (item: StyleItem): number | undefined => (item.limited ? undefined : EXCHANGE_PRICE[item.rarity]);
 
 /** レア度を確率で選ぶ */
 export function pickRarity(rand: () => number = Math.random): GachaRarity {
@@ -263,6 +297,32 @@ export interface DrawResult {
 export function pickReward(owned: (id: string) => boolean, rand: () => number = Math.random): DrawResult {
   const rarity = pickRarity(rand);
   const pool = GACHA_ITEMS.filter((x) => x.rarity === rarity);
+  const fresh = pool.filter((x) => !owned(x.id));
+  const list = fresh.length ? fresh : pool;
+  const item = list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
+  const dupe = fresh.length === 0;
+  return { item, dupe, refund: dupe ? REFUND[rarity] : 0 };
+}
+
+// ---- 期間限定ガチャ ----
+// そのシーズンのあいだだけ引ける。出るのはそのシーズンの限定のもの（R・SR・SSR）だけ。値段はいつものガチャと同じ。
+
+export const LIMITED_RARITIES = ['R', 'SR', 'SSR'] as const;
+/** 期間限定ガチャのレア度ごとの確率（%） */
+export const LIMITED_RATE: Record<(typeof LIMITED_RARITIES)[number], number> = { R: 60, SR: 32, SSR: 8 };
+
+/** 期間限定ガチャを1回引く */
+export function pickLimited(season: string, owned: (id: string) => boolean, rand: () => number = Math.random): DrawResult {
+  let roll = rand() * 100;
+  let rarity: (typeof LIMITED_RARITIES)[number] = 'R';
+  for (const r of LIMITED_RARITIES) {
+    roll -= LIMITED_RATE[r];
+    if (roll < 0) {
+      rarity = r;
+      break;
+    }
+  }
+  const pool = limitedItems(season).filter((x) => x.rarity === rarity);
   const fresh = pool.filter((x) => !owned(x.id));
   const list = fresh.length ? fresh : pool;
   const item = list[Math.min(list.length - 1, Math.floor(rand() * list.length))];
