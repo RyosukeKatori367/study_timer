@@ -5965,3 +5965,118 @@ button.ev-season {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ---------- 実績の報酬のタグ ---------- */
+
+.tag.tag-bronze {
+  background: linear-gradient(135deg, #8a5a32, #d89a5e 50%, #9b6438);
+  color: #fff3e6;
+}
+
+.tag.tag-sapphire {
+  background: linear-gradient(135deg, #1f3fae, #4d8cff 55%, #2b4fc7);
+  color: #eef4ff;
+}
+
+.tag.tag-ruby {
+  background: linear-gradient(135deg, #a3123a, #ff4d6d 55%, #b3173f);
+  color: #fff0f3;
+}
+
+.tag.tag-jade {
+  background: linear-gradient(135deg, #0b7a5a, #36c99a 55%, #0d8a66);
+  color: #ecfff7;
+}
+
+.tag.tag-steel {
+  background: linear-gradient(135deg, #3a4048, #8a939e 50%, #4a525c);
+  color: #f2f5f8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.tag.tag-candy {
+  background: repeating-linear-gradient(135deg, #ff8bd8 0 6px, #ffc2ec 6px 12px);
+  color: #5a1340;
+  font-weight: 700;
+}
+
+.tag.tag-ember {
+  background: linear-gradient(110deg, #7a1d0c, #ff5a36 40%, #ffb07a 50%, #ff5a36 60%, #7a1d0c);
+  background-size: 220% 100%;
+  color: #fff4ec;
+  font-weight: 700;
+  animation: gold-shine 3.5s linear infinite;
+}
+
+/* 千時間の賢者：深い紫に金の光 */
+.tag.tag-sage {
+  background: linear-gradient(110deg, #2b1a55 0%, #5b3fb0 35%, #f2d27a 50%, #5b3fb0 65%, #2b1a55 100%);
+  background-size: 220% 100%;
+  color: #fff6d8;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(155, 120, 255, 0.45);
+  animation: gold-shine 4s linear infinite;
+}
+
+/* 収集家：色が流れる */
+.tag.tag-prism {
+  background: linear-gradient(90deg, #ff9ecf, #ffd36a, #8ff0b8, #7fc4ff, #c9a2ff, #ff9ecf);
+  background-size: 300% 100%;
+  color: #2a1a2a;
+  font-weight: 800;
+  animation: gold-shine 5s linear infinite;
+}
+
+/* 虹の使い：虹色がゆっくり回る */
+.tag.tag-rainbow {
+  background: linear-gradient(90deg, #ff5e7e, #ffb347, #ffe66d, #5ee6a0, #5ec8ff, #a67bff, #ff5e7e);
+  background-size: 300% 100%;
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  animation: gold-shine 3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag.tag-ember,
+  .tag.tag-sage,
+  .tag.tag-prism,
+  .tag.tag-rainbow {
+    animation: none;
+  }
+}
+
+.ach-tag {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ach-tag .tag {
+  margin-left: 4px;
+}
+
+.style-ach {
+  font-size: 11px;
+  color: #ffd36a;
+}
+
+/* まだの実績のタグ：名前が読めるように少しだけ暗くして、鍵は右上に小さく */
+.style-tile.achtag .tag-prev {
+  filter: saturate(0.55) brightness(0.7);
+}
+
+.lock-mini {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: #bdbdbd;
+  line-height: 0;
+}
+
+.lock-mini .lock {
+  width: 14px;
+  height: 14px;
+}

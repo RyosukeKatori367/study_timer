@@ -18,7 +18,8 @@ import {
 import { api } from '../cloud/api';
 import { balance, fmtGumi } from '../gumi';
 import { exchange } from '../shop';
-import { shownTag, tagById, tagHtml } from '../tags';
+import { TAGS, shownTag, tagById, tagHtml } from '../tags';
+import { ACHIEVEMENTS } from '../achievements';
 import { GRANTS_CHANGE } from '../grants';
 import { $, esc } from '../ui/dom';
 import { pickList } from '../ui/sheet';
@@ -105,6 +106,14 @@ export function initStylePage(view: HTMLElement): void {
     view.querySelectorAll<HTMLElement>('.style-tile[data-tag]').forEach((b) => {
       b.onclick = () => void setTag(b.dataset.tag!).then(render);
     });
+    view.querySelectorAll<HTMLElement>('.style-tile[data-achtag]').forEach((b) => {
+      b.onclick = () => {
+        const t = tagById(b.dataset.achtag);
+        const a = ACHIEVEMENTS.find((x) => x.id === t?.ach);
+        if (!t || !a) return;
+        toast(a.hidden ? 'ひみつの実績を達成すると手に入ります' : `実績「${a.title}」（${a.desc}）で手に入ります`);
+      };
+    });
     view.querySelectorAll<HTMLElement>('.style-tile[data-id]').forEach((b) => {
       b.onclick = () => {
         const item = ALL_ITEMS.find((x) => x.id === b.dataset.id)!;
@@ -130,7 +139,8 @@ export function initStylePage(view: HTMLElement): void {
 function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], sel: string) => string): string {
   const uid = api.user()?.uid;
   const now = uid ? shownTag(uid, profileTag())?.id : undefined;
-  const extra = filter === 'locked' ? [] : ownedTags(uid).filter((t) => !TAG_ITEMS.some((x) => x.tag === t));
+  const owned = ownedTags(uid);
+  const extra = filter === 'locked' ? [] : owned.filter((t) => !TAG_ITEMS.some((x) => x.tag === t));
   const tiles = extra
     .map((t) => {
       const def = tagById(t);
@@ -142,10 +152,26 @@ function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], 
         </button>`;
     })
     .join('');
+  // まだの実績のタグ（鍵つき。押すと、どの実績で手に入るか出す。ひみつの実績のタグは隠す）
+  const locked =
+    filter === 'owned'
+      ? ''
+      : TAGS.filter((t) => t.ach && !owned.includes(t.id))
+          .map((t) => {
+            const secret = t.ach === 'secret';
+            return `
+        <button type="button" class="style-tile locked achtag" data-achtag="${esc(t.id)}" aria-label="${secret ? 'ひみつのタグ' : `${esc(t.name)}（実績で手に入る）`}">
+          <span class="style-prev"><span class="tag-prev" aria-hidden="true">${secret ? '<span class="tag">？？？</span>' : tagHtml(t)}</span><span class="lock-mini">${LOCK}</span></span>
+          <span class="style-name">${secret ? '？？？' : esc(t.name)}</span>
+          <span class="style-ach">実績</span>
+        </button>`;
+          })
+          .join('');
   const gacha = grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === now)?.id ?? '');
-  if (!tiles) return gacha;
+  const all = tiles + locked;
+  if (!all) return gacha;
   // ガチャのタグの一覧（style-grid）の頭に足す
-  return gacha.includes('class="style-grid"') ? gacha.replace('<div class="style-grid">', `<div class="style-grid">${tiles}`) : `<div class="style-grid">${tiles}</div>`;
+  return gacha.includes('class="style-grid"') ? gacha.replace('<div class="style-grid">', `<div class="style-grid">${all}`) : `<div class="style-grid">${all}</div>`;
 }
 
 /** まだ持っていないものを押したとき：交換できるものなら、交換するか聞く。交換したら true */

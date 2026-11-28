@@ -21,7 +21,7 @@ import { questName } from '../quests';
 import { drawGacha } from '../shop';
 import { EXCHANGE_PRICE, GACHA10_COST, GACHA_COST, GACHA_ITEMS, currentPattern, currentTheme, isOwned, itemById, type Rarity } from '../styles';
 import { bannerHtml, paintBanners } from './banner';
-import { shownTag, tagHtml } from '../tags';
+import { achTag, shownTag, tagHtml } from '../tags';
 import { HOUR, MIN } from '../time';
 import { $, esc, html } from '../ui/dom';
 import { toast } from '../ui/toast';
@@ -235,6 +235,24 @@ function shopScreen(): Screen {
 
 // ---- 実績 ----
 
+/** 報酬にタグがある実績は、そのタグを見せる（ひみつの実績は達成まで隠す） */
+function tagLine(a: Ach, hidden: boolean): string {
+  const t = achTag(a.id);
+  if (!t) return '';
+  return `<span class="ach-tag">報酬のタグ ${hidden ? '<span class="tag">？？？</span>' : tagHtml(t)}</span>`;
+}
+
+/** 受け取ったときのお知らせ（タグももらったら「付ける」ボタン） */
+function claimedToast(list: Ach[], gumi: number): void {
+  const tags = list.map((a) => achTag(a.id)).filter((t) => t !== undefined);
+  if (tags.length === 0) return void toast(`+${fmtGumi(gumi)}グミ`);
+  const t = tags[0];
+  toast(`+${fmtGumi(gumi)}グミ・「${t.name}」${tags.length > 1 ? `ほか${tags.length - 1}つの` : 'の'}タグ`, {
+    label: '付ける',
+    run: () => void setTag(t.id),
+  });
+}
+
 function achRow(a: Ach): string {
   const hidden = a.hidden && !a.done;
   const prog = a.unit === 'h' ? `${Math.floor(Math.min(a.now, a.target) / HOUR)} / ${a.target / HOUR}時間` : `${Math.min(a.now, a.target)} / ${a.target}`;
@@ -249,6 +267,7 @@ function achRow(a: Ach): string {
       <span class="q-main">
         <span class="q-title">${hidden ? '？？？' : esc(a.title)}</span>
         <span class="q-desc">${hidden ? 'ひみつの実績' : esc(a.desc)}</span>
+        ${tagLine(a, !!hidden)}
         ${a.done || hidden ? '' : `<span class="q-bar"><i style="width:${Math.min(100, (a.now / a.target) * 100)}%"></i></span><span class="q-prog">${prog}</span>`}
       </span>
       ${right}
@@ -284,13 +303,14 @@ function achScreen(): Screen {
         )
         .join('')}`;
     el.querySelector<HTMLElement>('[data-all]')?.addEventListener('click', () => {
-      const n = claimAchievements(claimableAchievements());
-      if (n) toast(`+${fmtGumi(n)}グミ`);
+      const list = claimableAchievements();
+      const n = claimAchievements(list);
+      if (n) claimedToast(list, n);
     });
     el.querySelectorAll<HTMLElement>('[data-ach]').forEach((b) => {
       b.onclick = () => {
         const a = achievements().find((x) => x.key === b.dataset.ach);
-        if (a && claimAchievements([a])) toast(`+${a.reward}グミ`);
+        if (a && claimAchievements([a])) claimedToast([a], a.reward);
       };
     });
   };

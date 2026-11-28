@@ -5,6 +5,7 @@
 
 import { isDeveloper } from './cloud/model';
 import { grantedTags } from './grants';
+import { TAGS } from './tags';
 import { GENERATED_PATTERNS } from './patterns.gen';
 import { saveSettings, settings } from './store';
 
@@ -321,6 +322,8 @@ export function useStyle(item: StyleItem): void {
 /** 持っているタグ（src/tags.ts の id）。開発者タグは開発者だけ、配られたタグ（古参など）はその人だけ */
 export function ownedTags(uid: string | undefined): string[] {
   const out = TAG_ITEMS.filter((x) => isOwned(x.id)).map((x) => x.tag);
-  const extra = [...(uid && isDeveloper(uid) ? ['dev'] : []), ...grantedTags(uid)];
+  // 実績の報酬のタグは、その実績を受け取っていれば持っている
+  const ach = TAGS.filter((t) => t.ach && `a:${t.ach}` in settings.gumi).map((t) => t.id);
+  const extra = [...(uid && isDeveloper(uid) ? ['dev'] : []), ...grantedTags(uid), ...ach];
   return [...new Set([...extra, ...out])];
 }

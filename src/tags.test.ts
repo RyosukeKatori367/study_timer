@@ -19,3 +19,22 @@ describe('タグ', () => {
     expect(shownTag('someone', 'kosan')).toMatchObject({ name: '古参', look: 'silver' });
   });
 });
+
+describe('実績のタグ', () => {
+  it('実績の報酬のタグがあり、名前がかぶっていない', async () => {
+    const { TAGS, achTag } = await import('./tags');
+    expect(achTag('total100')?.name).toBe('努力家');
+    expect(achTag('secret')?.name).toBe('虹の使い');
+    const ids = TAGS.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(TAGS.every((t) => t.id.length <= 24)).toBe(true);
+  });
+  it('実績を受け取ったら、そのタグを持っている', async () => {
+    const { settings } = await import('./store');
+    const { ownedTags } = await import('./styles');
+    settings.gumi = {};
+    expect(ownedTags('x')).not.toContain('doryoku');
+    settings.gumi = { 'a:total100': 200 };
+    expect(ownedTags('x')).toContain('doryoku');
+  });
+});
