@@ -23,6 +23,12 @@ export interface Season {
   /** みんなで何時間 */
   goalH: number;
   tiers: readonly Tier[];
+  /** シーズンの名前（'虚空劫灰のプラーナ'）。自動で続くシーズンにはない */
+  title?: string;
+  /** 英語の副題（はじまりの演出に出す） */
+  en?: string;
+  /** 見た目（イベントの帯と演出の色）。src/style.css の .season-<look> */
+  look?: string;
 }
 
 const TIERS: Tier[] = [
@@ -40,10 +46,15 @@ interface Def {
   days: number;
   goalH?: number;
   tiers?: Tier[];
+  title?: string;
+  en?: string;
+  look?: string;
 }
 
 /** 決めたシーズン（日付の順）。このあとは同じチャプターで自動で続く */
-export const SEASONS: Def[] = [{ chapter: 1, season: 1, start: '2026-11-28', days: 40 }];
+export const SEASONS: Def[] = [
+  { chapter: 1, season: 1, start: '2026-11-28', days: 40, title: '虚空劫灰のプラーナ', en: 'PRANA OF THE VOID AND ASH', look: 'kuukou' },
+];
 
 const DEFAULT_DAYS = 40;
 const DEFAULT_GOAL_H = 2000;
@@ -73,6 +84,9 @@ function make(d: Def): Season {
     days: d.days,
     goalH,
     tiers: d.tiers ?? TIERS.filter((t) => t.h <= goalH),
+    ...(d.title ? { title: d.title } : {}),
+    ...(d.en ? { en: d.en } : {}),
+    ...(d.look ? { look: d.look } : {}),
   };
 }
 

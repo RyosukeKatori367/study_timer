@@ -3,6 +3,7 @@
 import { api } from '../cloud/api';
 import { JOIN_MS, cachedTotal, claimTiers, liveSeasons, loadTotal, mySeasonMs, tiers, type TierState } from '../events';
 import { daysLeftIn, md, type Season } from '../seasons';
+import { emblemSvg, introUnseen, playSeasonIntro } from './season-intro';
 import { dateKey } from '../cloud/model';
 import { GUMI_CHANGE, STUDY_BLOCK, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
 import { NEWS, isNewNews, markNewsSeen } from '../news';
@@ -56,7 +57,7 @@ function tierRows(list: TierState[], mine: number): string {
         : t.ready
           ? `<button type="button" class="q-claim" data-tier="${esc(t.key)}">+${t.reward} 受け取る</button>`
           : t.reached && mine < JOIN_MS
-            ? '<span class="q-note">シーズン中に1時間 勉強すると受け取れる</span>'
+            ? '<span class="q-note">1時間 勉強すると受け取れる</span>'
             : `<span class="q-reward">+${t.reward}</span>`;
       return `
         <div class="q-row${t.claimed ? ' claimed' : t.reached ? ' done' : ''}">
@@ -122,9 +123,14 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     const today = dateKey(now, settings.dayBoundaryMin);
     const goal = cur.goalH.toLocaleString('ja-JP');
     return `
-      <section class="ev-banner">
-        <div class="ev-month"><span class="ev-season">${esc(cur.name)}</span><span>${md(cur.start)}〜${md(cur.end)}</span></div>
-        <div class="ev-title">みんなで${goal}時間</div>
+      <section class="ev-banner${cur.look ? ` season-${esc(cur.look)}` : ''}">
+        ${cur.title ? `<span class="ev-emblem">${emblemSvg(96, cur.look)}</span>` : ''}
+        <div class="ev-month"><button type="button" class="ev-season" data-intro aria-label="シーズンのはじまりをもう一度見る">${esc(cur.name)}</button><span>${md(cur.start)}〜${md(cur.end)}</span></div>
+        ${
+          cur.title
+            ? `<div class="ev-season-title">${esc(cur.title)}</div><div class="ev-goal">みんなで${goal}時間</div>`
+            : `<div class="ev-title">みんなで${goal}時間</div>`
+        }
         ${
           signed
             ? `<div class="ev-bar"><i class="ev-fill" style="width:${total === null ? 0 : pctOf(total, cur.goalH * HOUR)}%"></i>${ticks(cur, total)}</div>
@@ -203,6 +209,10 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
       };
     });
     view.querySelector<HTMLElement>('[data-login]')?.addEventListener('click', openLogin);
+    view.querySelector<HTMLElement>('[data-intro]')?.addEventListener('click', () => {
+      const { cur } = liveSeasons();
+      if (cur) playSeasonIntro(cur);
+    });
     view.querySelectorAll<HTMLElement>('[data-claim]').forEach((b) => {
       b.onclick = () => {
         const now = Date.now();
@@ -227,6 +237,9 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
 
   const show = () => {
     render();
+    // シーズン中にはじめて開いたときは、シーズンのはじまりの演出
+    const { cur } = liveSeasons();
+    if (cur && introUnseen(cur)) playSeasonIntro(cur);
     if (seg === 'event' && api.user()) {
       // 先に自分の分を送ってから、全員の合計を読む（送ったときは読み直す）
       const { cur, prev } = liveSeasons();

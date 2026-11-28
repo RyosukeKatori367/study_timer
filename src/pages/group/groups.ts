@@ -96,7 +96,7 @@ export async function listScreen(nav: Nav): Promise<Screen> {
 
   for (const g of list) {
     const row = $(`[data-gid="${CSS.escape(g.id)}"]`, box);
-    row.onclick = () => nav.push((n) => timelineScreen(n, g.id));
+    row.onclick = () => nav.push((n) => timelineScreen(n, g.id), 'group');
     // 今日勉強した人数と新着は、あとから入れる
     void api
       .getMembers(g.id)
@@ -208,7 +208,7 @@ export function codeScreen(nav: Nav, g: { id: string; code: string; name: string
   };
   el.querySelector<HTMLElement>('[data-open]')?.addEventListener('click', () => {
     nav.reset(nav_root);
-    nav.push((n) => timelineScreen(n, g.id));
+    nav.push((n) => timelineScreen(n, g.id), 'group');
   });
   return { el };
 }
@@ -273,7 +273,7 @@ export function joinScreen(nav: Nav, prefill = ''): Screen {
       markSeen(gid);
       toast('参加しました');
       nav.reset(nav_root);
-      nav.push((n) => timelineScreen(n, gid));
+      nav.push((n) => timelineScreen(n, gid), 'group');
     }
   };
 

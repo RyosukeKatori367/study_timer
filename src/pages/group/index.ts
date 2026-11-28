@@ -8,6 +8,7 @@ import { joinScreen, listScreen } from './groups';
 import { welcomeScreen } from './account';
 import { initAccountSection } from './settings-account';
 import { createNav, type Nav, type ScreenFn } from './ui';
+import { GROUP_TOP, setGroupTab } from './timeline';
 
 export const SHOW_VIEW = 'view:show';
 
@@ -57,6 +58,17 @@ export function openGroupScreen(fn: ScreenFn): void {
   if (!nav) return void document.dispatchEvent(new CustomEvent(SHOW_VIEW, { detail: 'group' }));
   ensureStarted();
   openGroup(fn);
+}
+
+/**
+ * グループタブを開いているときに、下のメニューのグループをもう一度押した。
+ * グループの中なら、そのグループのタイムラインのいちばん上へ。一覧などなら、いちばん上までスクロール
+ */
+export function groupRetap(): void {
+  if (!nav || !started) return;
+  if (nav.topKey() === 'group') return void document.dispatchEvent(new CustomEvent(GROUP_TOP));
+  setGroupTab('timeline');
+  if (!nav.backTo('group')) nav.scrollTop();
 }
 
 function ensureStarted(): void {

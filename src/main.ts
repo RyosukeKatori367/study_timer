@@ -7,7 +7,7 @@ import { initStopwatchPage } from './pages/stopwatch';
 import { initTimerPage } from './pages/timer';
 import { initCloud } from './cloud';
 import { api, setApi } from './cloud/api';
-import { SHOW_VIEW, initGroupPage, openGroupScreen } from './pages/group';
+import { SHOW_VIEW, groupRetap, initGroupPage, openGroupScreen } from './pages/group';
 import { authScreen } from './pages/group/account';
 import { initRun } from './run';
 import { initStylePage, setTag } from './pages/style';
@@ -128,6 +128,8 @@ navButtons.forEach((b) => {
     const to = b.dataset.view as ViewName;
     // マイページ（とそこから開いたページ）でもう一度押したら、マイページのいちばん上に戻る
     if (to === 'my' && (current === 'my' || NAV_OF[current] === 'my')) myHome();
+    // グループを開いているときにもう一度押したら、今のグループのタイムラインへ
+    if (to === 'group' && current === 'group') return groupRetap();
     showView(to);
   };
 });

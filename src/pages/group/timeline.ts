@@ -17,6 +17,14 @@ import { codeScreen, editScreen, markSeen, seenAt } from './groups';
 import { avatar, busy, groupIcon, header, nameHtml, type Nav, type Screen } from './ui';
 
 let tab: 'timeline' | 'ranking' | 'chat' = 'timeline';
+
+/** 次にグループの画面を出すときのタブ（下のメニューのグループをもう一度押したとき） */
+export function setGroupTab(next: typeof tab): void {
+  tab = next;
+}
+
+/** グループの画面がいちばん上に出ているときに、タイムラインのいちばん上に戻す */
+export const GROUP_TOP = 'group:top';
 let range: 'today' | 'week' = 'today';
 
 interface Ctx {
@@ -149,6 +157,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
     body.classList.toggle('chat-on', tab === 'chat');
     if (tab === 'chat') {
       chatDot.hidden = true;
+      el.closest('.view')?.scrollTo(0, 0); // チャットは画面全体をスクロールしない
       if (body.firstElementChild !== chat.el) {
         body.replaceChildren(chat.el);
         chat.show();
@@ -244,7 +253,7 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
       list.map((g) => ({ label: g.name, sub: `${g.memberCount}人` })),
       list.findIndex((g) => g.id === gid),
     );
-    if (i !== null && list[i].id !== gid) nav.replace((n) => timelineScreen(n, list[i].id));
+    if (i !== null && list[i].id !== gid) nav.replace((n) => timelineScreen(n, list[i].id), 'group');
   };
   bindPosts(body, nav, ctx, (pid) => posts.find((p) => p.id === pid));
 
@@ -274,11 +283,18 @@ export async function timelineScreen(nav: Nav, gid: string): Promise<Screen> {
       if (n > 0 && tab !== 'chat') chatDot.hidden = false;
     });
   }
+  const toTop = () => {
+    tab = 'timeline';
+    render();
+    el.closest('.view')?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  document.addEventListener(GROUP_TOP, toTop);
   return {
     el,
     dispose: () => {
       stops.forEach((s) => s());
       chat.dispose();
+      document.removeEventListener(GROUP_TOP, toTop);
     },
   };
 }

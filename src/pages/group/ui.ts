@@ -78,15 +78,22 @@ export interface Screen {
 export type ScreenFn = (nav: Nav) => Screen | Promise<Screen>;
 
 export interface Nav {
-  push(fn: ScreenFn): void;
+  /** 重ねて開く。key を付けておくと、あとで backTo(key) でその画面まで戻れる */
+  push(fn: ScreenFn, key?: string): void;
   /** 一つ前の画面に戻る */
   back(): void;
   /** 重なりを捨てて、この画面から始める */
   reset(fn: ScreenFn): void;
   /** 今の画面を差し替える（戻ったときにこの画面に戻らない） */
-  replace(fn: ScreenFn): void;
+  replace(fn: ScreenFn, key?: string): void;
   /** いちばん下（グループ一覧など）に戻る */
   home(): void;
+  /** いちばん上の画面の key */
+  topKey(): string | undefined;
+  /** key の画面まで戻って、いちばん上から出す。その画面がなければ false */
+  backTo(key: string): boolean;
+  /** 今の画面のいちばん上までスクロールする */
+  scrollTop(): void;
 }
 
 /** 見出し（戻るボタン・題・右のボタン） */
@@ -102,7 +109,7 @@ export function header(title: string, opt: { back?: boolean; right?: string; tit
 }
 
 export function createNav(view: HTMLElement, root: () => ScreenFn): Nav {
-  const stack: { fn: ScreenFn; scroll: number }[] = [];
+  const stack: { fn: ScreenFn; scroll: number; key?: string }[] = [];
   let current: Screen | null = null;
   let token = 0;
 
@@ -126,9 +133,9 @@ export function createNav(view: HTMLElement, root: () => ScreenFn): Nav {
   };
 
   const nav: Nav = {
-    push(fn) {
+    push(fn, key) {
       if (stack.length) stack.at(-1)!.scroll = view.scrollTop;
-      stack.push({ fn, scroll: 0 });
+      stack.push({ fn, scroll: 0, key });
       void show();
     },
     back() {
@@ -141,13 +148,25 @@ export function createNav(view: HTMLElement, root: () => ScreenFn): Nav {
       stack.push({ fn, scroll: 0 });
       void show();
     },
-    replace(fn) {
+    replace(fn, key) {
       stack.pop();
-      stack.push({ fn, scroll: 0 });
+      stack.push({ fn, scroll: 0, key });
       void show();
     },
     home() {
       nav.reset(root());
+    },
+    topKey: () => stack.at(-1)?.key,
+    backTo(key) {
+      let i = stack.length - 1;
+      while (i >= 0 && stack[i].key !== key) i--;
+      if (i < 0) return false;
+      stack.length = i + 1;
+      void show(0);
+      return true;
+    },
+    scrollTop() {
+      view.scrollTo({ top: 0, behavior: 'smooth' });
     },
   };
   return nav;

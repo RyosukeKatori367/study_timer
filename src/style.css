@@ -3336,24 +3336,58 @@ nav {
   font-size: 15px;
 }
 
-/* チャットは、メッセージが少なくても入力欄を画面のいちばん下に置く */
+/* チャット：グループ名とタブは上に、入力欄は下に置いたまま、メッセージだけをスクロールする */
+.view.scroll:has(> .sns.fill) {
+  overflow: hidden;
+}
+
 .sns.fill {
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.sns.fill > .sns-head,
+.sns.fill > .sns-seg {
+  flex: none;
 }
 
 .chat-on {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .chat-on .chat {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.chat-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-on .chat-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 -24px;
+  padding: 0 24px 4px;
 }
 
 .chat-on .chat-list {
-  flex: 1;
+  flex: 1 0 auto;
   justify-content: flex-end;
+}
+
+.chat-on .chat-form {
+  position: static;
+  flex: none;
+  background: transparent;
 }
 
 /* 教材の色 */
@@ -5322,4 +5356,354 @@ nav button {
   .tag.tag-silver {
     animation: none;
   }
+}
+
+/* ---------- シーズンのはじまりの演出 ---------- */
+
+.season-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  animation: si-in 0.3s ease-out both;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', serif;
+}
+
+.season-intro.out {
+  animation: si-out 0.6s ease-in forwards;
+}
+
+@keyframes si-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes si-out {
+  to {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+.si-waves {
+  position: absolute;
+  left: -10%;
+  width: 120%;
+  top: calc(50% - 90px);
+  height: 120px;
+  fill: none;
+  stroke: #f3ecf6;
+  stroke-width: 1;
+  animation: si-waves-out 0.8s ease-in 1.7s forwards;
+}
+
+.si-waves path {
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.7;
+  animation: si-draw 1.1s cubic-bezier(0.6, 0, 0.3, 1) var(--d) forwards;
+}
+
+@keyframes si-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes si-waves-out {
+  to {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+}
+
+.si-logo {
+  position: relative;
+  width: min(360px, 92vw);
+  height: 230px;
+}
+
+.si-bands,
+.si-band,
+.si-full {
+  position: absolute;
+  inset: 0;
+}
+
+.si-band {
+  opacity: 0;
+  animation: si-slice 0.95s steps(1, end) var(--d) forwards;
+}
+
+/* 帯ごとにずれて、ちらつきながら揃う（steps でカクカクさせる） */
+@keyframes si-slice {
+  0% {
+    opacity: 1;
+    transform: translateX(var(--dx));
+    filter: drop-shadow(4px 0 #ff2d6f) drop-shadow(-4px 0 #2de2ff);
+  }
+  18% {
+    transform: translateX(calc(var(--dx) * -0.45));
+  }
+  30% {
+    opacity: 0.2;
+  }
+  38% {
+    opacity: 1;
+    transform: translateX(calc(var(--dx) * 0.25));
+  }
+  55% {
+    transform: translateX(calc(var(--dx) * -0.1));
+    filter: drop-shadow(2px 0 #ff2d6f) drop-shadow(-2px 0 #2de2ff);
+  }
+  70% {
+    opacity: 0.5;
+  }
+  78% {
+    opacity: 1;
+    transform: translateX(0);
+    filter: drop-shadow(1px 0 #ff2d6f) drop-shadow(-1px 0 #2de2ff);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.si-full {
+  opacity: 0;
+  animation: si-show 0.01s linear 2.05s forwards;
+}
+
+.si-bands {
+  animation: si-hide 0.01s linear 2.06s forwards;
+}
+
+@keyframes si-show {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes si-hide {
+  to {
+    opacity: 0;
+  }
+}
+
+.si-mark {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #f4eff6;
+  text-align: center;
+}
+
+.si-full .emblem {
+  animation: si-glow 3s ease-in-out 2.1s infinite;
+}
+
+@keyframes si-glow {
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 140, 90, 0.55));
+  }
+}
+
+.si-title {
+  position: relative;
+  font-size: min(8.6vw, 34px);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  padding-left: 0.14em;
+  white-space: nowrap;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+}
+
+/* 揃ったあとに、光が文字の上をすっと通る */
+.si-full .si-title {
+  background: linear-gradient(100deg, #f4eff6 40%, #fff 48%, #ffd2b8 50%, #fff 52%, #f4eff6 60%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: si-sweep 1.4s ease-in-out 2.2s forwards;
+}
+
+@keyframes si-sweep {
+  to {
+    background-position: 0 0;
+  }
+}
+
+.si-en {
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  color: #b9b1bd;
+}
+
+.si-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  animation: si-rise 0.9s ease-out 2.4s forwards;
+}
+
+.si-chapter {
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.36em;
+  padding-left: 0.36em;
+  color: #e7dcd6;
+}
+
+.si-chapter::before,
+.si-chapter::after {
+  content: '';
+  display: inline-block;
+  width: 28px;
+  height: 1px;
+  margin: 0 12px;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.si-dates {
+  font-size: 13px;
+  color: #a79fa8;
+  letter-spacing: 0.1em;
+}
+
+@keyframes si-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    letter-spacing: 0.6em;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.si-skip {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 28px);
+  font-family: -apple-system, sans-serif;
+  font-size: 11px;
+  color: #6f6a72;
+  opacity: 0;
+  animation: si-show 0.6s ease 3.2s forwards;
+}
+
+.si-ash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: si-show 1.5s ease 1.6s forwards;
+}
+
+.si-ash i {
+  position: absolute;
+  bottom: -10px;
+  border-radius: 50%;
+  background: #8f8790;
+  opacity: 0;
+  animation: si-ash var(--t) linear infinite;
+}
+
+.si-ash i.ember {
+  background: #ff8a5c;
+  box-shadow: 0 0 6px #ff6a3d;
+}
+
+@keyframes si-ash {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(30px, -105vh);
+    opacity: 0;
+  }
+}
+
+.season-intro.season-kuukou {
+  background: radial-gradient(70% 45% at 50% 100%, rgba(255, 90, 54, 0.14), transparent 70%), #020104;
+}
+
+/* 動きを減らす設定のとき：組み上がった形をそのまま出す */
+.season-intro.still *,
+.season-intro.still {
+  animation-duration: 0.01s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* ---------- イベントの帯（シーズンの見た目） ---------- */
+
+.ev-banner.season-kuukou {
+  background:
+    radial-gradient(90% 80% at 100% 100%, rgba(255, 106, 61, 0.38), transparent 60%),
+    radial-gradient(60% 60% at 0% 0%, rgba(120, 100, 160, 0.35), transparent 70%),
+    linear-gradient(150deg, #0d0c14, #241f2b 55%, #3d2f33);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.ev-banner .ev-emblem {
+  position: absolute;
+  right: -14px;
+  top: 34px;
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+.ev-season-title {
+  position: relative;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', serif;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.2);
+}
+
+.ev-goal {
+  position: relative;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffe1d0;
+}
+
+button.ev-season {
+  font: inherit;
+  font-weight: 700;
+}
+
+.ev-banner > * {
+  position: relative;
+}
+
+.ev-banner > .ev-emblem {
+  position: absolute;
 }

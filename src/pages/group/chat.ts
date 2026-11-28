@@ -49,8 +49,10 @@ export interface Chat {
 export function createChat(gid: string, ctx: () => { members: Map<string, Member>; ownerId: string }): Chat {
   const el = html(`
     <div class="chat">
-      <button type="button" class="btn dark small" data-more hidden>前のメッセージ</button>
-      <div class="chat-list" aria-live="polite"></div>
+      <div class="chat-scroll">
+        <button type="button" class="btn dark small" data-more hidden>前のメッセージ</button>
+        <div class="chat-list" aria-live="polite"></div>
+      </div>
       <form class="chat-form" novalidate>
         <textarea class="input" rows="1" maxlength="${MESSAGE_MAX}" placeholder="メッセージ" aria-label="メッセージ"></textarea>
         <button type="submit" class="btn primary">送る</button>
@@ -66,7 +68,9 @@ export function createChat(gid: string, ctx: () => { members: Map<string, Member
   let stop: (() => void) | null = null;
   let visible = false;
   let stick = true; // いちばん下を見ているなら、新しいメッセージが来たら下まで送る
-  const view = () => el.closest<HTMLElement>('.view');
+  // メッセージだけをスクロールする（上のグループ名とタブ、下の入力欄は動かさない）
+  const scroller = $('.chat-scroll', el);
+  const view = (): HTMLElement | null => (scroller.isConnected ? scroller : null);
 
   const nearBottom = () => {
     const v = view();
