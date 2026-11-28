@@ -3,13 +3,18 @@
 
 import {
   ALL_ITEMS,
+  GACHA_ITEMS,
+  GACHA_RARITIES,
   PATTERNS,
+  RARITY_RATE,
   THEMES,
   canDraw,
   currentPattern,
+  currentRates,
   currentTheme,
   draw,
   isOwned,
+  lockedItems,
   nextDrawAt,
   patternUrl,
   themeVars,
@@ -26,9 +31,10 @@ import { toast } from '../ui/toast';
 const LOCK =
   '<svg class="lock" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 
-export const RARITY_COLOR: Record<Rarity, string> = { N: '#d9d9d9', R: '#6ab7ff', SR: '#ffd36a', SSR: '#ff8bd8' };
+const rarityTag = (r: Rarity) => (r === 'BASE' ? '' : `<span class="rarity r-${r}">${r}</span>`);
 
-const rarityTag = (r: Rarity) => `<span class="rarity r-${r}">${r}</span>`;
+/** 一覧の絞り込み */
+let filter: 'all' | 'owned' | 'locked' = 'all';
 
 /** テーマの見本（円・start ボタン・下のメニュー） */
 function themePreview(t: ThemeItem): string {
@@ -42,13 +48,22 @@ function themePreview(t: ThemeItem): string {
 
 function tileHtml(item: StyleItem, selected: boolean): string {
   const owned = isOwned(item.id);
+  // シークレットは、手に入れるまで中身も名前も隠す
+  if (item.rarity === 'SECRET' && !owned) {
+    return `
+      <button type="button" class="style-tile locked secret" data-id="${esc(item.id)}" aria-label="シークレット（まだ持っていません）">
+        <span class="style-prev"><span class="secret-prev">？</span></span>
+        <span class="style-name">？？？</span>
+        ${rarityTag(item.rarity)}
+      </button>`;
+  }
   const prev = item.kind === 'theme' ? themePreview(item) : `<span class="pattern-prev" data-pattern="${esc(item.id)}" aria-hidden="true"></span>`;
   return `
     <button type="button" class="style-tile${owned ? '' : ' locked'}" data-id="${esc(item.id)}" aria-pressed="${selected}"
       aria-label="${esc(item.name)}${owned ? '' : '（まだ持っていません）'}">
       <span class="style-prev">${prev}${owned ? '' : `<span class="lock-badge">${LOCK}</span>`}${selected ? '<span class="sel-badge">✓</span>' : ''}</span>
       <span class="style-name">${esc(item.name)}</span>
-      ${item.rarity !== 'N' || !owned ? rarityTag(item.rarity) : ''}
+      ${rarityTag(item.rarity)}
     </button>`;
 }
 
@@ -65,9 +80,19 @@ export function initStylePage(view: HTMLElement): void {
   const render = () => {
     const theme = currentTheme();
     const pattern = currentPattern();
-    const owned = ALL_ITEMS.filter((x) => isOwned(x.id)).length;
+    const owned = GACHA_ITEMS.filter((x) => isOwned(x.id)).length;
     const ready = canDraw();
     const next = nextDrawAt();
+    const shown = (x: StyleItem) => filter === 'all' || (filter === 'owned') === isOwned(x.id);
+    const grid = (items: StyleItem[], sel: string) => {
+      const list = items.filter(shown);
+      return list.length
+        ? `<div class="style-grid">${list.map((x) => tileHtml(x, x.id === sel)).join('')}</div>`
+        : '<p class="sns-lead">ありません</p>';
+    };
+    const base = THEMES.filter((x) => x.rarity === 'BASE');
+    const gachaThemes = THEMES.filter((x) => x.rarity !== 'BASE');
+    const ownedOf = (items: StyleItem[]) => `${items.filter((x) => isOwned(x.id)).length}/${items.length}`;
     view.innerHTML = `
       <h1>スタイル</h1>
       <section class="gacha-card">
@@ -78,17 +103,29 @@ export function initStylePage(view: HTMLElement): void {
           <button type="button" class="gacha-btn" data-draw ${ready ? '' : 'disabled'}>${
             ready ? '引く' : `また明日（${next.getHours()}:${pad2(next.getMinutes())}から）`
           }</button>
-          <div class="gacha-progress"><span style="width:${(owned / ALL_ITEMS.length) * 100}%"></span></div>
-          <div class="gacha-count">集めた ${owned} / ${ALL_ITEMS.length}</div>
+          <div class="gacha-progress"><span style="width:${(owned / GACHA_ITEMS.length) * 100}%"></span></div>
+          <div class="gacha-foot">
+            <span class="gacha-count">集めた ${owned} / ${GACHA_ITEMS.length}</span>
+            <button type="button" class="gacha-rates" data-rates>排出確率 ›</button>
+          </div>
         </div>
       </section>
+      <div class="sns-seg small style-filter" role="group">
+        <button type="button" data-filter="all" aria-pressed="${filter === 'all'}">すべて</button>
+        <button type="button" data-filter="owned" aria-pressed="${filter === 'owned'}">持っている</button>
+        <button type="button" data-filter="locked" aria-pressed="${filter === 'locked'}">まだ</button>
+      </div>
       <section class="style-section">
-        <h2 class="group-head">テーマ</h2>
-        <div class="style-grid">${THEMES.map((t) => tileHtml(t, t.id === theme.id)).join('')}</div>
+        <h2 class="group-head">ベースカラー<span class="head-note">はじめから使える</span></h2>
+        ${grid(base, theme.id)}
       </section>
       <section class="style-section">
-        <h2 class="group-head">模様</h2>
-        <div class="style-grid">${PATTERNS.map((p) => tileHtml(p, p.id === pattern.id)).join('')}</div>
+        <h2 class="group-head">テーマ<span class="head-note">${ownedOf(gachaThemes)}</span></h2>
+        ${grid(gachaThemes, theme.id)}
+      </section>
+      <section class="style-section">
+        <h2 class="group-head">模様<span class="head-note">${ownedOf(PATTERNS.filter((x) => x.rarity !== 'BASE'))}</span></h2>
+        ${grid(PATTERNS, pattern.id)}
       </section>
       <p class="settings-foot">テーマはボタン・計測の円・下のメニューの色が変わります。模様は背景に出ます（計測中の画面には出しません）</p>`;
     paintPatterns(view, theme.light);
@@ -96,11 +133,20 @@ export function initStylePage(view: HTMLElement): void {
     view.querySelectorAll<HTMLElement>('.style-tile').forEach((b) => {
       b.onclick = () => {
         const item = ALL_ITEMS.find((x) => x.id === b.dataset.id)!;
-        if (!isOwned(item.id)) return toast(`まだ持っていません。グミガチャで出ます（${item.rarity}）`);
+        if (!isOwned(item.id)) {
+          return toast(item.rarity === 'SECRET' ? 'シークレット。何が出るかはお楽しみ' : `まだ持っていません。グミガチャで出ます（${item.rarity}）`);
+        }
         useStyle(item);
         render();
       };
     });
+    view.querySelectorAll<HTMLElement>('[data-filter]').forEach((b) => {
+      b.onclick = () => {
+        filter = b.dataset.filter as typeof filter;
+        render();
+      };
+    });
+    $('[data-rates]', view).onclick = openRates;
     $('[data-draw]', view).onclick = () => {
       if (!canDraw()) return;
       const item = draw();
@@ -112,10 +158,71 @@ export function initStylePage(view: HTMLElement): void {
   render();
 }
 
+// ---- 排出確率 ----
+
+const RARITY_NOTE: Record<string, string> = {
+  N: '2色のテーマ・よくある模様',
+  R: 'やわらかいグラデーション・和柄や小物の模様',
+  SR: 'あざやかなグラデーション・動物や理科の模様',
+  SSR: '特別なグラデーション・文字や宇宙の模様',
+  SECRET: '1つだけの隠しもの',
+};
+
+const pct = (p: number): string => (p === 0 ? '0%' : p < 0.1 ? `${p.toFixed(2)}%` : `${p.toFixed(1)}%`);
+
+function openRates(): void {
+  const locked = lockedItems();
+  const now = currentRates(locked);
+  const host = html('<div class="fullpage" role="dialog" aria-modal="true" aria-label="排出確率"></div>');
+  const rows = GACHA_RARITIES.map((r) => {
+    const all = GACHA_ITEMS.filter((x) => x.rarity === r);
+    const left = all.filter((x) => !isOwned(x.id));
+    return `<tr><td>${rarityTag(r)}</td><td>${RARITY_RATE[r]}%</td><td>${left.length}/${all.length}</td><td class="now">${pct(now.rarity[r])}</td></tr>`;
+  }).join('');
+  const lists = GACHA_RARITIES.map((r) => {
+    const items = GACHA_ITEMS.filter((x) => x.rarity === r);
+    return `
+      <details class="rate-list">
+        <summary>${rarityTag(r)}<span>${esc(RARITY_NOTE[r])}（${items.length}種）</span></summary>
+        ${items
+          .map((x) => {
+            const hidden = x.rarity === 'SECRET' && !isOwned(x.id);
+            const name = hidden ? '？？？' : `${x.name}<small>${x.kind === 'theme' ? 'テーマ' : '模様'}</small>`;
+            const p = isOwned(x.id) ? '持っている' : pct(now.item.get(x.id) ?? 0);
+            return `<div class="rate-row${isOwned(x.id) ? ' owned' : ''}"><span>${hidden ? name : name}</span><span>${p}</span></div>`;
+          })
+          .join('')}
+      </details>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="sns">
+      <div class="sns-head">
+        <button type="button" class="sns-back" data-close aria-label="閉じる">×</button>
+        <div class="sns-head-title">排出確率</div>
+        <span class="sns-head-side"></span>
+      </div>
+      <div class="prose">
+        <p>グミガチャは1日1回、まだ持っていないテーマか模様が1つ出ます（同じものは出ません）。</p>
+        <p>先にレア度を下の確率で決め、そのレア度の中のまだ持っていないものから、同じ確率で1つ選びます。持っていないものがなくなったレア度の分は、残りのレア度に割り振り直します。ベースカラーは、はじめから使えるのでガチャには出ません。</p>
+      </div>
+      <table class="rate-table">
+        <thead><tr><th>レア度</th><th>確率</th><th>残り</th><th>今の確率</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="sns-note">「今の確率」は、あなたがまだ持っていないものから計算した、次に引くときの確率です</p>
+      <div class="sns-card rate-lists">${lists}</div>
+      <p class="sns-note">1つずつの確率は、次に引くときにそれが出る確率です</p>
+    </div>`;
+  $('[data-close]', host).onclick = () => host.remove();
+  $('#app').append(host);
+}
+
 // ---- 絵 ----
 
 /** グミの立方体（上・左・右の面の色）。SSR は虹色 */
-function cubeSvg(rarity: Rarity | 'jar', size: number, fill?: [string, string, string]): string {
+function cubeSvg(rarity0: Rarity | 'jar', size: number, fill?: [string, string, string]): string {
+  // シークレットは SSR と同じ虹色の立方体（演出のほうで、さらに特別にする）
+  const rarity = rarity0 === 'SECRET' ? 'SSR' : rarity0 === 'BASE' ? 'N' : rarity0;
   const k = Math.cos(Math.PI / 6);
   const s = 40;
   const c = 50;
@@ -129,6 +236,8 @@ function cubeSvg(rarity: Rarity | 'jar', size: number, fill?: [string, string, s
   const pts = (...ps: number[][]) => ps.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ');
   const id = `g${Math.random().toString(36).slice(2, 7)}`;
   const base: Record<string, [string, string, string]> = {
+    BASE: ['#ffffff', '#d9d9d9', '#a8a8a8'],
+    SECRET: ['#ffffff', '#d9d9d9', '#a8a8a8'],
     N: ['#ffffff', '#d9d9d9', '#a8a8a8'],
     R: ['#bfe1ff', '#6ab7ff', '#3a86d6'],
     SR: ['#fff1c2', '#ffd36a', '#d9a52b'],
@@ -241,6 +350,7 @@ function resultHtml(item: StyleItem | null): string {
       : `<span class="pattern-prev big" data-pattern="${esc(item.id)}" aria-hidden="true"></span>`;
   return `
     <div class="g-rarity">${item.rarity}</div>
+    ${item.rarity === 'SECRET' ? '<div class="g-secret">シークレットを引きました！</div>' : ''}
     <div class="g-prev">${prev}</div>
     <div class="g-name">${esc(item.name)}</div>
     <div class="g-kind">${item.kind === 'theme' ? 'テーマ' : '模様'}が使えるようになりました</div>
