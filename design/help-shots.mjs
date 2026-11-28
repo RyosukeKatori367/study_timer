@@ -62,7 +62,7 @@ async function fresh(query = '', extra = {}) {
       JSON.stringify({ materialId: 'm1', lapEndKind: 'count', lapEndCount: 10, dailyGoalMs: 3 * H, finishHold: false, ...extra }),
     );
     localStorage.setItem('studytimer:seasonIntro', 'c1s1');
-    localStorage.setItem('studytimer:news', '2026-11-28k');
+    localStorage.setItem('studytimer:news', '2026-11-28m');
   }, extra);
   await p.goto(URL + query);
   await p.waitForTimeout(900);

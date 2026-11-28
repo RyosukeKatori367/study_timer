@@ -2,6 +2,7 @@
 
 import { api } from '../../cloud/api';
 import { openManual } from '../manual';
+import { showPhoto } from '../../ui/photo';
 import { count, one, range as numRange, unitById, type Unit } from '../../units';
 import { bannerHtml, paintBanners } from '../banner';
 import { rankKeys, type Group, type Member } from '../../cloud/groups';
@@ -90,6 +91,12 @@ function postHtml(p: Post, ctx: Ctx, opt: { detail?: boolean } = {}): string {
       ${pills.length ? `<div class="pills">${pills.join('')}</div>` : ''}
       ${p.lapMs?.length ? lapChart(p.lapMs, unitById(p.laps?.u)) : ''}
       ${p.comment ? `<div class="post-comment">${esc(p.comment)}</div>` : ''}
+      ${
+        p.photo
+          ? `<button type="button" class="post-photo" data-photo aria-label="写真を大きく見る" style="aspect-ratio:${p.photo.w} / ${p.photo.h}">
+              <img src="${esc(p.photo.t)}" alt="" loading="lazy" decoding="async"></button>`
+          : ''
+      }
       <div class="post-actions">
         <button type="button" data-like class="${liked ? 'liked' : ''}" aria-pressed="${liked}" aria-label="いいね">
           ${liked ? '♥' : '♡'} ${p.likes.length || (liked ? '' : 'いいね')}
@@ -115,13 +122,15 @@ function bindPosts(root: HTMLElement, nav: Nav, ctx: Ctx, find: (pid: string) =>
       nav.push((n) => memberScreen(n, ctx.gid, p.uid));
     } else if (t.closest('[data-like]')) {
       void api.setLike(ctx.gid, p.id, !p.likes.includes(me())).catch(() => toast('いいねできませんでした'));
+    } else if (t.closest('[data-photo]') && p.photo) {
+      showPhoto(p.photo.t, () => api.getPostPhoto(ctx.gid, p.id));
     } else if (t.closest('[data-reply]')) {
       nav.push((n) => postScreen(n, ctx.gid, p.id));
     } else if (t.closest('[data-menu]')) {
       const i = await pickList('投稿', [{ label: 'この投稿を削除', danger: true }]);
       if (i !== 0 || !confirm('この投稿を削除しますか？返信も消えます')) return;
       try {
-        await api.deletePost(ctx.gid, p.id);
+        await api.deletePost(ctx.gid, p.id, !!p.photo);
         toast('削除しました');
       } catch {
         toast('削除できませんでした');

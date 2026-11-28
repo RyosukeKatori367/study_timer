@@ -103,6 +103,8 @@ interface FakeGroup {
 }
 
 const groups = new Map<string, FakeGroup>();
+/** 写真の大きい版（投稿の id → data URL） */
+const fullPhotos = new Map<string, string>();
 const invites = new Map<string, string>();
 
 function seed(): void {
@@ -329,11 +331,23 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       changed();
     },
 
-    createPost: async (s, opt, gids) => {
+    createPost: async (s, opt, gids, photo) => {
       const m = materialById(s.material);
       const body = postFromSession(s, opt, m ? { name: m.name, color: materialColor(m.id) } : null);
       for (const gid of gids) {
-        fg(gid).posts.unshift({ ...body, id: `p${Math.random()}`, uid: 'me', name: profile!.name, icon: profile!.icon, createdAt: Date.now(), at: Date.now(), pending: false });
+        const id = `p${Math.random()}`;
+        if (photo) fullPhotos.set(id, photo.full);
+        fg(gid).posts.unshift({
+          ...body,
+          ...(photo ? { photo: { t: photo.thumb, w: photo.w, h: photo.h } } : {}),
+          id,
+          uid: 'me',
+          name: profile!.name,
+          icon: profile!.icon,
+          createdAt: Date.now(),
+          at: Date.now(),
+          pending: false,
+        });
       }
       if (profile) profile.postPrefs = { ...profile.postPrefs, material: opt.material, laps: opt.laps, lapTimes: opt.lapTimes, away: opt.away, groups: gids };
       changed();
@@ -345,6 +359,7 @@ export function makeFakeApi(loggedIn: boolean, real: Api): Api {
       p.likes = liked ? [...new Set([...p.likes, 'me'])] : p.likes.filter((u) => u !== 'me');
       changed();
     },
+    getPostPhoto: async (_gid, pid) => fullPhotos.get(pid) ?? null,
     deletePost: async (gid, pid) => {
       const x = fg(gid);
       x.posts = x.posts.filter((p) => p.id !== pid);

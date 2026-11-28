@@ -9,6 +9,7 @@ import { cloudUser } from './account';
 import { fb } from './firebase';
 import { postFromSession, replyError, type PostDoc, type PostOptions, type ReplyDoc } from './model';
 import { cachedProfile, getProfile, savePostPrefs } from './profile';
+import type { PhotoData } from '../ui/photo';
 
 export type Post = PostDoc & {
   id: string;
@@ -29,7 +30,13 @@ function me(): string {
  * 出したもの（教材名など）と投稿先は、次の確認画面の初期値として覚える。
  * 届くのを待たずに返す（オフラインでも投稿の操作は終わる）。
  */
-export async function createPost(s: Session, opt: PostOptions, groups: string[], lite = false): Promise<void> {
+export async function createPost(
+  s: Session,
+  opt: PostOptions,
+  groups: string[],
+  photo?: PhotoData | null,
+  lite = false,
+): Promise<void> {
   if (groups.length === 0) throw new Error('投稿先のグループを選んでください');
   const p = cachedProfile() ?? (await getProfile());
   if (!p) throw new Error('先にプロフィールを作ってください');
@@ -43,21 +50,29 @@ export async function createPost(s: Session, opt: PostOptions, groups: string[],
     m ? { name: m.name, color: materialColor(m.id), ...(m.img && !lite ? { img: m.img } : {}) } : null,
     lite ? undefined : m?.unit,
   );
+  // 写真：小さい版は投稿に、大きい版は投稿の下の photo/full に入れる（ルールが古いときは写真なし）
+  const withPhoto = photo && !lite;
   const batch = F.writeBatch(db);
   for (const gid of groups) {
     if (!p.groupIds.includes(gid)) continue;
-    batch.set(F.doc(F.collection(db, 'groups', gid, 'posts')), {
+    const ref = F.doc(F.collection(db, 'groups', gid, 'posts'));
+    batch.set(ref, {
       ...body,
+      ...(withPhoto ? { photo: { t: photo.thumb, w: photo.w, h: photo.h } } : {}),
       uid,
       name: p.name,
       icon: p.icon,
       createdAt: F.serverTimestamp(),
     });
+    if (withPhoto) batch.set(F.doc(ref, 'photo', 'full'), { d: photo.full });
   }
-  // 送信はつながったときに済む。ここでは待たない。ルールが古くて断られたら、画像と数え方なしで送り直す
+  // 送信はつながったときに済む。ここでは待たない。ルールが古くて断られたら、画像・数え方・写真なしで送り直す
   void batch.commit().catch((e) => {
-    if ((e as { code?: string }).code === 'permission-denied' && !lite && (body.material?.img || body.laps?.u)) {
-      void createPost(s, opt, groups, true);
+    if ((e as { code?: string }).code === 'permission-denied' && !lite && (body.material?.img || body.laps?.u || withPhoto)) {
+      if (withPhoto) {
+        document.dispatchEvent(new CustomEvent('post:failed', { detail: '写真を投稿するにはルールの更新が必要です（写真なしで投稿しました）' }));
+      }
+      void createPost(s, opt, groups, null, true);
       return;
     }
     console.warn('投稿できませんでした', e);
@@ -94,6 +109,13 @@ export async function watchTimeline(gid: string, cb: (posts: Post[]) => void, n 
   );
 }
 
+/** 写真の大きい版を読む（なければ null） */
+export async function getPostPhoto(gid: string, pid: string): Promise<string | null> {
+  const { db, F } = await fb();
+  const snap = await F.getDoc(F.doc(db, 'groups', gid, 'posts', pid, 'photo', 'full'));
+  return snap.exists() ? ((snap.data() as { d?: string }).d ?? null) : null;
+}
+
 /** いいねする・取り消す */
 export async function setLike(gid: string, pid: string, liked: boolean): Promise<void> {
   const { db, F } = await fb();
@@ -103,13 +125,14 @@ export async function setLike(gid: string, pid: string, liked: boolean): Promise
   });
 }
 
-/** 投稿を消す（自分の投稿、または作成者ならグループの投稿）。返信も一緒に消す */
-export async function deletePost(gid: string, pid: string): Promise<void> {
+/** 投稿を消す（自分の投稿、または作成者ならグループの投稿）。返信と写真も一緒に消す */
+export async function deletePost(gid: string, pid: string, hasPhoto = false): Promise<void> {
   const { db, F } = await fb();
   const replies = await F.getDocs(F.collection(db, 'groups', gid, 'posts', pid, 'replies'));
   // 投稿と返信を1回で消す（1回で消せるのは 500 件まで。返信がそれ以上つくことは考えない）
   const batch = F.writeBatch(db);
-  for (const d of replies.docs.slice(0, 499)) batch.delete(d.ref);
+  for (const d of replies.docs.slice(0, 498)) batch.delete(d.ref);
+  if (hasPhoto) batch.delete(F.doc(db, 'groups', gid, 'posts', pid, 'photo', 'full'));
   batch.delete(F.doc(db, 'groups', gid, 'posts', pid));
   await batch.commit();
 }
@@ -165,7 +188,7 @@ export async function deleteMyPosts(gid: string): Promise<void> {
   const { db, F } = await fb();
   const uid = me();
   const mine = await F.getDocs(F.query(F.collection(db, 'groups', gid, 'posts'), F.where('uid', '==', uid)));
-  for (const d of mine.docs) await deletePost(gid, d.id);
+  for (const d of mine.docs) await deletePost(gid, d.id, 'photo' in d.data());
   // 人の投稿への自分の返信（返信のある投稿だけ見る）
   const withReplies = await F.getDocs(F.query(F.collection(db, 'groups', gid, 'posts'), F.where('replyCount', '>', 0)));
   for (const post of withReplies.docs) {

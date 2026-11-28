@@ -245,6 +245,29 @@ async function run(): Promise<void> {
     // ---- 投稿 ----
     const pid = F.doc(F.collection(b.db, 'groups', gid, 'posts')).id;
     await allow('メンバーは投稿できる', () => F.setDoc(F.doc(b.db, 'groups', gid, 'posts', pid), post(b.uid)));
+    // 写真（小さい版は投稿に、大きい版は photo/full に）
+    const ppid = F.doc(F.collection(b.db, 'groups', gid, 'posts')).id;
+    const jpg = 'data:image/jpeg;base64,/9j/AAAA';
+    await allow('写真つきで投稿できる', async () => {
+      const bt = F.writeBatch(b.db);
+      bt.set(F.doc(b.db, 'groups', gid, 'posts', ppid), { ...post(b.uid), photo: { t: jpg, w: 640, h: 480 } });
+      bt.set(F.doc(b.db, 'groups', gid, 'posts', ppid, 'photo', 'full'), { d: jpg });
+      await bt.commit();
+    });
+    await allow('メンバーは写真の大きい版を読める', () => F.getDoc(F.doc(a.db, 'groups', gid, 'posts', ppid, 'photo', 'full')));
+    await deny('入っていない人は写真を読めない', () => F.getDoc(F.doc(c.db, 'groups', gid, 'posts', ppid, 'photo', 'full')));
+    await deny('人の投稿の写真は書き換えられない', () =>
+      F.setDoc(F.doc(a.db, 'groups', gid, 'posts', ppid, 'photo', 'full'), { d: jpg }),
+    );
+    await deny('写真でないものは入れられない', () =>
+      F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), photo: { t: 'data:text/html;base64,AAAA', w: 1, h: 1 } }),
+    );
+    await allow('写真つきの投稿を写真ごと消せる', async () => {
+      const bt = F.writeBatch(b.db);
+      bt.delete(F.doc(b.db, 'groups', gid, 'posts', ppid, 'photo', 'full'));
+      bt.delete(F.doc(b.db, 'groups', gid, 'posts', ppid));
+      await bt.commit();
+    });
     await allow('時間を入力した記録も投稿できる', () => F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), { ...post(b.uid), mode: 'manual' }));
     await deny('人になりすまして投稿できない', () => F.addDoc(F.collection(b.db, 'groups', gid, 'posts'), post(a.uid)));
     await deny('最初からいいねの入った投稿は作れない', () =>

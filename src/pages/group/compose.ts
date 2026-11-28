@@ -3,6 +3,7 @@
 // 出すもの・投稿先は、前回の投稿の内容を初期値にする。
 
 import { api } from '../../cloud/api';
+import { preparePhoto, type PhotoData } from '../../ui/photo';
 import { count, one, range, unitFor } from '../../units';
 import type { Group } from '../../cloud/groups';
 import { COMMENT_MAX, DEFAULT_POST_PREFS, type PostOptions, type PostPrefs } from '../../cloud/model';
@@ -121,6 +122,13 @@ function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; 
               </div>`
             : ''
         }
+        <div class="field">
+          <span class="field-label">写真（1枚・なくてもいい）</span>
+          <div class="compose-photo" data-photo-box>
+            <button type="button" class="btn dark small" data-photo-add>＋ 写真を添える</button>
+          </div>
+          <input type="file" accept="image/*" hidden data-photo-file>
+        </div>
         <label class="field">
           <span class="field-label">ひとこと（なくてもいい）</span>
           <textarea class="input" rows="2" maxlength="${COMMENT_MAX}" placeholder="力学おわった！"></textarea>
@@ -158,13 +166,41 @@ function show(s: Session, prefs: PostPrefs, groups: { id: string; name: string; 
       render();
     };
   });
+  // 写真（1枚）
+  let photo: PhotoData | null = null;
+  const photoBox = $('[data-photo-box]', host);
+  const file = $<HTMLInputElement>('[data-photo-file]', host);
+  const renderPhoto = () => {
+    photoBox.innerHTML = photo
+      ? `<div class="compose-photo-prev"><img src="${photo.thumb}" alt="添える写真"><button type="button" class="photo-del" data-photo-del aria-label="写真をやめる">×</button></div>`
+      : `<button type="button" class="btn dark small" data-photo-add>＋ 写真を添える</button>`;
+    photoBox.querySelector<HTMLElement>('[data-photo-add]')?.addEventListener('click', () => file.click());
+    photoBox.querySelector<HTMLElement>('[data-photo-del]')?.addEventListener('click', () => {
+      photo = null;
+      renderPhoto();
+    });
+  };
+  file.onchange = async () => {
+    const f = file.files?.[0];
+    file.value = '';
+    if (!f) return;
+    photoBox.innerHTML = '<span class="sns-lead">写真を小さくしています…</span>';
+    try {
+      photo = await preparePhoto(f);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '写真を読み込めませんでした');
+    }
+    renderPhoto();
+  };
+  renderPhoto();
+
   const close = () => host.remove();
   $('[data-skip]', host).onclick = close;
   $('[data-post]', host).onclick = async () => {
     if (chosen.size === 0) return toast('投稿先のグループを選んでください');
     const comment = $<HTMLTextAreaElement>('textarea', host).value;
     try {
-      await api.createPost(s, { ...opt, comment }, [...chosen]);
+      await api.createPost(s, { ...opt, comment }, [...chosen], photo);
       close();
       toast(navigator.onLine ? '投稿しました' : 'つながったら投稿されます');
     } catch (e) {

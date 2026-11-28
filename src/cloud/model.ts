@@ -345,6 +345,8 @@ export interface PostDoc {
   lapMs?: number[];
   /** 計測中にアプリから離れた回数と時間（出さないときは付けない） */
   away?: { n: number; ms: number };
+  /** 写真（1枚）。t はタイムラインに出す小さい版（JPEG の data URL）。大きい版は photo/full の文書 */
+  photo?: { t: string; w: number; h: number };
   comment: string;
   /** いいねした人の uid */
   likes: string[];

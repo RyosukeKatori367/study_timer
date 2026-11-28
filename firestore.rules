@@ -213,7 +213,7 @@ service cloud.firestore {
 
         allow create: if isMember(gid)
           && request.resource.data.keys().hasAll(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'comment', 'likes'])
-          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'material', 'laps', 'lapMs', 'away', 'comment', 'likes'])
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'icon', 'createdAt', 'sessionId', 'mode', 'start', 'end', 'studyMs', 'material', 'laps', 'lapMs', 'away', 'photo', 'comment', 'likes'])
           && request.resource.data.uid == me()
           && validName(request.resource.data.name)
           && validIcon(request.resource.data.icon)
@@ -250,7 +250,16 @@ service cloud.firestore {
               || (request.resource.data.away is map
                   && request.resource.data.away.keys().hasOnly(['n', 'ms'])
                   && request.resource.data.away.n is int
-                  && request.resource.data.away.ms is number));
+                  && request.resource.data.away.ms is number))
+          // 写真（1枚）：タイムラインに出す小さい版。大きい版は photo/full に分けて入れる
+          && (!('photo' in request.resource.data)
+              || (request.resource.data.photo is map
+                  && request.resource.data.photo.keys().hasOnly(['t', 'w', 'h'])
+                  && request.resource.data.photo.t is string
+                  && request.resource.data.photo.t.size() <= 120000
+                  && request.resource.data.photo.t.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+                  && request.resource.data.photo.w is int && request.resource.data.photo.w > 0 && request.resource.data.photo.w <= 4000
+                  && request.resource.data.photo.h is int && request.resource.data.photo.h > 0 && request.resource.data.photo.h <= 4000));
 
         allow update: if signedIn() && (
           // いいね：自分の uid を足すか消すだけ
@@ -276,6 +285,21 @@ service cloud.firestore {
         // 消す：投稿した本人か、グループの作成者（返信も同時に消す）
         allow delete: if signedIn()
           && (resource.data.uid == me() || get(groupPath(gid)).data.ownerId == me());
+
+        // 写真の大きい版（タップしたときだけ読む）。投稿と同時に、投稿した本人だけが作れる
+        match /photo/{doc} {
+          allow read: if isMember(gid);
+          allow create: if isMember(gid)
+            && doc == 'full'
+            && getAfter(postPath(gid, pid)).data.uid == me()
+            && request.resource.data.keys().hasOnly(['d'])
+            && request.resource.data.d is string
+            && request.resource.data.d.size() <= 450000
+            && request.resource.data.d.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$');
+          // 投稿と一緒に消す（投稿した本人か、グループの作成者）
+          allow delete: if signedIn()
+            && (get(postPath(gid, pid)).data.uid == me() || get(groupPath(gid)).data.ownerId == me());
+        }
 
         match /replies/{rid} {
           allow read: if isMember(gid);

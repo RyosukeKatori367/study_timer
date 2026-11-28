@@ -43,6 +43,7 @@ const real = {
   watchPost: posts.watchPost,
   setLike: posts.setLike,
   deletePost: posts.deletePost,
+  getPostPhoto: posts.getPostPhoto,
   addReply: posts.addReply,
   watchReplies: posts.watchReplies,
   deleteReply: posts.deleteReply,
