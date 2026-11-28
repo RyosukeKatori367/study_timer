@@ -1,52 +1,37 @@
-// みんなのイベント（毎月）。ログインしている全員の、その月の勉強時間の合計で段階的に報酬が出る。
-// 毎月自動で始まるので、手で更新しなくてよい。
-// 合計は Firebase に置いた「一人ひとりのその月の合計」を足して出す（cloud/events.ts）。
+// みんなのイベント（シーズンごと）。ログインしている全員の、そのシーズンの勉強時間の合計で、段階的に報酬が出る。
+// シーズンは src/seasons.ts（今は「チャプター1 シーズン1」、2026-11-28 から40日）。
+// 合計は Firebase に置いた「一人ひとりのそのシーズンの合計」を足して出す（cloud/events.ts）。
 
 import { api } from './cloud/api';
 import { dateKey } from './cloud/model';
 import { addEntries, hasEntry } from './gumi';
+import { inSeason, prevSeason, seasonAt, type Season } from './seasons';
 import { getSessions, settings } from './store';
 import { HOUR } from './time';
 
-export const EVENT_GOAL_H = 2000;
-export const EVENT_TIERS: readonly { h: number; reward: number }[] = [
-  { h: 100, reward: 50 },
-  { h: 300, reward: 100 },
-  { h: 600, reward: 150 },
-  { h: 1000, reward: 200 },
-  { h: 2000, reward: 300 },
-];
-/** これだけその月に勉強した人が、報酬を受け取れる */
+/** シーズン中にこれだけ勉強した人が、報酬を受け取れる */
 export const JOIN_MS = HOUR;
 
-export const monthOf = (now = Date.now()): string => dateKey(now, settings.dayBoundaryMin).slice(0, 7);
+const today = (now = Date.now()): string => dateKey(now, settings.dayBoundaryMin);
 
-export function prevMonth(month: string): string {
-  const d = new Date(`${month}-15T12:00:00`);
-  d.setMonth(d.getMonth() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+export const currentSeason = (now = Date.now()): Season | null => seasonAt(today(now));
+
+/** 今のシーズンと、ひとつ前のシーズン（受け取り忘れ用） */
+export function liveSeasons(now = Date.now()): { cur: Season | null; prev: Season | null } {
+  const cur = currentSeason(now);
+  return { cur, prev: cur ? prevSeason(cur) : null };
 }
 
-/** 月の名前（'11月'） */
-export const monthName = (month: string): string => `${Number(month.slice(5))}月`;
-
-/** この端末の記録の、その月の合計 */
-export function myMonthMs(month: string): number {
+/** この端末の記録の、そのシーズンの合計 */
+export function mySeasonMs(s: Season): number {
   let ms = 0;
-  for (const s of getSessions()) if (dateKey(s.start, settings.dayBoundaryMin).startsWith(month)) ms += s.studyMs;
+  for (const x of getSessions()) if (inSeason(s, dateKey(x.start, settings.dayBoundaryMin))) ms += x.studyMs;
   return ms;
 }
 
-/** 月の終わりまでの日数（今日を含む） */
-export function daysLeft(now = Date.now()): number {
-  const d = new Date(now - settings.dayBoundaryMin * 60000);
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  return last - d.getDate() + 1;
-}
+export const tierKey = (s: Season, h: number): string => `e:${s.id}:${h}`;
 
-export const tierKey = (month: string, h: number): string => `e:${month}:${h}`;
-
-export interface Tier {
+export interface TierState {
   h: number;
   reward: number;
   key: string;
@@ -56,9 +41,9 @@ export interface Tier {
   ready: boolean;
 }
 
-export function tiers(month: string, totalMs: number | null, mine = myMonthMs(month)): Tier[] {
-  return EVENT_TIERS.map(({ h, reward }) => {
-    const key = tierKey(month, h);
+export function tiers(s: Season, totalMs: number | null, mine = mySeasonMs(s)): TierState[] {
+  return s.tiers.map(({ h, reward }) => {
+    const key = tierKey(s, h);
     const reached = totalMs !== null && totalMs >= h * HOUR;
     const claimed = hasEntry(key);
     return { h, reward, key, reached, claimed, ready: reached && !claimed && mine >= JOIN_MS };
@@ -66,7 +51,7 @@ export function tiers(month: string, totalMs: number | null, mine = myMonthMs(mo
 }
 
 /** 受け取れる段階をまとめて受け取る。もらったグミ */
-export function claimTiers(list: Tier[]): number {
+export function claimTiers(list: TierState[]): number {
   const entries: Record<string, number> = {};
   for (const t of list) if (t.ready) entries[t.key] = t.reward;
   if (Object.keys(entries).length) addEntries(entries);
@@ -91,26 +76,28 @@ function readCache(): Record<string, Cached> {
   }
 }
 
-export const cachedTotal = (month: string): Cached | null => readCache()[month] ?? null;
+export const cachedTotal = (id: string): Cached | null => readCache()[id] ?? null;
 
 /** 全員の合計を読み直す（ログインしていなければ null） */
-export async function loadTotal(month: string): Promise<Cached | null> {
+export async function loadTotal(id: string): Promise<Cached | null> {
   if (!api.user()) return null;
-  const r = await api.eventTotal(month);
+  const r = await api.eventTotal(id);
   const all = readCache();
-  all[month] = { ...r, at: Date.now() };
-  // 新しい2か月分だけ残す
-  const keep = Object.keys(all).sort().slice(-2);
+  all[id] = { ...r, at: Date.now() };
+  // 新しい3つだけ残す
+  const keep = Object.entries(all)
+    .sort((a, b) => b[1].at - a[1].at)
+    .slice(0, 3);
   try {
-    localStorage.setItem(CACHE, JSON.stringify(Object.fromEntries(keep.map((k) => [k, all[k]]))));
+    localStorage.setItem(CACHE, JSON.stringify(Object.fromEntries(keep)));
   } catch {
     /* 保存できなくてもよい */
   }
-  return all[month];
+  return all[id];
 }
 
-/** 受け取れる段階の数（覚えている合計で数える。今月と先月） */
+/** 受け取れる段階の数（覚えている合計で数える。今のシーズンとひとつ前） */
 export function claimableTiers(now = Date.now()): number {
-  const m = monthOf(now);
-  return [m, prevMonth(m)].reduce((n, month) => n + tiers(month, cachedTotal(month)?.total ?? null).filter((t) => t.ready).length, 0);
+  const { cur, prev } = liveSeasons(now);
+  return [cur, prev].reduce((n, s) => (s ? n + tiers(s, cachedTotal(s.id)?.total ?? null).filter((t) => t.ready).length : n), 0);
 }

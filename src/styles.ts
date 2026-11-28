@@ -4,6 +4,7 @@
 // 模様の画像は public/patterns/ に置いた SVG（GitHub Pages から配る）。テーマの色に塗って使う。
 
 import { isDeveloper } from './cloud/model';
+import { grantedTags } from './grants';
 import { GENERATED_PATTERNS } from './patterns.gen';
 import { saveSettings, settings } from './store';
 
@@ -317,8 +318,9 @@ export function useStyle(item: StyleItem): void {
   void applyStyle();
 }
 
-/** 持っているタグ（src/tags.ts の id）。開発者タグは開発者だけ */
+/** 持っているタグ（src/tags.ts の id）。開発者タグは開発者だけ、配られたタグ（古参など）はその人だけ */
 export function ownedTags(uid: string | undefined): string[] {
   const out = TAG_ITEMS.filter((x) => isOwned(x.id)).map((x) => x.tag);
-  return uid && isDeveloper(uid) ? ['dev', ...out] : out;
+  const extra = [...(uid && isDeveloper(uid) ? ['dev'] : []), ...grantedTags(uid)];
+  return [...new Set([...extra, ...out])];
 }

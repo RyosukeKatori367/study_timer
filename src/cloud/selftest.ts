@@ -377,16 +377,30 @@ async function run(): Promise<void> {
     });
     await allow('外された人は、自分の投稿を消せる', () => F.deleteDoc(F.doc(b.db, 'groups', gid, 'posts', pid)));
 
+    // ---- 配られたタグ（古参） ----
+    await deny('古参：あとから作ったアカウントは受け取れない', () =>
+      F.setDoc(F.doc(a.db, 'grants', a.uid), { tags: ['kosan'], at: F.serverTimestamp() }),
+    );
+    await deny('古参：配られていなければ付けられない', () => F.setDoc(F.doc(a.db, 'users', a.uid), { ...profile('A'), tag: 'kosan' }));
+    await deny('配られたタグ：自分で別のタグは配れない', () =>
+      F.setDoc(F.doc(a.db, 'grants', a.uid), { tags: ['dev'], at: F.serverTimestamp() }),
+    );
+    await allow('配られたタグ：自分の分は読める', () => F.getDoc(F.doc(a.db, 'grants', a.uid)));
+    await deny('配られたタグ：人の分は読めない', () => F.getDoc(F.doc(b.db, 'grants', a.uid)));
+
     // ---- みんなのイベント ----
-    // 本物の月とまざらないように、昔の年の月を使う
-    const month = `${1900 + Math.floor(Math.random() * 90)}-01`;
+    // 本物のシーズンとまざらないように、チャプター0 を使う
+    const month = `c0s${1000 + Math.floor(Math.random() * 9000)}`;
     const ev = (w: Who, uid: string) => F.doc(w.db, 'events', month, 'users', uid);
     await allow('イベント：自分の月の合計を書ける', () => F.setDoc(ev(a, a.uid), { ms: 3600000, updatedAt: F.serverTimestamp() }));
     await F.setDoc(ev(b, b.uid), { ms: 7200000, updatedAt: F.serverTimestamp() });
     await allow('イベント：自分の合計を直せる', () => F.setDoc(ev(a, a.uid), { ms: 5400000, updatedAt: F.serverTimestamp() }));
     await deny('イベント：人の合計は書けない', () => F.setDoc(ev(a, b.uid), { ms: 1, updatedAt: F.serverTimestamp() }));
-    await deny('イベント：1か月より長い時間は書けない', () =>
-      F.setDoc(ev(a, a.uid), { ms: 3000000000, updatedAt: F.serverTimestamp() }),
+    await deny('イベント：100日より長い時間は書けない', () =>
+      F.setDoc(ev(a, a.uid), { ms: 9000000000, updatedAt: F.serverTimestamp() }),
+    );
+    await deny('イベント：シーズンでない名前には書けない', () =>
+      F.setDoc(F.doc(a.db, 'events', '2026-11', 'users', a.uid), { ms: 1, updatedAt: F.serverTimestamp() }),
     );
     await deny('イベント：ほかの項目は書けない', () =>
       F.setDoc(ev(a, a.uid), { ms: 1, name: 'A', updatedAt: F.serverTimestamp() }),

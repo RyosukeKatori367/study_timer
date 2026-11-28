@@ -3,6 +3,7 @@ import { addSession, settings } from './store';
 import { claimQuest, dailyAllClear, dailyDefs, dailyQuests, weeklyDefs, weeklyQuests } from './quests';
 import { longestStreak } from './achievements';
 import { claimTiers, tiers } from './events';
+import { daysLeftIn, seasonAt, seasonsUntil } from './seasons';
 
 const HOUR = 3600000;
 const MIN = 60000;
@@ -46,13 +47,34 @@ describe('実績・イベント', () => {
     expect(longestStreak(['2026-11-01', '2026-11-02', '2026-11-04', '2026-11-05', '2026-11-06'])).toBe(3);
     expect(longestStreak(['2026-10-31', '2026-11-01'])).toBe(2);
   });
-  it('イベントは全員の合計と、自分が1時間以上で受け取れる', () => {
+  it('イベントは全員の合計と、自分がシーズン中に1時間以上で受け取れる', () => {
     settings.gumi = {};
-    const t = tiers('2026-11', 350 * HOUR, 2 * HOUR);
+    const s = seasonAt('2026-12-01')!;
+    const t = tiers(s, 350 * HOUR, 2 * HOUR);
     expect(t.map((x) => x.ready)).toEqual([true, true, false, false, false]);
-    expect(tiers('2026-11', 350 * HOUR, 30 * MIN).some((x) => x.ready)).toBe(false);
-    expect(tiers('2026-11', null, 2 * HOUR).some((x) => x.ready)).toBe(false);
+    expect(t[0].key).toBe('e:c1s1:100');
+    expect(tiers(s, 350 * HOUR, 30 * MIN).some((x) => x.ready)).toBe(false);
+    expect(tiers(s, null, 2 * HOUR).some((x) => x.ready)).toBe(false);
     expect(claimTiers(t)).toBe(150);
-    expect(tiers('2026-11', 350 * HOUR, 2 * HOUR).filter((x) => x.ready)).toHaveLength(0);
+    expect(tiers(s, 350 * HOUR, 2 * HOUR).filter((x) => x.ready)).toHaveLength(0);
+  });
+});
+
+describe('シーズン', () => {
+  it('チャプター1 シーズン1 は 2026-11-28 から40日（1/6 まで）', () => {
+    const s = seasonAt('2026-11-28')!;
+    expect(s.id).toBe('c1s1');
+    expect(s.name).toBe('チャプター1 シーズン1');
+    expect(s.end).toBe('2027-01-06');
+    expect(daysLeftIn(s, '2026-11-28')).toBe(40);
+    expect(daysLeftIn(s, '2027-01-06')).toBe(1);
+    expect(seasonAt('2026-11-27')).toBeNull();
+  });
+  it('終わったら次のシーズンが自動で続く', () => {
+    const s2 = seasonAt('2027-01-07')!;
+    expect(s2.id).toBe('c1s2');
+    expect(s2.start).toBe('2027-01-07');
+    expect(s2.end).toBe('2027-02-15');
+    expect(seasonsUntil('2027-06-01').map((x) => x.id).slice(0, 4)).toEqual(['c1s1', 'c1s2', 'c1s3', 'c1s4']);
   });
 });

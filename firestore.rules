@@ -8,7 +8,8 @@ rules_version = '2';
 // - グループの中身（メンバー・投稿）は、そのグループのメンバーだけが読める
 // - 招待コードは、コードを知っている1件だけ読める（一覧は取れない）
 // - 人数の増減は、本当にその人が入った・抜けたときだけ認める（人数の上限を守るため）
-// - みんなのイベントは、一人ひとりが自分のその月の合計だけを書き、全員の合計を集計で読む
+// - 古参などの配られたタグは grants にあり、持っている人だけが名前の横に付けられる
+// - みんなのイベントは、一人ひとりが自分のそのシーズンの合計だけを書き、全員の合計を集計で読む
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -36,11 +37,16 @@ service cloud.firestore {
     function validCode(c) { return c is string && c.matches('^[A-HJKMNP-Z2-9]{8}$'); }
     /** 日ごとの勉強時間 { '2026-11-27': ms }（直近14日） */
     function validDays(d) { return d is map && d.size() <= 14; }
-    /** 名前の横のタグ（あってもなくてもよい）。開発者タグは開発者だけ */
+    function isDev() { return signedIn() && me() == 'WrJppVm6T2VDHKUC1otLdn9rC7w1'; }
+    function grantPath(uid) { return /databases/$(database)/documents/grants/$(uid); }
+    /** 配られたタグ（grants/{uid} の tags にある） */
+    function granted(uid, tag) { return exists(grantPath(uid)) && get(grantPath(uid)).data.tags.hasAny([tag]); }
+    /** 名前の横のタグ（あってもなくてもよい）。開発者タグは開発者だけ、古参は配られた人だけ */
     function validTag(data, uid) {
       return !('tag' in data)
         || (data.tag is string && data.tag.size() <= 24
-            && (data.tag != 'dev' || uid == 'WrJppVm6T2VDHKUC1otLdn9rC7w1'));
+            && (data.tag != 'dev' || uid == 'WrJppVm6T2VDHKUC1otLdn9rC7w1')
+            && (data.tag != 'kosan' || granted(uid, 'kosan')));
     }
     /** 日ごと・教材ごとの内訳（あってもなくてもよい） */
     function validMats(data) { return !('mats' in data) || (data.mats is map && data.mats.size() <= 14); }
@@ -319,18 +325,41 @@ service cloud.firestore {
     }
 
     // ---- みんなのイベント ----
-    // events/{月}/users/{uid}：その人のその月の勉強時間の合計（自分の分だけ書ける）。
+    // events/{シーズン}/users/{uid}：その人のそのシーズン（c1s1 など）の勉強時間の合計（自分の分だけ書ける）。
     // 全員の合計は集計（sum）で読むので、ログインしている人は読める（中身は時間だけ）
-    match /events/{month}/users/{uid} {
+    match /events/{season}/users/{uid} {
       allow read: if signedIn();
       allow create, update: if isMe(uid)
-        && month.matches('^[0-9]{4}-[0-9]{2}$')
+        && season.matches('^c[0-9]+s[0-9]+$')
         && request.resource.data.keys().hasOnly(['ms', 'updatedAt'])
         && request.resource.data.ms is number
         && request.resource.data.ms >= 0
-        && request.resource.data.ms <= 2678400000
+        && request.resource.data.ms <= 8640000000
         && request.resource.data.updatedAt == request.time;
       allow delete: if isMe(uid);
+    }
+
+    // ---- 配られたタグ ----
+    // grants/{uid}：その人が使えるタグ { tags: ['kosan'], at }
+    // 古参：2026-11-28 14:00（日本時間、1795842000）より前にログインして、そのままの人は自分で受け取れる
+    // （ログインした時刻をルールで確かめるので、あとから作ったアカウントでは受け取れない）
+    // 開発者は、だれにでも配れる（Firebase コンソールで足してもよい）
+    match /grants/{uid} {
+      allow read: if isMe(uid) || isDev();
+      allow create: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['tags', 'at'])
+        && request.resource.data.tags == ['kosan']
+        && request.resource.data.at == request.time
+        && request.auth.token.auth_time < 1795842000;
+      allow update: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['tags', 'at'])
+        && request.resource.data.tags.toSet() == resource.data.tags.toSet().union(['kosan'].toSet())
+        && request.resource.data.at == request.time
+        && request.auth.token.auth_time < 1795842000;
+      allow create, update: if isDev()
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 20;
+      allow delete: if isMe(uid) || isDev();
     }
   }
 }

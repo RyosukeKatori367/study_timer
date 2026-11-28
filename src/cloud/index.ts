@@ -7,6 +7,7 @@ import { fb } from './firebase';
 import { leaveGroup, publishStudy } from './groups';
 import { deleteMyMessages } from './chat';
 import { deleteMyEvents, publishEvent } from './events';
+import { loadGrants } from './grants';
 import { deleteMyPosts } from './posts';
 import { getProfile } from './profile';
 import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sync';
@@ -18,7 +19,7 @@ import { deleteBackup, onLocalChange, startSync, stopSync, syncSoon } from './sy
 export function initCloud(refresh: () => void): void {
   document.addEventListener(USER_CHANGE, () => {
     const u = cloudUser();
-    if (u) void startSync(u.uid, refresh).then(publishAll);
+    if (u) void startSync(u.uid, refresh).then(afterSync);
     else stopSync();
   });
 
@@ -48,7 +49,7 @@ export function initCloud(refresh: () => void): void {
       void startCloud()
         .then(() => {
           const now = cloudUser();
-          if (now) return startSync(now.uid, refresh).then(publishAll);
+          if (now) return startSync(now.uid, refresh).then(afterSync);
         })
         .catch((e) => console.warn('Firebase を読み込めませんでした', e));
     if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 });
@@ -60,6 +61,18 @@ export function initCloud(refresh: () => void): void {
 function publishAll(): void {
   void publishStudy().catch(() => undefined);
   void publishEvent().catch(() => undefined);
+}
+
+/** 起動・ログインしたとき（バックアップの読み込みのあと）。送るものと、配られたタグ */
+function afterSync(): void {
+  publishAll();
+  void loadGrants().catch((e) => console.warn('配られたタグを読めませんでした', e));
+}
+
+/** 配られたタグの文書を消す（なければ何もしない） */
+async function deleteGrant(uid: string): Promise<void> {
+  const { db, F } = await fb();
+  await F.deleteDoc(F.doc(db, 'grants', uid)).catch(() => undefined);
 }
 
 /**
@@ -82,6 +95,7 @@ export async function deleteAccount(password: string): Promise<void> {
     }
   }
   await deleteMyEvents(u.uid);
+  await deleteGrant(u.uid);
   await deleteBackup(u.uid);
   const { db, F } = await fb();
   await F.deleteDoc(F.doc(db, 'users', u.uid));

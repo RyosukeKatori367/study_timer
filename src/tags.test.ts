@@ -15,4 +15,7 @@ describe('タグ', () => {
     expect(shownTag('someone', 'gouun')?.name).toBe('豪運');
     expect(shownTag('someone', 'unknown')).toBeNull();
   });
+  it('古参は銀色のタグ', () => {
+    expect(shownTag('someone', 'kosan')).toMatchObject({ name: '古参', look: 'silver' });
+  });
 });

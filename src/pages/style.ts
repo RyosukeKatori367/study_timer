@@ -11,13 +11,15 @@ import {
   currentTheme,
   exchangePrice,
   isOwned,
+  ownedTags,
   useStyle,
   type StyleItem,
 } from '../styles';
 import { api } from '../cloud/api';
 import { balance, fmtGumi } from '../gumi';
 import { exchange } from '../shop';
-import { tagById } from '../tags';
+import { shownTag, tagById, tagHtml } from '../tags';
+import { GRANTS_CHANGE } from '../grants';
 import { $, esc } from '../ui/dom';
 import { pickList } from '../ui/sheet';
 import { toast } from '../ui/toast';
@@ -94,13 +96,16 @@ export function initStylePage(view: HTMLElement): void {
       </section>
       <section class="style-section">
         <h2 class="group-head">タグ<span class="head-note">名前の横に出ます</span></h2>
-        ${grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === profileTag())?.id ?? '')}
+        ${tagGrid(filter, grid)}
       </section>
       <p class="settings-foot">まだのものは、ショップのグミガチャで出るか、グミと交換できます（数字は交換に使うグミ）。テーマはボタン・計測の円・下のメニューの色が、模様は背景が変わります（計測中の画面には出しません）</p>`;
     paintPatterns(view, theme.light);
     $('.view-back', view).onclick = back;
 
-    view.querySelectorAll<HTMLElement>('.style-tile').forEach((b) => {
+    view.querySelectorAll<HTMLElement>('.style-tile[data-tag]').forEach((b) => {
+      b.onclick = () => void setTag(b.dataset.tag!).then(render);
+    });
+    view.querySelectorAll<HTMLElement>('.style-tile[data-id]').forEach((b) => {
       b.onclick = () => {
         const item = ALL_ITEMS.find((x) => x.id === b.dataset.id)!;
         if (!isOwned(item.id)) return void offerExchange(item).then((ok) => ok && render());
@@ -117,7 +122,30 @@ export function initStylePage(view: HTMLElement): void {
     });
   };
   document.addEventListener('style:show', render);
+  document.addEventListener(GRANTS_CHANGE, render);
   render();
+}
+
+/** タグの一覧：開発者タグ・配られたタグ（古参など）と、ガチャのタグ */
+function tagGrid(filter: 'all' | 'owned' | 'locked', grid: (items: StyleItem[], sel: string) => string): string {
+  const uid = api.user()?.uid;
+  const now = uid ? shownTag(uid, profileTag())?.id : undefined;
+  const extra = filter === 'locked' ? [] : ownedTags(uid).filter((t) => !TAG_ITEMS.some((x) => x.tag === t));
+  const tiles = extra
+    .map((t) => {
+      const def = tagById(t);
+      if (!def) return '';
+      return `
+        <button type="button" class="style-tile" data-tag="${esc(t)}" aria-pressed="${now === t}" aria-label="${esc(def.name)}">
+          <span class="style-prev"><span class="tag-prev" aria-hidden="true">${tagHtml(def)}</span>${now === t ? '<span class="sel-badge">✓</span>' : ''}</span>
+          <span class="style-name">${esc(def.name)}</span>
+        </button>`;
+    })
+    .join('');
+  const gacha = grid(TAG_ITEMS, TAG_ITEMS.find((x) => x.tag === now)?.id ?? '');
+  if (!tiles) return gacha;
+  // ガチャのタグの一覧（style-grid）の頭に足す
+  return gacha.includes('class="style-grid"') ? gacha.replace('<div class="style-grid">', `<div class="style-grid">${tiles}`) : `<div class="style-grid">${tiles}</div>`;
 }
 
 /** まだ持っていないものを押したとき：交換できるものなら、交換するか聞く。交換したら true */

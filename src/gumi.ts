@@ -11,13 +11,14 @@
 //   s                 勉強ボーナス（3時間ごとに30。累計の分をまとめて1件、増えるだけ）
 //   d:<日付>:<id>     今日のクエスト             D:<日付>  今日のクエストを全部
 //   w:<週>:<id>       今週の目標
-//   e:<月>:<時間>     みんなのイベント
+//   e:<シーズン>:<時間> みんなのイベント（e:c1s1:100）
 //   a:<id>            実績
 //   g:<id> G:<id>     ガチャ1回・10回（マイナス）  r:<id>   かぶりのお返し
 //   x:<スタイルid>     交換所（マイナス）
 
 import { getSessions, saveSettings, settings, type Settings } from './store';
 import { dateKey } from './cloud/model';
+import { seasonShort } from './seasons';
 import { HOUR } from './time';
 
 export const GUMI_CHANGE = 'gumi:change';
@@ -178,7 +179,7 @@ export function entryLabel(key: string, names: (key: string) => string | undefin
     case 'w':
       return item(named ? `今週の目標「${named}」` : '今週の目標', md(a));
     case 'e':
-      return item(`みんなのイベント（${Number(a.slice(5))}月・${b}時間）`);
+      return item(`みんなのイベント（${seasonShort(a)}・${b}時間）`);
     case 'a':
       return item(named ? `実績「${named}」` : '実績');
     case 'g':

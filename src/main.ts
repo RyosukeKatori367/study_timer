@@ -10,7 +10,9 @@ import { api, setApi } from './cloud/api';
 import { SHOW_VIEW, initGroupPage, openGroupScreen } from './pages/group';
 import { authScreen } from './pages/group/account';
 import { initRun } from './run';
-import { initStylePage } from './pages/style';
+import { initStylePage, setTag } from './pages/style';
+import { GRANTS_CHANGE } from './grants';
+import { tagById } from './tags';
 import { initEventPage } from './pages/event';
 import { initMyPage, myHome } from './pages/my';
 import { claimableAchievements } from './achievements';
@@ -151,6 +153,12 @@ function updateBadges(): void {
   }
 }
 document.addEventListener(GUMI_CHANGE, updateBadges);
+// 古参タグなどを受け取ったとき
+document.addEventListener(GRANTS_CHANGE, (e) => {
+  const got = (e as CustomEvent<string[]>).detail ?? [];
+  const t = tagById(got[0]);
+  if (t) toast(`「${t.name}」タグを受け取りました！`, { label: '付ける', run: () => void setTag(t.id) });
+});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') updateBadges(); // 日付が変わったとき
 });

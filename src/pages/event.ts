@@ -1,21 +1,9 @@
 // イベントタブ。「イベント」（毎月のみんなのイベントと今週の目標）・「クエスト」（今日のクエスト）・「お知らせ」。
 
 import { api } from '../cloud/api';
-import {
-  EVENT_GOAL_H,
-  EVENT_TIERS,
-  JOIN_MS,
-  cachedTotal,
-  claimTiers,
-  daysLeft,
-  loadTotal,
-  monthName,
-  monthOf,
-  myMonthMs,
-  prevMonth,
-  tiers,
-  type Tier,
-} from '../events';
+import { JOIN_MS, cachedTotal, claimTiers, liveSeasons, loadTotal, mySeasonMs, tiers, type TierState } from '../events';
+import { daysLeftIn, md, type Season } from '../seasons';
+import { dateKey } from '../cloud/model';
 import { GUMI_CHANGE, STUDY_BLOCK, STUDY_BONUS, fmtGumi, nextStudyBonusIn } from '../gumi';
 import { NEWS, isNewNews, markNewsSeen } from '../news';
 import { claimQuest, dailyAllClear, dailyQuests, weekInfo, weeklyQuests, type Quest } from '../quests';
@@ -60,7 +48,7 @@ function questRow(q: { key: string; title: string; reward: number; done: boolean
     </div>`;
 }
 
-function tierRows(list: Tier[], mine: number): string {
+function tierRows(list: TierState[], mine: number): string {
   return list
     .map((t) => {
       const right = t.claimed
@@ -68,7 +56,7 @@ function tierRows(list: Tier[], mine: number): string {
         : t.ready
           ? `<button type="button" class="q-claim" data-tier="${esc(t.key)}">+${t.reward} 受け取る</button>`
           : t.reached && mine < JOIN_MS
-            ? '<span class="q-note">1時間 勉強すると受け取れる</span>'
+            ? '<span class="q-note">シーズン中に1時間 勉強すると受け取れる</span>'
             : `<span class="q-reward">+${t.reward}</span>`;
       return `
         <div class="q-row${t.claimed ? ' claimed' : t.reached ? ' done' : ''}">
@@ -85,74 +73,82 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
   /** 合計を読めなかった月 */
   const failed = new Set<string>();
 
-  /** 全員の合計を読み直す（1分以内に読んでいれば読まない） */
-  const refreshTotal = (month: string) => {
-    if (!api.user() || loading.has(month)) return;
-    const c = cachedTotal(month);
-    if (c && Date.now() - c.at < 60_000) return;
-    loading.add(month);
-    void loadTotal(month)
+  /** 全員の合計を読み直す（force でなければ、1分以内に読んでいれば読まない） */
+  const refreshTotal = (id: string, force = false) => {
+    if (!api.user() || loading.has(id)) return;
+    const c = cachedTotal(id);
+    if (!force && c && Date.now() - c.at < 60_000) return;
+    loading.add(id);
+    void loadTotal(id)
       .then(() => {
-        failed.delete(month);
+        failed.delete(id);
         if (view.classList.contains('active') && seg === 'event') render();
         document.dispatchEvent(new CustomEvent(GUMI_CHANGE)); // 下のメニューのしるしを直す
       })
       .catch((e) => {
         console.warn('イベントの合計を読めませんでした', e);
-        failed.add(month);
+        failed.add(id);
         if (view.classList.contains('active') && seg === 'event') render();
       })
-      .finally(() => loading.delete(month));
+      .finally(() => loading.delete(id));
   };
+
+  const ticks = (s: Season, total: number | null) =>
+    s.tiers
+      .filter((t) => t.h < s.goalH)
+      .map((t) => `<i class="ev-tick${total !== null && total >= t.h * HOUR ? ' on' : ''}" style="left:${(t.h / s.goalH) * 100}%"></i>`)
+      .join('');
 
   const eventHtml = (): string => {
     const now = Date.now();
-    const month = monthOf(now);
-    const last = prevMonth(month);
+    const { cur, prev } = liveSeasons(now);
     const signed = !!api.user();
-    const c = cachedTotal(month);
-    const total = signed ? (c?.total ?? null) : null;
-    const mine = myMonthMs(month);
-    const list = tiers(month, total, mine);
-    const ticks = EVENT_TIERS.slice(0, -1)
-      .map((t) => `<i class="ev-tick${total !== null && total >= t.h * HOUR ? ' on' : ''}" style="left:${(t.h / EVENT_GOAL_H) * 100}%"></i>`)
-      .join('');
-    const lastList = signed ? tiers(last, cachedTotal(last)?.total ?? null, myMonthMs(last)) : [];
-    const lastReady = lastList.filter((t) => t.ready);
     const wk = weekInfo(now);
     const nextWeek = new Date(wk.next);
     const weekly = weeklyQuests(now);
-    return `
-      <section class="ev-banner">
-        <div class="ev-month">${monthName(month)}のみんなのイベント</div>
-        <div class="ev-title">みんなで${EVENT_GOAL_H.toLocaleString('ja-JP')}時間</div>
-        ${
-          signed
-            ? `<div class="ev-bar"><i style="width:${total === null ? 0 : pctOf(total, EVENT_GOAL_H * HOUR)}%"></i>${ticks}</div>
-               <div class="ev-nums"><span><b>${total === null ? (failed.has(month) ? '—' : '…') : hours(total)}</b> / ${EVENT_GOAL_H.toLocaleString('ja-JP')}時間</span><span>あと${daysLeft(now)}日</span></div>
-               <div class="ev-sub">${
-                 failed.has(month) && !c ? '合計を読み込めませんでした（オフラインかも）・' : c ? `参加 ${c.people}人・` : ''
-               }あなたの${monthName(month)} ${fmtHM(mine)}</div>`
-            : `<p class="ev-sub">ログインしている人みんなの、今月の勉強時間を合わせます。ログインすると参加できます</p>
-               <button type="button" class="btn primary small" data-login>ログイン・登録</button>`
-        }
-      </section>
-      <section class="sns-card ev-card">
-        <div class="ev-card-head"><span>報酬</span><span class="head-note">今月1時間以上 勉強した人がもらえる</span></div>
-        ${tierRows(list, mine)}
-      </section>
-      ${
-        lastReady.length
-          ? `<section class="sns-card ev-card">
-               <div class="ev-card-head"><span>${monthName(last)}のイベント</span><span class="head-note">受け取り忘れ</span></div>
-               ${tierRows(lastList, myMonthMs(last))}
-             </section>`
-          : ''
-      }
+    const weekCard = `
       <section class="sns-card ev-card">
         <div class="ev-card-head"><span>今週の目標</span><span class="head-note">${nextWeek.getMonth() + 1}/${nextWeek.getDate()}（${'日月火水木金土'[nextWeek.getDay()]}）に入れ替わる</span></div>
         ${weekly.map(questRow).join('')}
       </section>`;
+    if (!cur) {
+      return `<section class="ev-banner"><div class="ev-title">次のシーズンをお楽しみに</div></section>${weekCard}`;
+    }
+    const c = cachedTotal(cur.id);
+    const total = signed ? (c?.total ?? null) : null;
+    const mine = mySeasonMs(cur);
+    const list = tiers(cur, total, mine);
+    const prevList = signed && prev ? tiers(prev, cachedTotal(prev.id)?.total ?? null, mySeasonMs(prev)) : [];
+    const today = dateKey(now, settings.dayBoundaryMin);
+    const goal = cur.goalH.toLocaleString('ja-JP');
+    return `
+      <section class="ev-banner">
+        <div class="ev-month"><span class="ev-season">${esc(cur.name)}</span><span>${md(cur.start)}〜${md(cur.end)}</span></div>
+        <div class="ev-title">みんなで${goal}時間</div>
+        ${
+          signed
+            ? `<div class="ev-bar"><i class="ev-fill" style="width:${total === null ? 0 : pctOf(total, cur.goalH * HOUR)}%"></i>${ticks(cur, total)}</div>
+               <div class="ev-nums"><span><b>${total === null ? (failed.has(cur.id) ? '—' : '…') : hours(total)}</b> / ${goal}時間</span><span>あと${daysLeftIn(cur, today)}日</span></div>
+               <div class="ev-sub">${
+                 failed.has(cur.id) && !c ? '合計を読み込めませんでした（オフラインかも）・' : c ? `参加 ${c.people}人・` : ''
+               }あなたのシーズン ${fmtHM(mine)}</div>`
+            : `<p class="ev-sub">ログインしている人みんなの、シーズン中の勉強時間を合わせます。ログインすると参加できます</p>
+               <button type="button" class="btn primary small" data-login>ログイン・登録</button>`
+        }
+      </section>
+      <section class="sns-card ev-card">
+        <div class="ev-card-head"><span>報酬</span><span class="head-note">シーズン中に1時間以上 勉強した人がもらえる</span></div>
+        ${tierRows(list, mine)}
+      </section>
+      ${
+        prev && prevList.some((t) => t.ready)
+          ? `<section class="sns-card ev-card">
+               <div class="ev-card-head"><span>${esc(prev.name)}の結果</span><span class="head-note">受け取り忘れ</span></div>
+               ${tierRows(prevList, mySeasonMs(prev))}
+             </section>`
+          : ''
+      }
+      ${weekCard}`;
   };
 
   const questHtml = (): string => {
@@ -220,8 +216,9 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
     view.querySelectorAll<HTMLElement>('[data-tier]').forEach((b) => {
       b.onclick = () => {
         const key = b.dataset.tier!;
-        const month = key.split(':')[1];
-        const got = claimTiers(tiers(month, cachedTotal(month)?.total ?? null).filter((t) => t.key === key));
+        const { cur, prev } = liveSeasons();
+        const s = [cur, prev].find((x) => x && key.startsWith(`e:${x.id}:`));
+        const got = s ? claimTiers(tiers(s, cachedTotal(s.id)?.total ?? null).filter((t) => t.key === key)) : 0;
         if (got) toast(`+${fmtGumi(got)}グミ（みんなのおかげ！）`);
         render();
       };
@@ -230,10 +227,16 @@ export function initEventPage(view: HTMLElement, openLogin: () => void): void {
 
   const show = () => {
     render();
-    if (seg === 'event') {
-      const m = monthOf();
-      refreshTotal(m);
-      refreshTotal(prevMonth(m));
+    if (seg === 'event' && api.user()) {
+      // 先に自分の分を送ってから、全員の合計を読む（送ったときは読み直す）
+      const { cur, prev } = liveSeasons();
+      void api
+        .publishEvent()
+        .catch(() => false)
+        .then((sent) => {
+          if (cur) refreshTotal(cur.id, sent);
+          if (prev) refreshTotal(prev.id, sent);
+        });
     }
     if (seg === 'news') {
       markNewsSeen();
